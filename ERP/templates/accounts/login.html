@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login — Al-Kawthar International Schools</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { DEFAULT: '#1e3a5f', light: '#2a5298', dark: '#152840' },
+                        accent:  { DEFAULT: '#c8a862' },
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-[#1e3a5f] via-[#1a3356] to-[#0f2240] flex items-center justify-center p-4">
+
+    <div class="w-full max-w-md">
+
+        <!-- Card -->
+        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden">
+
+            <!-- Header banner -->
+            <div class="bg-gradient-to-r from-[#1e3a5f] to-[#2a5298] px-8 py-8 text-center">
+                <!-- School Logo Circle -->
+                <div class="w-16 h-16 rounded-full bg-yellow-400 flex items-center justify-center
+                            text-[#1e3a5f] font-extrabold text-3xl mx-auto mb-4 shadow-lg select-none">
+                    ك
+                </div>
+                <h1 class="text-white text-xl font-bold tracking-wide">Al-Kawthar International Schools</h1>
+                <p class="text-blue-200 text-sm mt-1">Jeddah, Saudi Arabia</p>
+            </div>
+
+            <!-- Form -->
+            <div class="px-8 py-8">
+                <h2 class="text-slate-700 text-lg font-semibold mb-1">Sign in to ERP</h2>
+                <p class="text-slate-400 text-sm mb-6">Enter your credentials to continue</p>
+
+                <!-- Flash messages -->
+                {% if messages %}
+                <div class="mb-5 space-y-2">
+                    {% for message in messages %}
+                    <div class="px-4 py-3 rounded-lg text-sm font-medium
+                        {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
+                        {% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="POST" action="{% url 'accounts:login' %}" autocomplete="off">
+                    {% csrf_token %}
+
+                    <!-- Username -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-600 mb-1.5" for="id_username">
+                            Username
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-3 flex items-center text-slate-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                </svg>
+                            </span>
+                            <input id="id_username" name="username" type="text" required autofocus
+                                   placeholder="Enter your username"
+                                   class="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm
+                                          focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30 focus:border-[#1e3a5f]
+                                          text-slate-700 placeholder-slate-300 transition" />
+                        </div>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-slate-600 mb-1.5" for="id_password">
+                            Password
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-3 flex items-center text-slate-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6
+                                             a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                </svg>
+                            </span>
+                            <input id="id_password" name="password" type="password" required
+                                   placeholder="Enter your password"
+                                   class="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-lg text-sm
+                                          focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30 focus:border-[#1e3a5f]
+                                          text-slate-700 placeholder-slate-300 transition" />
+                            <!-- Toggle password visibility -->
+                            <button type="button" onclick="togglePassword()"
+                                    class="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600">
+                                <svg id="eye-icon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943
+                                             9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit"
+                            class="w-full bg-[#1e3a5f] hover:bg-[#2a5298] text-white font-semibold
+                                   py-2.5 rounded-lg transition duration-200 text-sm tracking-wide shadow-sm">
+                        Sign In
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <p class="text-center text-blue-200/60 text-xs mt-6">
+            &copy; 2026 Al-Kawthar International Schools — ERP System
+        </p>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const input = document.getElementById('id_password');
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+    </script>
+</body>
+</html>
