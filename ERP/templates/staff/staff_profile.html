@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block title %}{{ profile.user.full_name }} — Staff Profile{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-6">
+
+    <!-- Header -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="h-28 bg-gradient-to-br from-primary to-slate-700 relative">
+            <!-- Edit / Delete buttons -->
+            <div class="absolute top-4 right-4 flex gap-2 no-print">
+                <a href="{% url 'staff:staff_edit' profile.pk %}"
+                   class="inline-flex items-center gap-1 text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg transition">
+                    ✏ Edit
+                </a>
+                <a href="{% url 'staff:vacation_add' %}"
+                   class="inline-flex items-center gap-1 text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg transition">
+                    🌴 Request Leave
+                </a>
+                {% if request.user.role in "SUPER_ADMIN ADMIN" %}
+                <a href="{% url 'staff:staff_delete' profile.pk %}"
+                   class="inline-flex items-center gap-1 text-xs bg-red-500/70 hover:bg-red-600/80 text-white px-3 py-1.5 rounded-lg transition">
+                    🗑 Delete
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="px-6 pb-6 flex flex-wrap gap-5">
+            <!-- Avatar -->
+            <div class="-mt-10 flex-shrink-0">
+                <div class="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-md flex items-center justify-center text-2xl font-bold text-primary overflow-hidden">
+                    {% if profile.photo %}
+                    <img src="{{ profile.photo.url }}" alt="" class="w-full h-full object-cover">
+                    {% else %}
+                    {{ profile.user.full_name|first|upper }}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="mt-3 flex-1 min-w-0">
+                <div class="flex flex-wrap items-start gap-3">
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-800">{{ profile.user.full_name }}</h1>
+                        <p class="text-sm text-slate-500">
+                            {{ profile.get_designation_display }} · {{ profile.get_department_display }}
+                        </p>
+                    </div>
+                    <div class="ml-auto flex gap-2 flex-wrap">
+                        <span class="text-xs font-semibold px-3 py-1 rounded-full
+                            {% if profile.contract_type == 'SAUDI' %}bg-green-100 text-green-700
+                            {% else %}bg-blue-100 text-blue-700{% endif %}">
+                            {{ profile.get_contract_type_display }}
+                        </span>
+                        <span class="text-xs font-semibold px-3 py-1 rounded-full bg-primary/10 text-primary">
+                            {{ profile.user.get_role_display }}
+                        </span>
+                    </div>
+                </div>
+                <!-- Quick stats -->
+                <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="text-center">
+                        <p class="text-xs text-slate-500">Employee ID</p>
+                        <p class="font-bold text-slate-700 font-mono">{{ profile.employee_id }}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-slate-500">Joined</p>
+                        <p class="font-bold text-slate-700">{{ profile.join_date|date:"d M Y" }}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-slate-500">Attendance (this month)</p>
+                        <p class="font-bold text-green-600">{{ attendance_this_month }} days</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-xs text-slate-500">Absences</p>
+                        <p class="font-bold {% if absences_this_month > 3 %}text-red-600{% else %}text-slate-700{% endif %}">
+                            {{ absences_this_month }} days
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Personal / Employment Details -->
+        <div class="lg:col-span-2 space-y-5">
+            <!-- Employment Details -->
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <h3 class="font-semibold text-slate-700 mb-4 pb-2 border-b border-slate-100">Employment Details</h3>
+                <dl class="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                        <dt class="text-slate-500">Division</dt>
+                        <dd class="font-medium text-slate-700">{{ profile.division|default:"—" }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">Nationality</dt>
+                        <dd class="font-medium text-slate-700">{{ profile.nationality }}</dd>
+                    </div>
+                    {% if profile.iqama_number %}
+                    <div>
+                        <dt class="text-slate-500">Iqama Number</dt>
+                        <dd class="font-mono font-medium text-slate-700">{{ profile.iqama_number }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">Iqama Expiry</dt>
+                        <dd class="font-medium {% if profile.is_iqama_expiring_soon %}text-red-600{% else %}text-slate-700{% endif %}">
+                            {{ profile.iqama_expiry|date:"d M Y"|default:"—" }}
+                            {% if profile.is_iqama_expiring_soon %}⚠{% endif %}
+                        </dd>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <dt class="text-slate-500">Phone</dt>
+                        <dd class="font-medium text-slate-700">{{ profile.phone|default:"—" }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">Email</dt>
+                        <dd class="font-medium text-slate-700">{{ profile.user.email }}</dd>
+                    </div>
+                    {% if profile.emergency_contact_name %}
+                    <div>
+                        <dt class="text-slate-500">Emergency Contact</dt>
+                        <dd class="font-medium text-slate-700">{{ profile.emergency_contact_name }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">Emergency Phone</dt>
+                        <dd class="font-medium text-slate-700">{{ profile.emergency_contact_phone }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+                {% if profile.notes %}
+                <div class="mt-4 bg-amber-50 p-3 rounded-lg text-sm text-amber-800 border border-amber-100">
+                    {{ profile.notes }}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Subjects Taught -->
+            {% if profile.subjects_taught.all %}
+            <div class="bg-white rounded-xl border border-slate-200 p-5">
+                <h3 class="font-semibold text-slate-700 mb-3 pb-2 border-b border-slate-100">Subjects Qualified to Teach</h3>
+                <div class="flex flex-wrap gap-2">
+                    {% for subj in profile.subjects_taught.all %}
+                    <span class="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full font-medium">
+                        {{ subj.name }} ({{ subj.grade }})
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Current Assignments -->
+            {% if assignments %}
+            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-200 flex justify-between items-center">
+                    <h3 class="font-semibold text-slate-700">Class Assignments</h3>
+                    <a href="{% url 'staff:teacher_assignment_add' %}"
+                       class="text-xs text-primary hover:underline">+ Assign</a>
+                </div>
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Academic Year</th>
+                            <th class="px-4 py-2 text-left">Subject</th>
+                            <th class="px-4 py-2 text-left">Section</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-50">
+                        {% for a in assignments %}
+                        <tr class="hover:bg-slate-50/50">
+                            <td class="px-4 py-2.5 text-slate-600">{{ a.academic_year }}</td>
+                            <td class="px-4 py-2.5 font-medium text-slate-700">{{ a.subject.name }}</td>
+                            <td class="px-4 py-2.5 text-slate-600">{{ a.section }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right sidebar -->
+        <div class="space-y-5">
+            <!-- MOE Documents -->
+            <div class="bg-white rounded-xl border border-slate-200">
+                <div class="px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                    <h3 class="font-semibold text-slate-700 text-sm">MOE / Compliance Docs</h3>
+                    <a href="{% url 'staff:moe_add' %}" class="text-xs text-primary hover:underline">+ Add</a>
+                </div>
+                <div class="divide-y divide-slate-100">
+                    {% for doc in moe_docs %}
+                    <div class="px-4 py-3">
+                        <p class="text-sm font-medium text-slate-700">{{ doc.get_approval_type_display }}</p>
+                        <div class="flex justify-between mt-0.5">
+                            <span class="text-xs text-slate-500">
+                                {% if doc.expiry_date %}Exp: {{ doc.expiry_date|date:"d M Y" }}{% else %}No expiry{% endif %}
+                            </span>
+                            <span class="text-xs font-medium px-2 py-0.5 rounded-full
+                                {% if doc.status == 'APPROVED' %}{% if doc.is_expiring_soon %}bg-amber-100 text-amber-700{% else %}bg-green-100 text-green-700{% endif %}
+                                {% elif doc.status == 'EXPIRED' %}bg-red-100 text-red-700
+                                {% elif doc.status == 'SUBMITTED' %}bg-blue-100 text-blue-700
+                                {% else %}bg-slate-100 text-slate-600{% endif %}">
+                                {{ doc.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="px-4 py-6 text-sm text-center text-slate-400">No documents on file.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Recent Vacation Requests -->
+            <div class="bg-white rounded-xl border border-slate-200">
+                <div class="px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                    <h3 class="font-semibold text-slate-700 text-sm">Recent Leave</h3>
+                    <a href="{% url 'staff:vacation_add' %}" class="text-xs text-primary hover:underline">+ Request</a>
+                </div>
+                <div class="divide-y divide-slate-100">
+                    {% for vr in recent_vacations %}
+                    <div class="px-4 py-3">
+                        <div class="flex justify-between">
+                            <p class="text-sm font-medium text-slate-700">{{ vr.get_vacation_type_display }}</p>
+                            <span class="text-xs font-medium px-2 py-0.5 rounded-full
+                                {% if vr.status == 'APPROVED' %}bg-green-100 text-green-700
+                                {% elif vr.status == 'REJECTED' %}bg-red-100 text-red-700
+                                {% else %}bg-amber-100 text-amber-700{% endif %}">
+                                {{ vr.get_status_display }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            {{ vr.from_date|date:"d M" }} – {{ vr.to_date|date:"d M Y" }} ({{ vr.duration_days }}d)
+                        </p>
+                    </div>
+                    {% empty %}
+                    <p class="px-4 py-6 text-sm text-center text-slate-400">No leave records.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
