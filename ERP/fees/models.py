@@ -194,6 +194,10 @@ class Payment(models.Model):
 
     class Meta:
         ordering = ['-payment_date', '-id']
+        indexes = [
+            models.Index(fields=['payment_date'], name='payment_date_idx'),
+            models.Index(fields=['student_fee', 'payment_date'], name='payment_fee_date_idx'),
+        ]
 
     def __str__(self):
         return f"{self.receipt_number} — SAR {self.paid_amount}"

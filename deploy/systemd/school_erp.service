@@ -1,0 +1,37 @@
+# /etc/systemd/system/school_erp.service
+# Setup:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable school_erp
+#   sudo systemctl start school_erp
+
+[Unit]
+Description=Al-Kawthar School ERP – Gunicorn application server
+After=network.target postgresql.service
+
+[Service]
+Type=notify
+User=erp
+Group=www-data
+WorkingDirectory=/home/erp/school-erp/ERP
+
+# Load secrets from .env
+EnvironmentFile=/home/erp/school-erp/.env
+
+Environment="DJANGO_SETTINGS_MODULE=ERP.settings_production"
+
+ExecStart=/home/erp/school-erp/venv/bin/gunicorn \
+    --config /home/erp/school-erp/gunicorn.conf.py \
+    ERP.wsgi:application
+
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=on-failure
+RestartSec=5
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

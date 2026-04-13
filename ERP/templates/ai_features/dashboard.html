@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}AI Features — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-[#1e3a5f] to-[#2e5482] rounded-2xl px-6 py-5 text-white">
+        <div class="flex items-center gap-3 mb-1">
+            <svg class="w-7 h-7 text-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+            </svg>
+            <h1 class="text-2xl font-bold">AI Intelligence Hub</h1>
+        </div>
+        <p class="text-blue-200 text-sm">
+            Predictive analytics and smart insights for {{ current_year.name|default:"current year" }}
+        </p>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+        <!-- Attendance Risk -->
+        <a href="{% url 'ai:attendance_risk' %}"
+           class="group bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md hover:border-primary/40 transition block">
+            <div class="flex items-start justify-between mb-3">
+                <div class="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <span class="text-xs text-primary font-medium group-hover:underline">View →</span>
+            </div>
+            <p class="text-3xl font-bold text-red-600">{{ attn_summary.high }}</p>
+            <p class="text-sm font-semibold text-slate-700 mt-0.5">High-Risk Attendance</p>
+            <p class="text-xs text-slate-400 mt-0.5">{{ attn_summary.medium }} medium · {{ attn_summary.low }} low</p>
+        </a>
+
+        <!-- Grade Failing -->
+        <a href="{% url 'ai:grade_analytics' %}"
+           class="group bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md hover:border-primary/40 transition block">
+            <div class="flex items-start justify-between mb-3">
+                <div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                </div>
+                <span class="text-xs text-primary font-medium group-hover:underline">View →</span>
+            </div>
+            <p class="text-3xl font-bold text-amber-600">{{ failing_count }}</p>
+            <p class="text-sm font-semibold text-slate-700 mt-0.5">Students Failing a Subject</p>
+            <p class="text-xs text-slate-400 mt-0.5">Based on approved marks</p>
+        </a>
+
+        <!-- Fee Default -->
+        <a href="{% url 'ai:fee_default_risk' %}"
+           class="group bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md hover:border-primary/40 transition block">
+            <div class="flex items-start justify-between mb-3">
+                <div class="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <span class="text-xs text-primary font-medium group-hover:underline">View →</span>
+            </div>
+            <p class="text-3xl font-bold text-orange-600">{{ fee_high }}</p>
+            <p class="text-sm font-semibold text-slate-700 mt-0.5">High-Risk Fee Defaults</p>
+            <p class="text-xs text-slate-400 mt-0.5">Overdue or unpaid balances</p>
+        </a>
+
+        <!-- NOOR Validation -->
+        <a href="{% url 'ai:noor_validation' %}"
+           class="group bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md hover:border-primary/40 transition block">
+            <div class="flex items-start justify-between mb-3">
+                <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <span class="text-xs text-primary font-medium group-hover:underline">View →</span>
+            </div>
+            <p class="text-3xl font-bold {% if noor_errors > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                {{ noor_errors }}
+            </p>
+            <p class="text-sm font-semibold text-slate-700 mt-0.5">NOOR Data Errors</p>
+            <p class="text-xs text-slate-400 mt-0.5">{{ noor_total }} students checked</p>
+        </a>
+
+    </div>
+
+    <!-- Quick Links -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <h2 class="font-semibold text-slate-700 mb-4 text-sm uppercase tracking-wider">AI Tools</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <a href="{% url 'ai:attendance_risk' %}"
+               class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition">
+                <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                <span class="text-sm font-medium text-slate-700">Attendance Risk Detector</span>
+            </a>
+            <a href="{% url 'ai:grade_analytics' %}"
+               class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition">
+                <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                </svg>
+                <span class="text-sm font-medium text-slate-700">Grade Trend Analytics</span>
+            </a>
+            <a href="{% url 'ai:fee_default_risk' %}"
+               class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition">
+                <svg class="w-5 h-5 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                <span class="text-sm font-medium text-slate-700">Fee Default Predictor</span>
+            </a>
+            <a href="{% url 'ai:noor_validation' %}"
+               class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition">
+                <svg class="w-5 h-5 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span class="text-sm font-medium text-slate-700">NOOR CSV Validator</span>
+            </a>
+            <a href="{% url 'students:list' %}"
+               class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition">
+                <svg class="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                <span class="text-sm font-medium text-slate-700">Smart Performance Summary</span>
+            </a>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

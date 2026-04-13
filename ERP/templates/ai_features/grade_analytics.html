@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Grade Analytics — Al-Kawthar AI{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+        <a href="{% url 'ai:dashboard' %}" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition">
+            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-primary">Grade Trend Analytics</h1>
+            <p class="text-sm text-slate-500">Performance trends and failing subject detection</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <form method="get" class="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-3">
+        <select name="year" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+            <option value="">All Years</option>
+            {% for yr in years %}
+            <option value="{{ yr.pk }}" {% if selected_year and selected_year.pk == yr.pk %}selected{% endif %}>
+                {{ yr.name }}{% if yr.is_current %} ✓{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+        <select name="grade" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+            <option value="">All Grades</option>
+            {% for gr in grades %}
+            <option value="{{ gr.pk }}" {% if selected_grade and selected_grade.pk == gr.pk %}selected{% endif %}>{{ gr.name }}</option>
+            {% endfor %}
+        </select>
+        <select name="section" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+            <option value="">All Sections</option>
+            {% for sec in sections %}
+            <option value="{{ sec.pk }}" {% if selected_section and selected_section.pk == sec.pk %}selected{% endif %}>
+                {{ sec.grade.name }} — {{ sec.name }}
+            </option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="bg-primary text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-opacity-90">Filter</button>
+        <a href="{% url 'ai:grade_analytics' %}" class="border border-slate-300 rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">Clear</a>
+    </form>
+
+    <!-- Section Performance Chart -->
+    {% if section_perf %}
+    <div class="bg-white rounded-xl border border-slate-200 p-5">
+        <h2 class="font-semibold text-slate-700 mb-4">Section Performance Comparison</h2>
+        <canvas id="sectionChart" height="120"></canvas>
+    </div>
+    {% endif %}
+
+    <!-- Student Trends Table -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="font-semibold text-slate-700">Student Performance Breakdown</h2>
+            <span class="text-xs text-slate-400">{{ student_trends|length }} students</span>
+        </div>
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Student</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Section</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Avg %</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Trend</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Failing Subjects</th>
+                    <th class="text-right px-4 py-3 font-semibold text-slate-600">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for item in student_trends %}
+                <tr class="hover:bg-slate-50 transition {% if item.failing_subjects %}bg-red-50/30{% endif %}">
+                    <td class="px-4 py-3 font-medium text-slate-800">{{ item.student.full_name }}</td>
+                    <td class="px-4 py-3 text-slate-500 text-xs">{{ item.student.grade.name }} / {{ item.student.section.name }}</td>
+                    <td class="px-4 py-3">
+                        <span class="font-bold
+                            {% if item.avg_pct >= 75 %}text-green-600
+                            {% elif item.avg_pct >= 60 %}text-amber-600
+                            {% else %}text-red-600{% endif %}">
+                            {{ item.avg_pct }}%
+                        </span>
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if item.trend == 'IMPROVING' %}
+                        <span class="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                            ↑ Improving
+                        </span>
+                        {% elif item.trend == 'DECLINING' %}
+                        <span class="inline-flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
+                            ↓ Declining
+                        </span>
+                        {% elif item.trend == 'STABLE' %}
+                        <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                            → Stable
+                        </span>
+                        {% else %}
+                        <span class="text-xs text-slate-400">No data</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if item.failing_subjects %}
+                        <div class="flex flex-wrap gap-1">
+                            {% for subj in item.failing_subjects %}
+                            <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">{{ subj }}</span>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <span class="text-xs text-slate-400">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <a href="{% url 'ai:performance_summary' item.student.pk %}"
+                           class="text-xs font-medium text-primary hover:underline">Summary</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-4 py-10 text-center text-slate-400">
+                        No approved mark data available for the selected filters.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+{% if section_perf %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    const raw = {{ chart_json|safe }};
+    const ctx = document.getElementById('sectionChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: raw.labels,
+            datasets: [{
+                label: 'Average Score (%)',
+                data: raw.data,
+                backgroundColor: raw.data.map(v =>
+                    v >= 75 ? 'rgba(34,197,94,0.7)' :
+                    v >= 60 ? 'rgba(234,179,8,0.7)' :
+                              'rgba(239,68,68,0.7)'
+                ),
+                borderColor: raw.data.map(v =>
+                    v >= 75 ? 'rgb(34,197,94)' :
+                    v >= 60 ? 'rgb(234,179,8)' :
+                              'rgb(239,68,68)'
+                ),
+                borderWidth: 1,
+                borderRadius: 4,
+            }],
+        },
+        options: {
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ` ${ctx.raw}%`
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: { callback: v => v + '%' },
+                },
+                x: { ticks: { font: { size: 11 } } }
+            }
+        }
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

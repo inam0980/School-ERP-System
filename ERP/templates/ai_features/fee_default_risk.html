@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Fee Default Risk — Al-Kawthar AI{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+        <a href="{% url 'ai:dashboard' %}" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition">
+            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-primary">Fee Default Predictor</h1>
+            <p class="text-sm text-slate-500">Students flagged for likely fee default</p>
+        </div>
+    </div>
+
+    <!-- Alert if high risk -->
+    {% if high_count > 0 %}
+    <div class="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-medium">
+        <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+        </svg>
+        <span>{{ high_count }} student(s) at HIGH risk of fee default — immediate follow-up recommended.</span>
+    </div>
+    {% endif %}
+
+    <!-- Summary -->
+    <div class="flex flex-wrap gap-3">
+        <div class="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-sm font-semibold">
+            <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>High Risk: {{ high_count }}
+        </div>
+        <div class="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-xl text-sm font-semibold">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>Medium Risk: {{ medium_count }}
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <form method="get" class="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-3">
+        <select name="year" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+            <option value="">All Years</option>
+            {% for yr in years %}
+            <option value="{{ yr.pk }}" {% if selected_year and selected_year.pk == yr.pk %}selected{% endif %}>
+                {{ yr.name }}{% if yr.is_current %} ✓{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+        <select name="risk" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+            <option value="">All Risk Levels</option>
+            <option value="HIGH"   {% if risk_filter == 'HIGH' %}selected{% endif %}>High Only</option>
+            <option value="MEDIUM" {% if risk_filter == 'MEDIUM' %}selected{% endif %}>Medium Only</option>
+            <option value="LOW"    {% if risk_filter == 'LOW' %}selected{% endif %}>Low Only</option>
+        </select>
+        <button type="submit" class="bg-primary text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-opacity-90">Filter</button>
+        <a href="{% url 'ai:fee_default_risk' %}" class="border border-slate-300 rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">Clear</a>
+    </form>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Student</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Grade / Section</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Overdue Fees</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Total Balance</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Max Days Overdue</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Risk Level</th>
+                    <th class="text-right px-4 py-3 font-semibold text-slate-600">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for item in fee_list %}
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="px-4 py-3 font-medium text-slate-800">{{ item.student.full_name }}</td>
+                    <td class="px-4 py-3 text-slate-500 text-xs">{{ item.student.grade.name }} / {{ item.student.section.name }}</td>
+                    <td class="px-4 py-3 text-slate-700">{{ item.overdue_count }}</td>
+                    <td class="px-4 py-3 font-semibold text-red-600">SAR {{ item.total_balance|floatformat:2 }}</td>
+                    <td class="px-4 py-3 text-slate-500">{{ item.days_overdue }} day(s)</td>
+                    <td class="px-4 py-3">
+                        {% if item.risk == 'HIGH' %}
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">HIGH</span>
+                        {% elif item.risk == 'MEDIUM' %}
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">MEDIUM</span>
+                        {% else %}
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">LOW</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <a href="{% url 'students:detail' item.student.pk %}"
+                           class="text-xs font-medium text-primary hover:underline">View</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="px-4 py-10 text-center text-slate-400">No overdue fee records found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-xs text-slate-400 text-right">{{ fee_list|length }} student(s) with pending fees</p>
+</div>
+{% endblock %}

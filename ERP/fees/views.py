@@ -10,6 +10,7 @@ from django.http import JsonResponse, HttpResponse
 from django.db.models import Q, Sum, Count
 from django.views.decorators.http import require_POST
 from django.utils import timezone
+from django.core.cache import cache
 
 from accounts.decorators import role_required
 from students.models import Student
@@ -32,6 +33,10 @@ _STAFF_VIEW  = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'STAFF')
 
 @login_required
 def api_fees_summary(request):
+    cached = cache.get('fees_dashboard_summary')
+    if cached is not None:
+        return JsonResponse(cached)
+
     today    = timezone.localdate()
     overdue  = StudentFee.objects.filter(status='OVERDUE').count()
     today_total = Payment.objects.filter(payment_date=today).aggregate(
@@ -40,11 +45,13 @@ def api_fees_summary(request):
         payment_date__year=today.year,
         payment_date__month=today.month,
     ).aggregate(s=Sum('paid_amount'))['s'] or 0
-    return JsonResponse({
+    data = {
         'overdue':     overdue,
         'today':       float(today_total),
         'this_month':  float(month_total),
-    })
+    }
+    cache.set('fees_dashboard_summary', data, 300)
+    return JsonResponse(data)
 
 
 # ════════════════════════════════════════════════════════════════

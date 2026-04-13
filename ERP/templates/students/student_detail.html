@@ -127,7 +127,7 @@
 
         <!-- Upload panel (collapsed by default) -->
         <div id="uploadPanel" class="hidden px-5 py-4 border-b border-slate-100 bg-slate-50">
-            <form method="POST" enctype="multipart/form-data" action="{% url 'students:document_upload' student.pk %}" class="flex flex-col sm:flex-row gap-3 items-end">
+            <form method="POST" enctype="multipart/form-data" action="{% url 'students:doc_upload' student.pk %}" class="flex flex-col sm:flex-row gap-3 items-end">
                 {% csrf_token %}
                 <div class="flex-1">
                     <label class="text-xs font-medium text-slate-500 mb-1 block">Document Type</label>
