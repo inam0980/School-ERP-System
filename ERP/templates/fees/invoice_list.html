@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Tax Invoices — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-primary">Tax Invoices (ZATCA)</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Simplified tax invoices — 15% VAT</p>
+    </div>
+</div>
+
+<!-- Filter -->
+<form method="get" class="mb-5 flex gap-3">
+    <input type="text" name="student" value="{{ request.GET.student|default:'' }}"
+           placeholder="Filter by student name or ID…"
+           class="border border-slate-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary w-72">
+    <button type="submit"
+            class="bg-primary text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-light transition">
+        Filter
+    </button>
+    {% if request.GET.student %}
+    <a href="{% url 'fees:invoice_list' %}"
+       class="border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition">
+        Clear
+    </a>
+    {% endif %}
+</form>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wide">
+            <tr>
+                <th class="px-5 py-3 text-left">Invoice #</th>
+                <th class="px-5 py-3 text-left">Student</th>
+                <th class="px-5 py-3 text-left">Date</th>
+                <th class="px-5 py-3 text-right">Subtotal</th>
+                <th class="px-5 py-3 text-right">VAT 15%</th>
+                <th class="px-5 py-3 text-right">Total</th>
+                <th class="px-5 py-3 text-left">Status</th>
+                <th class="px-5 py-3 text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for inv in invoices %}
+            <tr class="hover:bg-slate-50 transition">
+                <td class="px-5 py-3 font-mono text-xs">{{ inv.invoice_number }}</td>
+                <td class="px-5 py-3">
+                    <a href="{% url 'fees:student_ledger' inv.student.pk %}"
+                       class="font-medium text-primary hover:underline">{{ inv.student.get_full_name }}</a>
+                    <p class="text-xs text-slate-400">{{ inv.student.student_id }}</p>
+                </td>
+                <td class="px-5 py-3 text-slate-600">{{ inv.date|date:"d M Y" }}</td>
+                <td class="px-5 py-3 text-right">SAR {{ inv.subtotal|floatformat:2 }}</td>
+                <td class="px-5 py-3 text-right text-orange-600">SAR {{ inv.tax_amount|floatformat:2 }}</td>
+                <td class="px-5 py-3 text-right font-bold">SAR {{ inv.total|floatformat:2 }}</td>
+                <td class="px-5 py-3">
+                    <span class="text-xs px-2.5 py-1 rounded-full font-medium
+                        {% if inv.status == 'ISSUED' %}bg-green-100 text-green-700
+                        {% elif inv.status == 'VOIDED' %}bg-red-100 text-red-700
+                        {% else %}bg-slate-100 text-slate-600{% endif %}">
+                        {{ inv.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-5 py-3 text-right">
+                    <a href="{% url 'fees:invoice_print' inv.pk %}" target="_blank"
+                       class="text-xs px-3 py-1.5 border border-primary text-primary rounded-lg hover:bg-primary hover:text-white transition font-medium">
+                        🖨 Print
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="px-5 py-12 text-center text-slate-400">
+                No invoices found. Invoices are generated from the Student Ledger.
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

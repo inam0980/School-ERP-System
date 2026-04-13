@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Outstanding Fees Report — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-primary">Outstanding Fees Report</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Filter and export unpaid / partial fee records</p>
+    </div>
+    <a href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv"
+       class="inline-flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition font-medium">
+        📥 Export CSV
+    </a>
+</div>
+
+<!-- Filter Form -->
+<form method="get" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-6">
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {% for field in form %}
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{{ field.label }}</label>
+            {{ field }}
+        </div>
+        {% endfor %}
+    </div>
+    <div class="flex gap-3 mt-4">
+        <button type="submit"
+                class="bg-primary text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-primary-light transition">
+            Apply Filters
+        </button>
+        <a href="{% url 'fees:outstanding' %}"
+           class="border border-slate-300 text-slate-600 px-5 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition">
+            Reset
+        </a>
+    </div>
+</form>
+
+<!-- Totals bar -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Assigned</p>
+        <p class="text-xl font-bold text-slate-700">SAR {{ net_total|floatformat:2 }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Collected</p>
+        <p class="text-xl font-bold text-green-600">SAR {{ paid_total|floatformat:2 }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-red-100 px-5 py-4">
+        <p class="text-xs text-red-400 uppercase tracking-wide mb-1">Outstanding Balance</p>
+        <p class="text-xl font-bold text-red-600">SAR {{ balance_total|floatformat:2 }}</p>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wide">
+            <tr>
+                <th class="px-4 py-3 text-left">Student</th>
+                <th class="px-4 py-3 text-left">Grade / Section</th>
+                <th class="px-4 py-3 text-left">Fee Type</th>
+                <th class="px-4 py-3 text-right">Net Fee</th>
+                <th class="px-4 py-3 text-right">Paid</th>
+                <th class="px-4 py-3 text-right">Balance</th>
+                <th class="px-4 py-3 text-left">Due Date</th>
+                <th class="px-4 py-3 text-left">Status</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for sf in fees %}
+            <tr class="hover:bg-slate-50 transition">
+                <td class="px-4 py-3">
+                    <a href="{% url 'fees:student_ledger' sf.student.pk %}"
+                       class="font-medium text-primary hover:underline">{{ sf.student.get_full_name }}</a>
+                    <p class="text-xs text-slate-400">{{ sf.student.student_id }}</p>
+                </td>
+                <td class="px-4 py-3 text-slate-600">
+                    {{ sf.student.current_section.grade }}<br>
+                    <span class="text-xs text-slate-400">{{ sf.student.current_section }}</span>
+                </td>
+                <td class="px-4 py-3 text-slate-600">{{ sf.fee_structure.fee_type.name }}</td>
+                <td class="px-4 py-3 text-right font-medium">SAR {{ sf.net_amount|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right text-green-600">SAR {{ sf.amount_paid|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right font-bold text-red-600">SAR {{ sf.balance|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-slate-600">{{ sf.due_date|date:"d M Y" }}</td>
+                <td class="px-4 py-3">
+                    <span class="text-xs font-medium px-2.5 py-1 rounded-full
+                        {% if sf.status == 'OVERDUE' %}bg-red-100 text-red-700
+                        {% elif sf.status == 'PARTIAL' %}bg-yellow-100 text-yellow-700
+                        {% elif sf.status == 'PAID' %}bg-green-100 text-green-700
+                        {% else %}bg-slate-100 text-slate-600{% endif %}">
+                        {{ sf.get_status_display }}
+                    </span>
+                </td>
+                <td class="px-4 py-3 text-right space-x-1">
+                    <a href="{% url 'fees:collection' %}?student_id={{ sf.student.pk }}&fee_id={{ sf.pk }}"
+                       class="text-xs px-2.5 py-1 border border-primary text-primary rounded hover:bg-primary hover:text-white transition">
+                        Collect
+                    </a>
+                    <a href="{% url 'fees:student_fee_edit' sf.pk %}"
+                       class="text-xs px-2.5 py-1 border border-slate-300 text-slate-600 rounded hover:bg-slate-50 transition">
+                        Edit
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="9" class="px-4 py-12 text-center text-slate-400">No records match the selected filters.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

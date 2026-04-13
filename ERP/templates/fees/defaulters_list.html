@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Defaulters List — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-primary">Defaulters List</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Students with fees overdue by more than 30 days (cutoff: {{ cutoff|date:"d M Y" }})</p>
+    </div>
+    <a href="?export=csv"
+       class="inline-flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition font-medium">
+        📥 Export CSV
+    </a>
+</div>
+
+{% if total_overdue %}
+<div class="mb-5 flex items-center gap-4 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
+    <svg class="w-6 h-6 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+    </svg>
+    <div>
+        <p class="font-semibold text-red-700">Total Overdue Balance: SAR {{ total_overdue|floatformat:2 }}</p>
+        <p class="text-xs text-red-500">{{ student_fees|length }} overdue record(s) flagged</p>
+    </div>
+</div>
+{% endif %}
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wide">
+            <tr>
+                <th class="px-4 py-3 text-left">Student</th>
+                <th class="px-4 py-3 text-left">Section</th>
+                <th class="px-4 py-3 text-left">Fee Type</th>
+                <th class="px-4 py-3 text-right">Net Fee</th>
+                <th class="px-4 py-3 text-right">Paid</th>
+                <th class="px-4 py-3 text-right">Balance</th>
+                <th class="px-4 py-3 text-left">Due Date</th>
+                <th class="px-4 py-3 text-right">Days Overdue</th>
+                <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for sf in fees %}
+            <tr class="hover:bg-red-50/30 transition">
+                <td class="px-4 py-3">
+                    <a href="{% url 'fees:student_ledger' sf.student.pk %}"
+                       class="font-medium text-primary hover:underline">{{ sf.student.get_full_name }}</a>
+                    <p class="text-xs text-slate-400">{{ sf.student.student_id }}</p>
+                </td>
+                <td class="px-4 py-3 text-slate-600">{{ sf.student.current_section }}</td>
+                <td class="px-4 py-3 text-slate-600">{{ sf.fee_structure.fee_type.name }}</td>
+                <td class="px-4 py-3 text-right font-medium">SAR {{ sf.net_amount|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right text-green-600">SAR {{ sf.amount_paid|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right font-bold text-red-600">SAR {{ sf.balance|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-slate-600">{{ sf.due_date|date:"d M Y" }}</td>
+                <td class="px-4 py-3 text-right">
+                    {% with days=sf.due_date|timesince %}
+                    <span class="font-semibold text-red-600">
+                        {{ sf.overdue_days|default:"30+" }}
+                    </span>
+                    {% endwith %}
+                </td>
+                <td class="px-4 py-3 text-right space-x-1">
+                    <a href="{% url 'fees:collection' %}?student_id={{ sf.student.pk }}&fee_id={{ sf.pk }}"
+                       class="text-xs px-2.5 py-1 border border-primary text-primary rounded hover:bg-primary hover:text-white transition">
+                        Collect
+                    </a>
+                    <a href="{% url 'fees:student_ledger' sf.student.pk %}"
+                       class="text-xs px-2.5 py-1 border border-slate-300 text-slate-600 rounded hover:bg-slate-50 transition">
+                        Ledger
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="9" class="px-4 py-12 text-center text-slate-400">
+                No defaulters found. All fees paid on time!
+            </td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

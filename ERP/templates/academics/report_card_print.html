@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Report Card — {{ student.full_name }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 11pt; color: #111; }
+  .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 20mm 15mm; }
+  .header { text-align: center; border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 16px; }
+  .header h1 { font-size: 18pt; color: #1e3a5f; }
+  .header p  { font-size: 10pt; color: #555; margin-top: 2px; }
+  .logo-row  { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 6px; }
+  .logo-circle { width: 48px; height: 48px; background: #c8a862; border-radius: 50%;
+                 display: flex; align-items: center; justify-content: center;
+                 font-weight: 900; font-size: 20pt; color: #1e3a5f; }
+  .student-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+                  background: #f5f7fa; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
+  .student-info .row { display: flex; gap: 4px; font-size: 10pt; }
+  .student-info .label { font-weight: bold; color: #1e3a5f; min-width: 100px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  thead { background: #1e3a5f; color: white; }
+  th, td { padding: 8px 10px; text-align: left; border: 1px solid #ddd; font-size: 10pt; }
+  thead th { font-size: 10pt; }
+  .center { text-align: center; }
+  tfoot td { background: #f5f7fa; font-weight: bold; }
+  .pass { background: #d1fae5; color: #065f46; border-radius: 4px; padding: 2px 8px; }
+  .fail { background: #fee2e2; color: #991b1b; border-radius: 4px; padding: 2px 8px; }
+  .absent { background: #fef9c3; color: #92400e; border-radius: 4px; padding: 2px 8px; }
+  .summary-box { background: #1e3a5f; color: white; border-radius: 8px; padding: 16px; text-align: center;
+                 margin-bottom: 20px; }
+  .summary-box .big { font-size: 20pt; font-weight: 900; }
+  .signature-row { display: flex; justify-content: space-between; margin-top: 40px; }
+  .sig { text-align: center; border-top: 1px solid #888; width: 150px; padding-top: 6px; font-size: 9pt; color: #555; }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .no-print { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+    <!-- Header -->
+    <div class="header">
+        <div class="logo-row">
+            <div class="logo-circle">ك</div>
+            <div>
+                <h1>Al-Kawthar International Schools</h1>
+                <p>Jeddah, Saudi Arabia</p>
+            </div>
+        </div>
+        <p style="font-size:13pt; font-weight:bold; color:#c8a862; margin-top:8px;">
+            STUDENT PROGRESS REPORT
+        </p>
+        <p>Term: {{ data.year }} &nbsp;|&nbsp; {{ term }}</p>
+    </div>
+
+    <!-- Student Info -->
+    <div class="student-info">
+        <div class="row"><span class="label">Student Name:</span> {{ student.full_name }}</div>
+        <div class="row"><span class="label">Arabic Name:</span> {{ student.arabic_name|default:'—' }}</div>
+        <div class="row"><span class="label">Student ID:</span> {{ student.student_id }}</div>
+        <div class="row"><span class="label">Grade / Section:</span> {{ student.grade }} – {{ student.section }}</div>
+        <div class="row"><span class="label">Division:</span> {{ student.division }}</div>
+        <div class="row"><span class="label">Academic Year:</span> {{ data.year }}</div>
+    </div>
+
+    <!-- Marks table -->
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Subject</th>
+                <th class="center">Weighted Avg %</th>
+                <th class="center">Grade</th>
+                <th class="center">GPA Points</th>
+                <th class="center">Result</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in data.subjects %}
+        <tr>
+            <td class="center">{{ forloop.counter }}</td>
+            <td>{{ r.subject.name }}</td>
+            <td class="center">{% if r.absent %}AB{% elif r.avg_pct is not None %}{{ r.avg_pct }}%{% else %}—{% endif %}</td>
+            <td class="center">{{ r.letter }}</td>
+            <td class="center">{{ r.gpa }}</td>
+            <td class="center">
+                {% if r.absent %}<span class="absent">Absent</span>
+                {% elif r.passed %}<span class="pass">Pass</span>
+                {% else %}<span class="fail">Fail</span>{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td class="center" colspan="4">Cumulative GPA</td>
+                <td class="center">{{ data.overall_gpa|default:'—' }}</td>
+                <td class="center">
+                    {% if data.passed %}<span class="pass">PASS</span>
+                    {% else %}<span class="fail">FAIL</span>{% endif %}
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- Overall summary -->
+    <div class="summary-box">
+        <div class="big">
+            GPA: {{ data.overall_gpa|default:'—' }} &nbsp;/&nbsp;
+            {% if data.passed %}PROMOTED{% else %}NEEDS IMPROVEMENT{% endif %}
+        </div>
+    </div>
+
+    <!-- Signatures -->
+    <div class="signature-row">
+        <div class="sig">Class Teacher</div>
+        <div class="sig">Head of Department</div>
+        <div class="sig">Principal</div>
+        <div class="sig">Parent / Guardian</div>
+    </div>
+
+    <!-- Print button (hidden when printing) -->
+    <div class="no-print" style="text-align:center; margin-top:30px;">
+        <button onclick="window.print()"
+                style="background:#1e3a5f; color:white; border:none; padding:10px 28px;
+                       border-radius:8px; font-size:12pt; cursor:pointer;">
+            🖨️ Print Report Card
+        </button>
+    </div>
+</div>
+</body>
+</html>

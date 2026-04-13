@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Exam Types — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-primary">Exam Types</h1>
+    <a href="{% url 'academics:exam_type_add' %}"
+       class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-light transition">
+        + Add Type
+    </a>
+</div>
+
+{% if messages %}
+{% for msg in messages %}
+<div class="mb-4 px-4 py-3 rounded-lg text-sm
+    {% if msg.tags == 'error' %}bg-red-50 text-red-700{% else %}bg-green-50 text-green-700{% endif %}">{{ msg }}</div>
+{% endfor %}
+{% endif %}
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    {% if types %}
+    <table class="min-w-full divide-y divide-slate-200 text-sm">
+        <thead class="bg-slate-50">
+            <tr>
+                <th class="px-5 py-3 text-left font-semibold text-slate-600">Name</th>
+                <th class="px-5 py-3 text-left font-semibold text-slate-600">Weight %</th>
+                <th class="px-5 py-3 text-left font-semibold text-slate-600">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+        {% for t in types %}
+        <tr class="hover:bg-slate-50">
+            <td class="px-5 py-3 font-medium text-slate-800">{{ t.name }}</td>
+            <td class="px-5 py-3 text-slate-600">{{ t.weight_percentage }}%</td>
+            <td class="px-5 py-3 flex gap-2">
+                <a href="{% url 'academics:exam_type_edit' pk=t.pk %}"
+                   class="px-3 py-1 rounded bg-amber-100 text-amber-700 text-xs hover:bg-amber-200">Edit</a>
+                <form method="post" action="{% url 'academics:exam_type_delete' pk=t.pk %}"
+                      onsubmit="return confirm('Delete this exam type?');" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="px-3 py-1 rounded bg-red-100 text-red-700 text-xs hover:bg-red-200">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="py-12 text-center text-slate-400">No exam types yet. <a href="{% url 'academics:exam_type_add' %}" class="text-primary underline">Add one</a>.</div>
+    {% endif %}
+</div>
+{% endblock %}
