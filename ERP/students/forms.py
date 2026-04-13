@@ -10,6 +10,37 @@ _FILE   = ('block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 '
            'file:rounded-lg file:border-0 file:text-sm file:font-medium '
            'file:bg-[#1e3a5f] file:text-white hover:file:bg-[#2a5298] file:cursor-pointer')
 
+_ALLOWED_IMAGE_EXTS   = {'.jpg', '.jpeg', '.png', '.webp'}
+_ALLOWED_DOC_EXTS     = {'.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'}
+_MAX_PHOTO_BYTES      = 5 * 1024 * 1024    # 5 MB
+_MAX_DOC_BYTES        = 10 * 1024 * 1024   # 10 MB
+
+
+def _validate_image(f):
+    """Reject non-image files and files that exceed the size limit."""
+    import os
+    if f:
+        ext = os.path.splitext(f.name)[1].lower()
+        if ext not in _ALLOWED_IMAGE_EXTS:
+            raise forms.ValidationError(
+                f"Only {', '.join(_ALLOWED_IMAGE_EXTS)} files are allowed."
+            )
+        if f.size > _MAX_PHOTO_BYTES:
+            raise forms.ValidationError("Photo must not exceed 5 MB.")
+
+
+def _validate_document(f):
+    """Reject disallowed document types and oversized files."""
+    import os
+    if f:
+        ext = os.path.splitext(f.name)[1].lower()
+        if ext not in _ALLOWED_DOC_EXTS:
+            raise forms.ValidationError(
+                f"Only {', '.join(_ALLOWED_DOC_EXTS)} files are allowed."
+            )
+        if f.size > _MAX_DOC_BYTES:
+            raise forms.ValidationError("Document must not exceed 10 MB.")
+
 
 class StudentForm(forms.ModelForm):
     class Meta:
@@ -57,6 +88,11 @@ class StudentForm(forms.ModelForm):
         if current and not self.instance.pk:
             self.fields['academic_year'].initial = current
 
+    def clean_photo(self):
+        f = self.cleaned_data.get('photo')
+        _validate_image(f)
+        return f
+
 
 class DocumentUploadForm(forms.ModelForm):
     class Meta:
@@ -67,6 +103,11 @@ class DocumentUploadForm(forms.ModelForm):
             'description': forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'Optional notes / ملاحظات اختيارية'}),
             'file':        forms.FileInput(attrs={'class': _FILE}),
         }
+
+    def clean_file(self):
+        f = self.cleaned_data.get('file')
+        _validate_document(f)
+        return f
 
 
 class StudentFilterForm(forms.Form):

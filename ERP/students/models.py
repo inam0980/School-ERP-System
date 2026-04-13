@@ -78,6 +78,12 @@ class Student(models.Model):
     class Meta:
         ordering = ['grade', 'section', 'full_name']
         verbose_name = 'Student / طالب'
+        indexes = [
+            models.Index(fields=['section'], name='student_section_idx'),
+            models.Index(fields=['grade', 'section'], name='student_grade_section_idx'),
+            models.Index(fields=['academic_year', 'is_active'], name='student_year_active_idx'),
+            models.Index(fields=['student_id'], name='student_id_idx'),
+        ]
 
     def __str__(self):
         return f"[{self.student_id}] {self.full_name}"

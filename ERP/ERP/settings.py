@@ -152,3 +152,15 @@ NPM_BIN_PATH = r"C:\Program Files\nodejs\npm.cmd"
 
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
+# ── Cache (per-process in-memory; swap for Redis in production) ───────────────
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'erp-cache',
+        'TIMEOUT': 300,   # 5 minutes default
+    }
+}
+
+# OpenAI (optional) — set to enable GPT-4o-mini summaries in AI features
+OPENAI_API_KEY = ''
+

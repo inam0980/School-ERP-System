@@ -43,6 +43,10 @@ class Attendance(models.Model):
         ordering = ['-date', 'student__full_name']
         verbose_name = 'Attendance'
         verbose_name_plural = 'Attendance Records'
+        indexes = [
+            models.Index(fields=['date', 'student'], name='attendance_date_student_idx'),
+            models.Index(fields=['student', 'status'], name='attendance_student_status_idx'),
+        ]
 
     def __str__(self):
         return f"{self.student.full_name} — {self.date} — {self.get_status_display()}"
