@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Delete Confirmation — School Setup{% endblock %}
+{% block page_title %}School Setup{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto space-y-0">
+    {% include 'core/school_setup/_tabs.html' %}
+
+    <div class="bg-white rounded-xl shadow-sm border border-red-100 overflow-hidden">
+        <div class="px-6 py-4 bg-red-50 border-b border-red-100 flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4
+                             c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <h2 class="font-semibold text-red-800 text-base">Confirm Delete</h2>
+        </div>
+
+        <div class="px-6 py-7">
+            <p class="text-sm text-slate-600 mb-1">You are about to permanently delete:</p>
+            <p class="font-semibold text-slate-900 text-lg mb-3">"{{ obj }}"</p>
+            <p class="text-sm text-slate-500 mb-7">
+                This action <span class="font-semibold text-red-600">cannot be undone</span>.
+                All related records (grades, sections, subjects) may also be removed.
+            </p>
+
+            <form method="POST" class="flex gap-3">
+                {% csrf_token %}
+                <button type="submit"
+                        class="px-5 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-lg
+                               hover:bg-red-700 transition shadow-sm">
+                    Yes, Delete
+                </button>
+                <a href="{% url back_url %}"
+                   class="px-5 py-2.5 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg
+                          hover:bg-slate-200 transition">
+                    Cancel
+                </a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

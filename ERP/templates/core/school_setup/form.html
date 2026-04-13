@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} — School Setup{% endblock %}
+{% block page_title %}School Setup{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-0">
+    {% include 'core/school_setup/_tabs.html' %}
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="font-semibold text-slate-800">{{ title }}</h2>
+            <a href="{% url back_url %}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                </svg>
+                Back to list
+            </a>
+        </div>
+
+        <form method="POST" class="px-6 py-6 space-y-5">
+            {% csrf_token %}
+            {% for field in form %}
+            <div>
+                {% if field.field.widget.input_type == 'checkbox' %}
+                <label class="flex items-center gap-3 cursor-pointer select-none">
+                    {{ field }}
+                    <span class="text-sm font-medium text-slate-700">{{ field.label }}</span>
+                </label>
+                {% else %}
+                <label class="block text-sm font-medium text-slate-600 mb-1.5" for="{{ field.id_for_label }}">
+                    {{ field.label }}
+                    {% if field.field.required %}<span class="text-red-400 ml-0.5">*</span>{% endif %}
+                </label>
+                {{ field }}
+                {% endif %}
+                {% if field.help_text %}
+                <p class="mt-1 text-xs text-slate-400">{{ field.help_text }}</p>
+                {% endif %}
+                {% for error in field.errors %}
+                <p class="mt-1 text-xs text-red-500 flex items-center gap-1">
+                    <svg class="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    {{ error }}
+                </p>
+                {% endfor %}
+            </div>
+            {% endfor %}
+
+            <div class="pt-2 flex gap-3 border-t border-slate-100">
+                <button type="submit"
+                        class="px-5 py-2.5 bg-[#1e3a5f] text-white text-sm font-semibold rounded-lg
+                               hover:bg-[#2a5298] transition shadow-sm">
+                    Save
+                </button>
+                <a href="{% url back_url %}"
+                   class="px-5 py-2.5 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-200 transition">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

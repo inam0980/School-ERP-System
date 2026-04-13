@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Subjects — School Setup{% endblock %}
+{% block page_title %}School Setup{% endblock %}
+
+{% block content %}
+<div class="space-y-0">
+    {% include 'core/school_setup/_tabs.html' %}
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
+            <div>
+                <h2 class="font-semibold text-slate-800">Subjects</h2>
+                <p class="text-xs text-slate-400 mt-0.5">{{ subjects|length }} record(s)</p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <form method="GET" class="flex gap-2">
+                    <input type="text" name="q" value="{{ q }}" placeholder="Search name or code…"
+                           class="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none
+                                  focus:ring-2 focus:ring-[#1e3a5f]/20 w-40" />
+                    <select name="division"
+                            class="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none
+                                   focus:ring-2 focus:ring-[#1e3a5f]/20 bg-white">
+                        <option value="">All Divisions</option>
+                        {% for div in divisions %}
+                        <option value="{{ div.pk }}" {% if div.pk|stringformat:"s" == selected_div %}selected{% endif %}>{{ div }}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200">Filter</button>
+                </form>
+                <a href="{% url 'core:subject_add' %}"
+                   class="px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-lg hover:bg-[#2a5298] transition flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Subject
+                </a>
+            </div>
+        </div>
+
+        {% if subjects %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                    <tr>
+                        <th class="px-6 py-3 text-left">Name</th>
+                        <th class="px-6 py-3 text-left">Code</th>
+                        <th class="px-6 py-3 text-left">Grade</th>
+                        <th class="px-6 py-3 text-left">Division</th>
+                        <th class="px-6 py-3 text-left">Status</th>
+                        <th class="px-6 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for sub in subjects %}
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-6 py-3.5 font-medium text-slate-800">{{ sub.name }}</td>
+                        <td class="px-6 py-3.5 font-mono text-xs text-slate-500 bg-slate-50 rounded">{{ sub.code }}</td>
+                        <td class="px-6 py-3.5 text-slate-600">{{ sub.grade.name }}</td>
+                        <td class="px-6 py-3.5">
+                            <span class="px-2.5 py-0.5 bg-purple-50 text-purple-700 text-xs font-medium rounded-full">{{ sub.division }}</span>
+                        </td>
+                        <td class="px-6 py-3.5">
+                            {% if sub.is_active %}
+                            <span class="px-2.5 py-0.5 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-100">Active</span>
+                            {% else %}
+                            <span class="px-2.5 py-0.5 bg-slate-50 text-slate-500 text-xs rounded-full border border-slate-100">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-3.5 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="{% url 'core:subject_edit' sub.pk %}"
+                                   class="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition">Edit</a>
+                                <a href="{% url 'core:subject_delete' sub.pk %}"
+                                   class="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition">Delete</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-14 text-center">
+            <p class="text-slate-400 text-sm">No subjects found.</p>
+            <a href="{% url 'core:subject_add' %}"
+               class="mt-3 inline-block text-sm text-[#1e3a5f] font-medium hover:underline">+ Add your first subject</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

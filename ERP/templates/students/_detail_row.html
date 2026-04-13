@@ -1,0 +1,8 @@
+{% comment %}
+    Detail row partial — usage:
+    {% include 'students/_detail_row.html' with label="Field Label" value=some_value %}
+{% endcomment %}
+<div class="flex items-center justify-between gap-3">
+    <span class="text-xs text-slate-400 w-36 flex-shrink-0">{{ label }}</span>
+    <span class="text-sm text-slate-700 text-right">{{ value|default:"—" }}</span>
+</div>

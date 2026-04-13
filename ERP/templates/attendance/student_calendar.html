@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% block title %}Attendance Calendar — {{ student.full_name }}{% endblock %}
+{% block page_title %}Attendance Calendar / تقويم الحضور{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-5">
+
+    <!-- Back -->
+    <a href="{% url 'attendance:report' %}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 w-fit">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        Back to Report
+    </a>
+
+    <!-- Student header -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex items-center gap-4">
+        {% if student.photo %}
+        <img src="{{ student.photo.url }}" class="w-14 h-14 rounded-xl object-cover border border-slate-200 flex-shrink-0" alt="">
+        {% else %}
+        <div class="w-14 h-14 rounded-xl bg-[#1e3a5f] flex items-center justify-center text-white text-2xl font-bold flex-shrink-0">{{ student.full_name|first }}</div>
+        {% endif %}
+        <div class="flex-1 min-w-0">
+            <h2 class="text-lg font-bold text-slate-800">{{ student.full_name }}</h2>
+            <p class="text-sm text-slate-400 font-mono">{{ student.student_id }} · {{ student.division }} / {{ student.grade }} / {{ student.section }}</p>
+        </div>
+        <a href="{% url 'students:detail' student.pk %}" class="text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50">Profile</a>
+    </div>
+
+    <!-- Monthly stats strip -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm px-4 py-3 col-span-2 md:col-span-1">
+            <p class="text-xs text-slate-400 font-medium">Recorded</p>
+            <p class="text-xl font-bold text-slate-800 mt-0.5">{{ stats.total }}</p>
+        </div>
+        <div class="bg-emerald-50 rounded-xl border border-emerald-100 shadow-sm px-4 py-3">
+            <p class="text-xs text-emerald-600 font-medium">Present</p>
+            <p class="text-xl font-bold text-emerald-700 mt-0.5">{{ stats.present }}</p>
+        </div>
+        <div class="bg-amber-50 rounded-xl border border-amber-100 shadow-sm px-4 py-3">
+            <p class="text-xs text-amber-600 font-medium">Late</p>
+            <p class="text-xl font-bold text-amber-700 mt-0.5">{{ stats.late }}</p>
+        </div>
+        <div class="bg-red-50 rounded-xl border border-red-100 shadow-sm px-4 py-3">
+            <p class="text-xs text-red-500 font-medium">Absent</p>
+            <p class="text-xl font-bold text-red-600 mt-0.5">{{ stats.absent }}</p>
+        </div>
+        <div class="bg-slate-50 rounded-xl border border-slate-100 shadow-sm px-4 py-3">
+            <p class="text-xs text-slate-500 font-medium">Attendance %</p>
+            <p class="text-xl font-bold mt-0.5
+                {% if stats.pct >= 90 %}text-emerald-600
+                {% elif stats.pct >= 75 %}text-amber-600
+                {% elif stats.pct != None %}text-red-600
+                {% else %}text-slate-400{% endif %}">
+                {% if stats.pct != None %}{{ stats.pct }}%{% else %}—{% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Calendar card -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+
+        <!-- Month navigation -->
+        <div class="flex items-center justify-between px-5 py-4 bg-[#1e3a5f] text-white">
+            <a href="?year={{ prev_year }}&month={{ prev_month }}" class="p-1.5 rounded-lg hover:bg-white/10 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            </a>
+            <h3 class="text-base font-bold">{{ month_name }} {{ year }}</h3>
+            <a href="?year={{ next_year }}&month={{ next_month }}"
+               class="p-1.5 rounded-lg hover:bg-white/10 transition{% if next_year > today.year or next_year == today.year and next_month > today.month %} opacity-30 pointer-events-none{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </a>
+        </div>
+
+        <!-- Day-of-week headers -->
+        <div class="grid grid-cols-7 bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500 text-center">
+            <div class="py-2">Mon</div><div class="py-2">Tue</div><div class="py-2">Wed</div>
+            <div class="py-2">Thu</div><div class="py-2">Fri</div>
+            <div class="py-2 text-slate-400">Sat</div><div class="py-2 text-slate-400">Sun</div>
+        </div>
+
+        <!-- Weeks -->
+        <div class="p-3 space-y-1.5">
+            {% for week in weeks %}
+            <div class="grid grid-cols-7 gap-1.5">
+                {% for cell in week %}
+                {% if cell == None %}
+                    <div class="h-14 rounded-lg"></div>
+                {% else %}
+                    <div class="h-14 rounded-lg flex flex-col items-center justify-center relative group
+                        {% if cell.status == 'P' %}bg-emerald-100 border border-emerald-300
+                        {% elif cell.status == 'A' %}bg-red-100 border border-red-300
+                        {% elif cell.status == 'L' %}bg-amber-100 border border-amber-300
+                        {% elif cell.status == 'E' %}bg-blue-100 border border-blue-300
+                        {% elif cell.is_today %}border-2 border-[#1e3a5f] bg-[#1e3a5f]/5
+                        {% else %}bg-slate-50 border border-slate-100{% endif %}">
+                        <span class="text-xs font-bold
+                            {% if cell.status == 'P' %}text-emerald-700
+                            {% elif cell.status == 'A' %}text-red-600
+                            {% elif cell.status == 'L' %}text-amber-700
+                            {% elif cell.status == 'E' %}text-blue-700
+                            {% elif cell.is_today %}text-[#1e3a5f]
+                            {% else %}text-slate-500{% endif %}">{{ cell.day }}</span>
+                        {% if cell.status %}
+                        <span class="text-[9px] font-semibold mt-0.5
+                            {% if cell.status == 'P' %}text-emerald-600
+                            {% elif cell.status == 'A' %}text-red-500
+                            {% elif cell.status == 'L' %}text-amber-600
+                            {% elif cell.status == 'E' %}text-blue-600{% endif %}">
+                            {{ cell.status_label }}
+                        </span>
+                        {% endif %}
+                        {% if cell.remarks %}
+                        <div class="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 z-20 hidden group-hover:block">
+                            <div class="bg-slate-800 text-white text-[10px] px-2 py-1.5 rounded shadow-xl whitespace-nowrap max-w-[160px] text-center">{{ cell.remarks }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Legend -->
+        <div class="px-5 py-3 border-t border-slate-100 bg-slate-50 flex flex-wrap gap-4 text-xs">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-200 border border-emerald-300"></span><span class="text-slate-500">Present</span></span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-red-200 border border-red-300"></span><span class="text-slate-500">Absent</span></span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-amber-200 border border-amber-300"></span><span class="text-slate-500">Late</span></span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-blue-200 border border-blue-300"></span><span class="text-slate-500">Excused</span></span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-slate-100 border border-slate-200"></span><span class="text-slate-500">Not recorded</span></span>
+        </div>
+    </div>
+
+    <!-- Month quick-jump -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 px-5 py-4">
+        <p class="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">Jump to Month</p>
+        <div class="flex flex-wrap gap-2">
+            {% for m in month_range %}
+            <a href="?year={{ year }}&month={{ m }}"
+               class="px-3 py-1.5 text-xs rounded-lg border transition
+                      {% if m == month %}bg-[#1e3a5f] text-white border-[#1e3a5f]
+                      {% else %}border-slate-200 text-slate-600 hover:bg-slate-50{% endif %}">
+                {{ m }}/{{ year }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

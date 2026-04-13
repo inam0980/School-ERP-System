@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% block title %}{{ student.full_name }} — Student Profile{% endblock %}
+{% block page_title %}Student Profile / ملف الطالب{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto space-y-5">
+
+    <!-- Back -->
+    <a href="{% url 'students:list' %}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 w-fit">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        Back to Students
+    </a>
+
+    <!-- Profile Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col sm:flex-row gap-5 items-start">
+        <div class="flex-shrink-0">
+            {% if student.photo %}
+                <img src="{{ student.photo.url }}" class="w-28 h-28 rounded-xl object-cover border border-slate-200 shadow-sm" alt="{{ student.full_name }}">
+            {% else %}
+                <div class="w-28 h-28 rounded-xl bg-[#1e3a5f] flex items-center justify-center text-white text-3xl font-bold shadow-sm">
+                    {{ student.full_name|first|upper }}
+                </div>
+            {% endif %}
+        </div>
+        <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">{{ student.full_name }}</h2>
+                    <p class="text-base text-slate-500 mt-0.5" dir="rtl">{{ student.arabic_name }}</p>
+                    <p class="text-xs text-slate-400 mt-1 font-mono">{{ student.student_id }}</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    {% if student.is_active %}
+                        <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">Active</span>
+                    {% else %}
+                        <span class="px-2.5 py-1 text-xs font-semibold bg-red-50 text-red-600 border border-red-200 rounded-full">Inactive</span>
+                    {% endif %}
+                    <span class="px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full">{{ student.get_enrollment_type_display }}</span>
+                </div>
+            </div>
+            <!-- Quick stats -->
+            <div class="mt-3 flex flex-wrap gap-4">
+                <div class="text-sm text-slate-600"><span class="font-medium">Division:</span> {{ student.division }}</div>
+                <div class="text-sm text-slate-600"><span class="font-medium">Grade:</span> {{ student.grade }}</div>
+                <div class="text-sm text-slate-600"><span class="font-medium">Section:</span> {{ student.section }}</div>
+                <div class="text-sm text-slate-600"><span class="font-medium">Roll #:</span> {{ student.roll_number|default:"—" }}</div>
+                <div class="text-sm text-slate-600"><span class="font-medium">Year:</span> {{ student.academic_year }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-wrap gap-2">
+        <a href="{% url 'students:edit' student.pk %}"
+           class="px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-lg hover:bg-[#2a5298] flex items-center gap-1.5 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            Edit
+        </a>
+        <a href="{% url 'students:id_card' student.pk %}" target="_blank"
+           class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/></svg>
+            Print ID Card
+        </a>
+        {% if student.is_active %}
+        <a href="{% url 'students:delete' student.pk %}"
+           class="px-4 py-2 bg-red-50 text-red-600 border border-red-200 text-sm font-medium rounded-lg hover:bg-red-100 flex items-center gap-1.5 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+            Deactivate
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        <!-- Personal Info Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-5 py-3 bg-slate-50 border-b border-slate-100 text-sm font-semibold text-slate-600">Personal Info</div>
+            <div class="px-5 py-4 space-y-3">
+                {% include 'students/_detail_row.html' with label="Date of Birth" value=student.dob %}
+                {% include 'students/_detail_row.html' with label="Gender" value=student.get_gender_display %}
+                {% include 'students/_detail_row.html' with label="Nationality" value=student.nationality %}
+                {% include 'students/_detail_row.html' with label="National / Iqama ID" value=student.national_id %}
+                {% include 'students/_detail_row.html' with label="Admission Date" value=student.admission_date %}
+                {% if student.previous_school %}
+                {% include 'students/_detail_row.html' with label="Previous School" value=student.previous_school %}
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Guardian Info Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-5 py-3 bg-slate-50 border-b border-slate-100 text-sm font-semibold text-slate-600">Guardian Info</div>
+            <div class="px-5 py-4 space-y-3">
+                <div class="flex items-start justify-between gap-3">
+                    <span class="text-xs text-slate-400 w-32 flex-shrink-0">Father</span>
+                    <span class="text-sm text-slate-700">{{ student.father_name }}</span>
+                    <span class="text-sm text-slate-500 mr-auto" dir="rtl">{{ student.arabic_father }}</span>
+                </div>
+                <div class="flex items-start justify-between gap-3">
+                    <span class="text-xs text-slate-400 w-32 flex-shrink-0">Mother</span>
+                    <span class="text-sm text-slate-700">{{ student.mother_name }}</span>
+                    <span class="text-sm text-slate-500 mr-auto" dir="rtl">{{ student.arabic_mother }}</span>
+                </div>
+                {% include 'students/_detail_row.html' with label="Phone 1" value=student.guardian_phone %}
+                {% if student.guardian_phone2 %}
+                    {% include 'students/_detail_row.html' with label="Phone 2" value=student.guardian_phone2 %}
+                {% endif %}
+                {% if student.guardian_email %}
+                    {% include 'students/_detail_row.html' with label="Email" value=student.guardian_email %}
+                {% endif %}
+                <div>
+                    <p class="text-xs text-slate-400 mb-0.5">Address</p>
+                    <p class="text-sm text-slate-700">{{ student.address }}</p>
+                    <p class="text-sm text-slate-500 mt-0.5" dir="rtl">{{ student.arabic_address }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+            <span class="text-sm font-semibold text-slate-600">Documents / الوثائق</span>
+            <button type="button" onclick="document.getElementById('uploadPanel').classList.toggle('hidden')"
+                    class="text-xs px-3 py-1.5 bg-[#1e3a5f] text-white rounded-lg hover:bg-[#2a5298] transition">+ Upload</button>
+        </div>
+
+        <!-- Upload panel (collapsed by default) -->
+        <div id="uploadPanel" class="hidden px-5 py-4 border-b border-slate-100 bg-slate-50">
+            <form method="POST" enctype="multipart/form-data" action="{% url 'students:document_upload' student.pk %}" class="flex flex-col sm:flex-row gap-3 items-end">
+                {% csrf_token %}
+                <div class="flex-1">
+                    <label class="text-xs font-medium text-slate-500 mb-1 block">Document Type</label>
+                    {{ doc_form.doc_type }}
+                </div>
+                <div class="flex-1">
+                    <label class="text-xs font-medium text-slate-500 mb-1 block">File</label>
+                    {{ doc_form.file }}
+                </div>
+                <div class="flex-1">
+                    <label class="text-xs font-medium text-slate-500 mb-1 block">Description (optional)</label>
+                    {{ doc_form.description }}
+                </div>
+                <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700">Save</button>
+            </form>
+        </div>
+
+        <div class="divide-y divide-slate-50">
+            {% for doc in documents %}
+            <div class="px-5 py-3 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-700">{{ doc.get_doc_type_display }}</p>
+                        <p class="text-xs text-slate-400">{{ doc.description }} · {{ doc.uploaded_at|date:"d M Y" }}</p>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <a href="{{ doc.file.url }}" target="_blank"
+                       class="text-xs px-2.5 py-1 border border-slate-200 rounded text-slate-600 hover:bg-slate-50">View</a>
+                    <form method="POST" action="{% url 'students:document_delete' doc.pk %}" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="text-xs px-2.5 py-1 border border-red-200 rounded text-red-500 hover:bg-red-50"
+                                onclick="return confirm('Delete this document?')">Delete</button>
+                    </form>
+                </div>
+            </div>
+            {% empty %}
+            <p class="px-5 py-4 text-sm text-slate-400">No documents uploaded yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

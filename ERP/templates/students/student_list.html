@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% block title %}Students / الطلاب{% endblock %}
+{% block page_title %}Students / الطلاب{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+    <!-- Header row -->
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="text-xl font-bold text-slate-800">Students / الطلاب</h2>
+            <p class="text-xs text-slate-400 mt-0.5">{{ total }} student(s) found</p>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+            {% if user.role in 'SUPER_ADMIN,ADMIN' %}
+            <a href="{% url 'students:import' %}"
+               class="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                Import Excel
+            </a>
+            <a href="{% url 'students:add' %}"
+               class="px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-lg hover:bg-[#2a5298] transition flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                Add Student / إضافة طالب
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Filter form -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 px-5 py-4">
+        <form method="GET" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
+            <div class="lg:col-span-2">
+                <label class="text-xs font-medium text-slate-500 mb-1 block">Search / بحث</label>
+                {{ form.q }}
+            </div>
+            <div>
+                <label class="text-xs font-medium text-slate-500 mb-1 block">Division / القسم</label>
+                {{ form.division }}
+            </div>
+            <div>
+                <label class="text-xs font-medium text-slate-500 mb-1 block">Grade / الصف</label>
+                {{ form.grade }}
+            </div>
+            <div>
+                <label class="text-xs font-medium text-slate-500 mb-1 block">Section / الفصل</label>
+                {{ form.section }}
+            </div>
+            <div class="flex gap-2">
+                <div class="flex-1">
+                    <label class="text-xs font-medium text-slate-500 mb-1 block">Status</label>
+                    {{ form.is_active }}
+                </div>
+                <button type="submit" class="mt-5 px-4 py-2.5 bg-[#1e3a5f] text-white text-sm rounded-lg hover:bg-[#2a5298] transition shrink-0">
+                    Filter
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        {% if students %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Photo</th>
+                        <th class="px-4 py-3 text-left">Student ID</th>
+                        <th class="px-4 py-3 text-left">Name (EN)</th>
+                        <th class="px-4 py-3 text-right" dir="rtl">الاسم (عربي)</th>
+                        <th class="px-4 py-3 text-left">Division</th>
+                        <th class="px-4 py-3 text-left">Grade / Section</th>
+                        <th class="px-4 py-3 text-left">Gender</th>
+                        <th class="px-4 py-3 text-left">Guardian Phone</th>
+                        <th class="px-4 py-3 text-left">Status</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for s in students %}
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-4 py-3">
+                            {% if s.photo %}
+                            <img src="{{ s.photo.url }}" alt="" class="w-9 h-9 rounded-full object-cover border border-slate-200">
+                            {% else %}
+                            <div class="w-9 h-9 rounded-full bg-[#1e3a5f]/10 flex items-center justify-center text-[#1e3a5f] font-bold text-sm">
+                                {{ s.full_name|first|upper }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ s.student_id }}</td>
+                        <td class="px-4 py-3 font-medium text-slate-800">
+                            <a href="{% url 'students:detail' s.pk %}" class="hover:text-[#1e3a5f] hover:underline">{{ s.full_name }}</a>
+                        </td>
+                        <td class="px-4 py-3 text-slate-600 text-right font-medium" dir="rtl">{{ s.arabic_name }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">{{ s.division }}</span>
+                        </td>
+                        <td class="px-4 py-3 text-slate-600">{{ s.grade.name }} / {{ s.section.name }}</td>
+                        <td class="px-4 py-3 text-slate-500 text-xs">{{ s.get_gender_display }}</td>
+                        <td class="px-4 py-3 text-slate-600 text-xs">{{ s.guardian_phone|default:"—" }}</td>
+                        <td class="px-4 py-3">
+                            {% if s.is_active %}
+                            <span class="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-100">Active</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 bg-red-50 text-red-600 text-xs font-semibold rounded-full border border-red-100">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <div class="flex items-center justify-end gap-1.5">
+                                <a href="{% url 'students:detail' s.pk %}" title="View"
+                                   class="p-1.5 text-slate-500 hover:text-[#1e3a5f] hover:bg-slate-100 rounded-lg transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                </a>
+                                {% if user.role in 'SUPER_ADMIN,ADMIN' %}
+                                <a href="{% url 'students:edit' s.pk %}" title="Edit"
+                                   class="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                </a>
+                                <a href="{% url 'students:id_card' s.pk %}" title="ID Card" target="_blank"
+                                   class="p-1.5 text-purple-500 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/></svg>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-14 text-center">
+            <svg class="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-5-3.87M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a4 4 0 015-3.87M7 20v-2c0-.656.126-1.283.356-1.857m0 0A5.002 5.002 0 0112 11a5 5 0 014.644 7.143"/></svg>
+            <p class="text-slate-400 text-sm">No students found matching your filters.</p>
+            {% if user.role in 'SUPER_ADMIN,ADMIN' %}
+            <a href="{% url 'students:add' %}" class="mt-3 inline-block text-sm text-[#1e3a5f] font-medium hover:underline">+ Add first student</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

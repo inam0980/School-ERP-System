@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% block title %}Import Students{% endblock %}
+{% block page_title %}Import Students / استيراد بيانات الطلاب{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-5">
+
+    <a href="{% url 'students:list' %}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1 w-fit">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        Back to Students
+    </a>
+
+    <!-- Flash messages -->
+    {% if messages %}
+    <div class="space-y-2">
+        {% for msg in messages %}
+        <div class="flex items-center gap-2 px-4 py-3 rounded-lg text-sm
+            {% if msg.tags == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-200
+            {% elif msg.tags == 'error' %}bg-red-50 text-red-600 border border-red-200
+            {% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
+            {{ msg }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Upload Card -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-3.5 bg-[#1e3a5f] text-white">
+            <h3 class="text-sm font-semibold">Upload Excel File / رفع ملف Excel</h3>
+        </div>
+        <div class="p-6">
+            <form method="POST" enctype="multipart/form-data" class="space-y-4">
+                {% csrf_token %}
+                <div class="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-[#1e3a5f]/40 transition cursor-pointer"
+                     onclick="document.getElementById('excelFile').click()">
+                    <svg class="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <p class="text-sm text-slate-500">Click to select an Excel file (.xlsx)</p>
+                    <p id="fileName" class="text-xs text-slate-400 mt-1">No file selected</p>
+                    <input type="file" id="excelFile" name="excel_file" accept=".xlsx" class="hidden"
+                           onchange="document.getElementById('fileName').textContent = this.files[0]?.name || 'No file selected'">
+                </div>
+                <button type="submit"
+                        class="w-full py-2.5 bg-[#1e3a5f] text-white text-sm font-semibold rounded-lg hover:bg-[#2a5298] transition flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                    Import Students
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Download Template -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex items-center justify-between gap-4">
+        <div>
+            <p class="text-sm font-semibold text-slate-700">Download Template / تحميل النموذج</p>
+            <p class="text-xs text-slate-400 mt-0.5">Download the required Excel format before uploading.</p>
+        </div>
+        <a href="{% url 'students:import_template' %}"
+           class="flex-shrink-0 px-4 py-2 border border-[#1e3a5f] text-[#1e3a5f] text-sm font-medium rounded-lg hover:bg-[#1e3a5f]/5 flex items-center gap-1.5 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Download
+        </a>
+    </div>
+
+    <!-- Format Reference -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-5 py-3 bg-slate-50 border-b border-slate-100 text-sm font-semibold text-slate-600">
+            Required Columns (Row 1 = Headers, Row 2+ = Data)
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-100">
+                        <th class="px-3 py-2 text-left font-medium text-slate-500">#</th>
+                        <th class="px-3 py-2 text-left font-medium text-slate-500">Column Name</th>
+                        <th class="px-3 py-2 text-left font-medium text-slate-500">Required</th>
+                        <th class="px-3 py-2 text-left font-medium text-slate-500">Example</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for col in columns %}
+                    <tr>
+                        <td class="px-3 py-2 text-slate-400">{{ forloop.counter }}</td>
+                        <td class="px-3 py-2 font-mono text-slate-700">{{ col.name }}</td>
+                        <td class="px-3 py-2">
+                            {% if col.required %}
+                                <span class="text-red-500 font-medium">Yes</span>
+                            {% else %}
+                                <span class="text-slate-400">No</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2 text-slate-500">{{ col.example }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="px-5 py-3 bg-amber-50 border-t border-amber-100 text-xs text-amber-700">
+            <strong>Note:</strong> Division, Grade, and Section must match existing records exactly. Academic Year must also exist and be active. Date format: YYYY-MM-DD.
+        </div>
+    </div>
+
+</div>
+{% endblock %}
