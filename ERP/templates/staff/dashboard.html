@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Staff & HR Dashboard — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-primary">Staff & HR Dashboard</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Manage employees, leave requests and regulatory compliance</p>
+    </div>
+    <div class="flex gap-3">
+        <a href="{% url 'staff:staff_add' %}"
+           class="inline-flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary-light transition font-medium text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Staff
+        </a>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Staff</p>
+        <p class="text-3xl font-bold text-primary">{{ total_staff }}</p>
+        <p class="text-xs text-slate-400 mt-1">{{ total_teachers }} teachers</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Saudi / Foreign</p>
+        <p class="text-3xl font-bold text-slate-700">{{ total_saudi }}<span class="text-xl text-slate-400"> / {{ total_foreign }}</span></p>
+        <p class="text-xs text-slate-400 mt-1">Contract types</p>
+    </div>
+    <div class="bg-white rounded-xl border border-{% if pending_vacations > 0 %}amber{% else %}slate{% endif %}-200 px-5 py-4">
+        <p class="text-xs text-{% if pending_vacations > 0 %}amber{% else %}slate{% endif %}-500 uppercase tracking-wide mb-1">Pending Leave</p>
+        <p class="text-3xl font-bold text-{% if pending_vacations > 0 %}amber-600{% else %}slate-700{% endif %}">{{ pending_vacations }}</p>
+        <a href="{% url 'staff:vacation_list' %}?status=PENDING"
+           class="text-xs text-primary hover:underline mt-1 inline-block">Review →</a>
+    </div>
+    <div class="bg-white rounded-xl border border-{% if iqama_expiring > 0 or moe_expiring > 0 %}red{% else %}slate{% endif %}-200 px-5 py-4">
+        <p class="text-xs text-{% if iqama_expiring > 0 or moe_expiring > 0 %}red{% else %}slate{% endif %}-500 uppercase tracking-wide mb-1">Compliance Alerts</p>
+        <p class="text-3xl font-bold text-{% if iqama_expiring > 0 or moe_expiring > 0 %}red-600{% else %}slate-700{% endif %}">{{ iqama_expiring|add:moe_expiring }}</p>
+        <p class="text-xs text-slate-400 mt-1">Iqama: {{ iqama_expiring }} · MOE: {{ moe_expiring }}</p>
+    </div>
+</div>
+
+<!-- Quick Links -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    {% for link in links %}
+    {% endfor %}
+    <a href="{% url 'staff:staff_list' %}"
+       class="bg-white rounded-xl border border-slate-200 p-4 flex flex-col items-center gap-2 hover:border-primary hover:shadow-sm transition text-center">
+        <div class="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-xl">👥</div>
+        <span class="text-sm font-medium text-slate-700">Staff List</span>
+    </a>
+    <a href="{% url 'staff:teacher_assignment_list' %}"
+       class="bg-white rounded-xl border border-slate-200 p-4 flex flex-col items-center gap-2 hover:border-primary hover:shadow-sm transition text-center">
+        <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-xl">📚</div>
+        <span class="text-sm font-medium text-slate-700">Assignments</span>
+    </a>
+    <a href="{% url 'staff:vacation_list' %}"
+       class="bg-white rounded-xl border border-slate-200 p-4 flex flex-col items-center gap-2 hover:border-primary hover:shadow-sm transition text-center">
+        <div class="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-xl">🌴</div>
+        <span class="text-sm font-medium text-slate-700">Leave Requests</span>
+    </a>
+    <a href="{% url 'staff:moe_list' %}"
+       class="bg-white rounded-xl border border-slate-200 p-4 flex flex-col items-center gap-2 hover:border-primary hover:shadow-sm transition text-center">
+        <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-xl">📋</div>
+        <span class="text-sm font-medium text-slate-700">MOE Documents</span>
+    </a>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Pending Leave Requests -->
+    <div class="bg-white rounded-xl border border-slate-200">
+        <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h3 class="font-semibold text-slate-700">Recent Leave Requests</h3>
+            <a href="{% url 'staff:vacation_list' %}" class="text-xs text-primary hover:underline">View all</a>
+        </div>
+        <div class="divide-y divide-slate-100">
+            {% for req in recent_requests %}
+            <div class="px-5 py-3.5 flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-slate-700 truncate">{{ req.staff.full_name }}</p>
+                    <p class="text-xs text-slate-500">
+                        {{ req.get_vacation_type_display }} · {{ req.from_date|date:"d M" }} – {{ req.to_date|date:"d M Y" }}
+                        ({{ req.duration_days }}d)
+                    </p>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <span class="text-xs px-2.5 py-0.5 rounded-full font-medium
+                        {% if req.status == 'APPROVED' %}bg-green-100 text-green-700
+                        {% elif req.status == 'REJECTED' %}bg-red-100 text-red-700
+                        {% else %}bg-amber-100 text-amber-700{% endif %}">
+                        {{ req.get_status_display }}
+                    </span>
+                    {% if req.status == 'PENDING' %}
+                    <a href="{% url 'staff:vacation_approve' req.pk %}"
+                       class="text-xs text-primary hover:underline">Review</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <p class="px-5 py-8 text-center text-sm text-slate-400">No recent requests.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Department Breakdown -->
+    <div class="bg-white rounded-xl border border-slate-200">
+        <div class="px-5 py-4 border-b border-slate-200">
+            <h3 class="font-semibold text-slate-700">Department Breakdown</h3>
+        </div>
+        <div class="p-5 space-y-3">
+            {% for dept in dept_breakdown %}
+            <div class="flex items-center gap-3">
+                <span class="text-sm text-slate-600 w-36 truncate">{{ dept.department }}</span>
+                <div class="flex-1 bg-slate-100 rounded-full h-2.5">
+                    <div class="bg-primary h-2.5 rounded-full"
+                         style="width: {% widthratio dept.count total_staff 100 %}%"></div>
+                </div>
+                <span class="text-sm font-semibold text-slate-700 w-6 text-right">{{ dept.count }}</span>
+            </div>
+            {% empty %}
+            <p class="text-sm text-slate-400">No staff profiles yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

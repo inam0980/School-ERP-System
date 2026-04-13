@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Review Leave Request — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+        <a href="{% url 'staff:vacation_list' %}"
+           class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition">
+            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <h1 class="text-2xl font-bold text-primary">Review Leave Request</h1>
+    </div>
+
+    <!-- Request Summary -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5 mb-5 space-y-3">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+                {{ vr.staff.full_name|first|upper }}
+            </div>
+            <div>
+                <p class="font-semibold text-slate-800">{{ vr.staff.full_name }}</p>
+                <p class="text-xs text-slate-500">{{ vr.staff.get_role_display }}</p>
+            </div>
+            <span class="ml-auto text-xs font-semibold px-3 py-1 rounded-full bg-amber-100 text-amber-700">
+                {{ vr.get_status_display }}
+            </span>
+        </div>
+
+        <hr class="border-slate-100">
+
+        <dl class="grid grid-cols-2 gap-3 text-sm">
+            <div>
+                <dt class="text-slate-500">Leave Type</dt>
+                <dd class="font-semibold text-slate-700">{{ vr.get_vacation_type_display }}</dd>
+            </div>
+            <div>
+                <dt class="text-slate-500">Duration</dt>
+                <dd class="font-semibold text-slate-700">{{ vr.duration_days }} day(s)</dd>
+            </div>
+            <div>
+                <dt class="text-slate-500">From</dt>
+                <dd class="font-semibold text-slate-700">{{ vr.from_date|date:"D, d M Y" }}</dd>
+            </div>
+            <div>
+                <dt class="text-slate-500">To</dt>
+                <dd class="font-semibold text-slate-700">{{ vr.to_date|date:"D, d M Y" }}</dd>
+            </div>
+            <div class="col-span-2">
+                <dt class="text-slate-500 mb-1">Reason</dt>
+                <dd class="bg-slate-50 rounded-lg p-3 text-slate-700">{{ vr.reason }}</dd>
+            </div>
+            <div>
+                <dt class="text-slate-500">Submitted On</dt>
+                <dd class="text-slate-700">{{ vr.created_at|date:"d M Y H:i" }}</dd>
+            </div>
+        </dl>
+    </div>
+
+    <!-- Approval Form -->
+    <form method="post" class="bg-white rounded-xl border border-primary/30 p-6 space-y-5">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
+            {{ form.non_field_errors.0 }}
+        </div>
+        {% endif %}
+
+        <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-3">Decision</label>
+            <div class="flex gap-4">
+                {% for choice in form.action %}
+                <label class="flex items-center gap-2 cursor-pointer">
+                    {{ choice.tag }}
+                    <span class="text-sm font-medium
+                        {% if choice.choice_value == 'APPROVED' %}text-green-700
+                        {% else %}text-red-600{% endif %}">
+                        {{ choice.choice_label }}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+            {% if form.action.errors %}<p class="mt-1 text-xs text-red-600">{{ form.action.errors.0 }}</p>{% endif %}
+        </div>
+
+        <div id="rejection-section" class="hidden">
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">{{ form.rejection_reason.label }}</label>
+            {{ form.rejection_reason }}
+            {% if form.rejection_reason.errors %}
+            <p class="mt-1 text-xs text-red-600">{{ form.rejection_reason.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+            <a href="{% url 'staff:vacation_list' %}"
+               class="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition text-sm font-medium">
+               Cancel
+            </a>
+            <button type="submit"
+                    class="px-6 py-2.5 rounded-lg bg-primary text-white hover:bg-primary-light transition text-sm font-semibold">
+                Submit Decision
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+(function () {
+    const radios = document.querySelectorAll('[name="action"]');
+    const rejSection = document.getElementById('rejection-section');
+    function toggle() {
+        const val = document.querySelector('[name="action"]:checked')?.value;
+        rejSection.classList.toggle('hidden', val !== 'REJECTED');
+    }
+    radios.forEach(r => r.addEventListener('change', toggle));
+    toggle();
+})();
+</script>
+{% endblock %}
