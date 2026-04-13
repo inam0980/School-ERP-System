@@ -31,8 +31,9 @@
 
         <!-- School Logo / Name -->
         <div class="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-            <div class="w-9 h-9 rounded-full bg-yellow-500 flex items-center justify-center
-                        text-[#1e3a5f] font-extrabold text-lg select-none">ك</div>
+            {% load static %}
+            <img src="{% static 'images/logo.png' %}" alt="Al-Kawthar Logo"
+                 class="w-14 h-14 rounded-full object-cover shrink-0">
             <div>
                 <p class="text-white font-bold text-sm leading-tight">Al-Kawthar</p>
                 <p class="text-slate-400 text-xs">International Schools</p>
