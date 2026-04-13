@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Staff Attendance — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold text-primary">Staff Attendance</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Daily attendance overview for all staff</p>
+    </div>
+
+    <!-- Date Navigation -->
+    <div class="bg-white rounded-xl border border-slate-200 px-5 py-4 flex items-center justify-between gap-4">
+        <a href="?date={{ prev_date }}"
+           class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-primary transition px-3 py-2 rounded-lg hover:bg-slate-100">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+            </svg>
+            Previous
+        </a>
+        <div class="text-center">
+            <form method="get" class="flex items-center gap-2">
+                <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}"
+                       onchange="this.form.submit()"
+                       class="border border-slate-300 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30">
+            </form>
+        </div>
+        <a href="?date={{ next_date }}"
+           class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-primary transition px-3 py-2 rounded-lg hover:bg-slate-100">
+            Next
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+        </a>
+    </div>
+
+    <!-- Summary Counts -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-slate-200 px-4 py-3 text-center">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Staff</p>
+            <p class="text-3xl font-bold text-slate-800 mt-1">{{ total }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-green-200 px-4 py-3 text-center">
+            <p class="text-xs font-semibold text-green-600 uppercase tracking-wider">Present</p>
+            <p class="text-3xl font-bold text-green-600 mt-1">{{ present }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-amber-200 px-4 py-3 text-center">
+            <p class="text-xs font-semibold text-amber-600 uppercase tracking-wider">Late</p>
+            <p class="text-3xl font-bold text-amber-500 mt-1">{{ late }}</p>
+        </div>
+        <div class="bg-white rounded-xl border border-red-200 px-4 py-3 text-center">
+            <p class="text-xs font-semibold text-red-500 uppercase tracking-wider">Absent</p>
+            <p class="text-3xl font-bold text-red-500 mt-1">{{ absent }}</p>
+        </div>
+    </div>
+
+    <!-- Attendance Table -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Staff Member</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Role</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Marked By</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Remarks</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for item in staff_list %}
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                {{ item.user.full_name|first|upper }}
+                            </div>
+                            <span class="font-medium text-slate-800">{{ item.user.full_name }}</span>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-slate-500 text-xs">{{ item.user.get_role_display }}</td>
+                    <td class="px-4 py-3">
+                        {% if item.status == 'P' %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                            <span class="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0"></span>Present
+                        </span>
+                        {% elif item.status == 'A' %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                            <span class="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0"></span>Absent
+                        </span>
+                        {% elif item.status == 'L' %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></span>Late
+                        </span>
+                        {% elif item.status == 'E' %}
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0"></span>Excused
+                        </span>
+                        {% else %}
+                        <span class="text-slate-400 text-xs">— Not marked</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-slate-500 text-xs">
+                        {% if item.attendance %}{{ item.attendance.marked_by.full_name|default:"—" }}{% else %}—{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-slate-500 text-xs max-w-[160px] truncate">
+                        {% if item.attendance and item.attendance.remarks %}{{ item.attendance.remarks }}{% else %}—{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-4 py-10 text-center text-slate-400">No staff records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}

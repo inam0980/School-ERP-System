@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Welcome Banner -->
+    <div class="bg-gradient-to-r from-[#1e3a5f] to-[#2e5482] rounded-2xl px-6 py-5 text-white flex flex-wrap items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold">Welcome, {{ request.user.full_name }}</h1>
+            <p class="text-blue-200 mt-0.5 text-sm">
+                {{ today|date:"l, d F Y" }}
+                {% if current_year %} · {{ current_year.name }}{% endif %}
+            </p>
+        </div>
+        {% if my_profile and my_profile.photo %}
+        <img src="{{ my_profile.photo.url }}" alt="Profile Photo"
+             class="w-16 h-16 rounded-full object-cover border-2 border-white/40">
+        {% else %}
+        <div class="w-16 h-16 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center text-2xl font-bold">
+            {{ request.user.full_name|first|upper }}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <!-- My Classes -->
+        <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">My Classes</p>
+            <p class="text-3xl font-bold text-primary mt-1">{{ assignments|length }}</p>
+            <p class="text-xs text-slate-400 mt-0.5">Subject assignments this year</p>
+        </div>
+        <!-- Students I Teach -->
+        <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Students</p>
+            <p class="text-3xl font-bold text-accent mt-1">{{ students_count }}</p>
+            <p class="text-xs text-slate-400 mt-0.5">Across all my sections</p>
+        </div>
+        <!-- Present Days This Month -->
+        <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Present Days</p>
+            <p class="text-3xl font-bold text-green-600 mt-1">{{ present_days }}</p>
+            <p class="text-xs text-slate-400 mt-0.5">This month</p>
+        </div>
+        <!-- Pending Marks -->
+        <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Marks</p>
+            <p class="text-3xl font-bold text-amber-500 mt-1">{{ pending_exams|length }}</p>
+            <p class="text-xs text-slate-400 mt-0.5">Exams awaiting entry</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        <!-- My Classes (assignments) -->
+        <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <h2 class="font-semibold text-slate-800">My Classes This Year</h2>
+                <span class="text-xs text-slate-400">{{ current_year.name|default:"No active year" }}</span>
+            </div>
+
+            {% if assignments %}
+            <div class="divide-y divide-slate-100">
+                {% for a in assignments %}
+                <div class="flex items-center gap-4 px-5 py-3">
+                    <div class="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium text-slate-800 text-sm truncate">{{ a.subject.name }}</p>
+                        <p class="text-xs text-slate-500">
+                            {{ a.section.grade.name }} — {{ a.section.name }}
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="px-5 py-10 text-center text-slate-400 text-sm">
+                No class assignments for this year yet.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar: My Leave Requests -->
+        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <h2 class="font-semibold text-slate-800">My Leave</h2>
+                <a href="{% url 'staff:vacation_add' %}"
+                   class="text-xs text-primary hover:underline font-medium">+ Request</a>
+            </div>
+
+            <div class="divide-y divide-slate-100">
+                {% for vr in my_vacations %}
+                <div class="px-5 py-3">
+                    <div class="flex items-center justify-between mb-0.5">
+                        <span class="text-sm font-medium text-slate-700">{{ vr.get_vacation_type_display }}</span>
+                        {% if vr.status == 'PENDING' %}
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Pending</span>
+                        {% elif vr.status == 'APPROVED' %}
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Approved</span>
+                        {% else %}
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Rejected</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-xs text-slate-400">{{ vr.from_date|date:"d M" }} – {{ vr.to_date|date:"d M Y" }} ({{ vr.duration_days }}d)</p>
+                </div>
+                {% empty %}
+                <div class="px-5 py-6 text-center text-sm text-slate-400">No leave requests yet.</div>
+                {% endfor %}
+            </div>
+
+            {% if my_vacations %}
+            <div class="px-5 py-3 border-t border-slate-100">
+                <a href="{% url 'staff:vacation_list' %}" class="text-xs text-primary hover:underline font-medium">
+                    View all →
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <!-- Pending Marks Table -->
+    {% if pending_exams %}
+    <div class="bg-white rounded-xl border border-amber-200 overflow-hidden">
+        <div class="flex items-center gap-2 px-5 py-4 border-b border-amber-100 bg-amber-50">
+            <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+            <h2 class="font-semibold text-amber-800">Exams Awaiting Mark Entry</h2>
+        </div>
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-100">
+                <tr>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Subject</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Section</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Exam Type</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Date</th>
+                    <th class="text-right px-4 py-3 font-semibold text-slate-600">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for exam in pending_exams %}
+                <tr class="hover:bg-amber-50/30 transition">
+                    <td class="px-4 py-3 font-medium text-slate-800">{{ exam.subject.name }}</td>
+                    <td class="px-4 py-3 text-slate-600">{{ exam.section.name }}</td>
+                    <td class="px-4 py-3 text-slate-500">{{ exam.exam_type.name }}</td>
+                    <td class="px-4 py-3 text-slate-500">{{ exam.date|date:"d M Y" }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <a href="{% url 'academics:marks_entry' exam.pk %}"
+                           class="text-xs font-semibold text-white bg-primary px-3 py-1.5 rounded-lg hover:bg-opacity-90 transition">
+                            Enter Marks
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

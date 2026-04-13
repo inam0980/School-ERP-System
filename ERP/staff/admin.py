@@ -2,12 +2,6 @@ from django.contrib import admin
 from .models import StaffProfile, TeacherAssignment, VacationRequest, MOEApproval
 
 
-class TeacherAssignmentInline(admin.TabularInline):
-    model  = TeacherAssignment
-    extra  = 1
-    fields = ['subject', 'section', 'academic_year']
-
-
 @admin.register(StaffProfile)
 class StaffProfileAdmin(admin.ModelAdmin):
     list_display   = ['employee_id', 'user', 'designation', 'department',
@@ -15,7 +9,6 @@ class StaffProfileAdmin(admin.ModelAdmin):
     list_filter    = ['department', 'designation', 'contract_type', 'division']
     search_fields  = ['user__full_name', 'employee_id', 'iqama_number']
     filter_horizontal = ['subjects_taught']
-    inlines        = [TeacherAssignmentInline]
     readonly_fields = ['created_at', 'updated_at']
 
 
