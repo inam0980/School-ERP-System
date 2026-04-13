@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Teacher Assignments — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+    <!-- Header -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-primary">Teacher Assignments</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Map teachers to subjects and sections by academic year</p>
+        </div>
+        <a href="{% url 'staff:teacher_assignment_add' %}"
+           class="inline-flex items-center gap-2 bg-primary text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-opacity-90 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            Assign Teacher
+        </a>
+    </div>
+
+    <!-- Year Filter -->
+    <div class="flex flex-wrap gap-2">
+        <a href="{% url 'staff:teacher_assignment_list' %}"
+           class="px-4 py-2 rounded-lg text-sm font-medium transition
+                  {% if not selected_year %}bg-primary text-white{% else %}border border-slate-300 text-slate-600 hover:bg-slate-50{% endif %}">
+            All Years
+        </a>
+        {% for yr in years %}
+        <a href="?year={{ yr.pk }}"
+           class="px-4 py-2 rounded-lg text-sm font-medium transition
+                  {% if selected_year.pk == yr.pk %}bg-primary text-white
+                  {% else %}border border-slate-300 text-slate-600 hover:bg-slate-50{% endif %}">
+            {{ yr.name }}{% if yr.is_current %} (Current){% endif %}
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Teacher</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Subject</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Section</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Grade</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Academic Year</th>
+                    <th class="text-right px-4 py-3 font-semibold text-slate-600">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for a in assignments %}
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                {{ a.teacher.full_name|first|upper }}
+                            </div>
+                            <span class="font-medium text-slate-800">{{ a.teacher.full_name }}</span>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 text-slate-700">{{ a.subject.name }}</td>
+                    <td class="px-4 py-3 text-slate-700">{{ a.section.name }}</td>
+                    <td class="px-4 py-3 text-slate-500">{{ a.section.grade.name }}</td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                                     {% if a.academic_year.is_current %}bg-green-100 text-green-700{% else %}bg-slate-100 text-slate-600{% endif %}">
+                            {{ a.academic_year.name }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex justify-end gap-2">
+                            <a href="{% url 'staff:teacher_assignment_edit' a.pk %}"
+                               class="text-xs font-medium text-primary hover:underline">Edit</a>
+                            <a href="{% url 'staff:teacher_assignment_delete' a.pk %}"
+                               class="text-xs font-medium text-red-500 hover:underline">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="px-4 py-10 text-center text-slate-400">
+                        No assignments found.
+                        <a href="{% url 'staff:teacher_assignment_add' %}" class="text-primary hover:underline">
+                            Assign a teacher now
+                        </a>.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <p class="text-xs text-slate-400 text-right">{{ assignments|length }} assignment(s) shown.</p>
+</div>
+{% endblock %}

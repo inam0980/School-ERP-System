@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}MOE Compliance Documents — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+    <!-- Header -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-primary">MOE Compliance Documents</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Ministry of Education & Ajeer regulatory records</p>
+        </div>
+        <a href="{% url 'staff:moe_add' %}"
+           class="inline-flex items-center gap-2 bg-primary text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-opacity-90 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Document
+        </a>
+    </div>
+
+    <!-- Alert banner -->
+    {% if expiring_soon > 0 %}
+    <div class="flex items-center gap-3 bg-amber-50 border border-amber-300 text-amber-800 rounded-xl px-4 py-3 text-sm font-medium">
+        <svg class="w-5 h-5 flex-shrink-0 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+        </svg>
+        <span>{{ expiring_soon }} approved document(s) expiring within 60 days — action required.</span>
+    </div>
+    {% endif %}
+
+    <!-- Filters -->
+    <form method="get" class="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap gap-3">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search staff name…"
+               class="flex-1 min-w-[160px] border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+
+        <select name="status"
+                class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+            <option value="">All Statuses</option>
+            {% for val, label in status_choices %}
+            <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="type"
+                class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+            <option value="">All Types</option>
+            {% for val, label in type_choices %}
+            <option value="{{ val }}" {% if type_filter == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit"
+                class="bg-primary text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-opacity-90 transition">
+            Filter
+        </button>
+        {% if status_filter or type_filter or q %}
+        <a href="{% url 'staff:moe_list' %}"
+           class="border border-slate-300 rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition">
+           Clear
+        </a>
+        {% endif %}
+    </form>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+                <tr>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Staff</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Document Type</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Reference No.</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">Expiry Date</th>
+                    <th class="text-left px-4 py-3 font-semibold text-slate-600">File</th>
+                    <th class="text-right px-4 py-3 font-semibold text-slate-600">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for doc in approvals %}
+                <tr class="hover:bg-slate-50 transition {% if doc.is_expiring_soon %}bg-amber-50{% endif %}">
+                    <td class="px-4 py-3 font-medium text-slate-800">{{ doc.staff.full_name }}</td>
+                    <td class="px-4 py-3 text-slate-600">{{ doc.get_approval_type_display }}</td>
+                    <td class="px-4 py-3">
+                        {% if doc.status == 'APPROVED' %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">Approved</span>
+                        {% elif doc.status == 'PENDING' %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Pending</span>
+                        {% elif doc.status == 'SUBMITTED' %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Submitted</span>
+                        {% elif doc.status == 'REJECTED' %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Rejected</span>
+                        {% else %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-600">Expired</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-slate-500 font-mono text-xs">
+                        {{ doc.reference_number|default:"—" }}
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if doc.expiry_date %}
+                            <span class="{% if doc.is_expiring_soon %}text-red-600 font-semibold{% else %}text-slate-600{% endif %}">
+                                {{ doc.expiry_date|date:"d M Y" }}
+                                {% if doc.is_expiring_soon %}
+                                <span class="block text-xs text-red-500">Expiring soon!</span>
+                                {% endif %}
+                            </span>
+                        {% else %}
+                            <span class="text-slate-400">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if doc.file %}
+                        <a href="{{ doc.file.url }}" target="_blank"
+                           class="inline-flex items-center gap-1 text-primary hover:underline text-xs font-medium">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            View
+                        </a>
+                        {% else %}
+                        <span class="text-slate-400 text-xs">No file</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex justify-end gap-2">
+                            <a href="{% url 'staff:moe_edit' doc.pk %}"
+                               class="text-xs font-medium text-primary hover:underline">Edit</a>
+                            <a href="{% url 'staff:moe_delete' doc.pk %}"
+                               class="text-xs font-medium text-red-500 hover:underline">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="px-4 py-10 text-center text-slate-400">
+                        No documents found. <a href="{% url 'staff:moe_add' %}" class="text-primary hover:underline">Add one now</a>.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}
