@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Bulk Assign Fees — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+        <a href="{% url 'fees:dashboard' %}" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition">
+            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-primary">Bulk Assign Fees</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Create student fee records for all students in a grade or section at once</p>
+        </div>
+    </div>
+
+    {% if messages %}
+    {% for msg in messages %}
+    <div class="mb-4 px-4 py-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200">{{ msg }}</div>
+    {% endfor %}
+    {% endif %}
+
+    {% if results %}
+    <div class="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-5">
+        <h3 class="font-semibold text-blue-800 mb-2">Assignment Result</h3>
+        <p class="text-sm text-blue-700">✅ <strong>{{ results.created }}</strong> fee records created</p>
+        <p class="text-sm text-blue-600">⚠️ <strong>{{ results.skipped }}</strong> already existed (skipped)</p>
+    </div>
+    {% endif %}
+
+    <form method="post" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
+        {% csrf_token %}
+        {% for field in form %}
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1.5">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<p class="mt-1 text-xs text-red-600">{{ field.errors.0 }}</p>{% endif %}
+            {% if field.help_text %}<p class="mt-1 text-xs text-slate-500">{{ field.help_text }}</p>{% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
+            <strong>Note:</strong> This assigns the selected fee to all <em>active</em> students in the
+            fee structure's grade. If a section is selected, only that section's students are assigned.
+            Already-existing records are skipped.
+        </div>
+
+        <button type="submit"
+                class="w-full bg-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-light transition"
+                onclick="return confirm('Assign fees to all qualifying students?')">
+            📌 Assign Now
+        </button>
+    </form>
+</div>
+{% endblock %}

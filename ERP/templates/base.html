@@ -76,7 +76,7 @@
                 </svg>
                 Attendance
             </a>
-            <a href="/academics/" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300
+            <a href="{% url 'academics:exam_list' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300
                                           hover:bg-white/10 hover:text-white transition-all text-sm font-medium
                                           {% if request.resolver_match.namespace == 'academics' %}bg-white/15 text-white{% endif %}">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
@@ -85,6 +85,17 @@
                 </svg>
                 Academics
             </a>
+            {% if user.role == 'SUPER_ADMIN' or user.role == 'ADMIN' %}
+            <a href="{% url 'academics:marks_approval' %}" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300
+                                          hover:bg-white/10 hover:text-white transition-all text-sm font-medium ml-4
+                                          {% if 'marks_approval' in request.resolver_match.url_name %}bg-white/15 text-white{% endif %}">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Marks Approval
+            </a>
+            {% endif %}
             <a href="/staff/" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300
                                       hover:bg-white/10 hover:text-white transition-all text-sm font-medium
                                       {% if request.resolver_match.namespace == 'staff' %}bg-white/15 text-white{% endif %}">

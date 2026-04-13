@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Fee Types — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-primary">Fee Types</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Manage fee categories and taxability settings</p>
+    </div>
+    <a href="{% url 'fees:fee_type_add' %}"
+       class="inline-flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary-light transition font-medium">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add Fee Type
+    </a>
+</div>
+
+{% if messages %}
+{% for msg in messages %}
+<div class="mb-4 px-4 py-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200">{{ msg }}</div>
+{% endfor %}
+{% endif %}
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wide">
+            <tr>
+                <th class="px-5 py-3 text-left">Name</th>
+                <th class="px-5 py-3 text-left">Category</th>
+                <th class="px-5 py-3 text-left">Taxable (15% VAT)</th>
+                <th class="px-5 py-3 text-left">Description</th>
+                <th class="px-5 py-3 text-right">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for ft in fee_types %}
+            <tr class="hover:bg-slate-50 transition">
+                <td class="px-5 py-4 font-medium text-slate-700">{{ ft.name }}</td>
+                <td class="px-5 py-4">
+                    <span class="text-xs font-medium px-2.5 py-1 rounded-full
+                        {% if ft.category == 'TUITION' %}bg-blue-100 text-blue-700
+                        {% elif ft.category == 'TRANSPORT' %}bg-purple-100 text-purple-700
+                        {% elif ft.category == 'UNIFORM' %}bg-yellow-100 text-yellow-700
+                        {% elif ft.category == 'BOOKS' %}bg-green-100 text-green-700
+                        {% elif ft.category == 'EXTRACURRICULAR' %}bg-pink-100 text-pink-700
+                        {% else %}bg-slate-100 text-slate-600{% endif %}">
+                        {{ ft.get_category_display }}
+                    </span>
+                </td>
+                <td class="px-5 py-4">
+                    {% if ft.is_taxable %}
+                    <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
+                        ✓ VAT 15%
+                    </span>
+                    {% else %}
+                    <span class="text-xs text-slate-400 px-2.5 py-1">—</span>
+                    {% endif %}
+                </td>
+                <td class="px-5 py-4 text-slate-500 max-w-xs truncate">{{ ft.description|default:"—" }}</td>
+                <td class="px-5 py-4 text-right space-x-2">
+                    <a href="{% url 'fees:fee_type_edit' ft.pk %}"
+                       class="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-accent text-accent hover:bg-accent hover:text-white transition font-medium">
+                        Edit
+                    </a>
+                    <a href="{% url 'fees:fee_type_delete' ft.pk %}"
+                       onclick="return confirm('Delete this fee type? This cannot be undone.')"
+                       class="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition font-medium">
+                        Delete
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="px-5 py-12 text-center text-slate-400">No fee types yet. Add your first one.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

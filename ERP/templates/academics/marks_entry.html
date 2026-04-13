@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% block title %}Marks Entry — {{ exam.name }} — Al-Kawthar{% endblock %}
+
+{% block extra_head %}
+<style>
+    .status-draft     { @apply bg-slate-100 text-slate-600; }
+    .status-submitted { @apply bg-amber-100 text-amber-700; }
+    .status-approved  { @apply bg-green-100 text-green-700; }
+    input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex flex-wrap items-start justify-between gap-4 mb-6">
+    <div>
+        <div class="flex items-center gap-2 text-sm text-slate-500 mb-1">
+            <a href="{% url 'academics:exam_list' %}" class="hover:text-primary">Exams</a>
+            <span>/</span>
+            <span>{{ exam.subject.name }}</span>
+        </div>
+        <h1 class="text-2xl font-bold text-primary">{{ exam.name }}</h1>
+        <p class="text-sm text-slate-500 mt-0.5">
+            {{ exam.section.grade }} – {{ exam.section.name }} &nbsp;|&nbsp;
+            {{ exam.exam_type.name }} &nbsp;|&nbsp;
+            {{ exam.get_term_display }} &nbsp;|&nbsp;
+            {{ exam.date|date:"d M Y" }} &nbsp;|&nbsp;
+            <strong>Total: {{ exam.total_marks }}</strong>
+        </p>
+    </div>
+
+    <div class="flex flex-wrap gap-2">
+        <!-- Approval / unlock for admins -->
+        {% if is_admin %}
+        {% if has_approved %}
+        <form method="post" action="{% url 'academics:unlock_marks' exam_pk=exam.pk %}">
+            {% csrf_token %}
+            <button type="submit"
+                    class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium"
+                    onclick="return confirm('Unlock approved marks for re-entry?')">
+                🔓 Unlock Marks
+            </button>
+        </form>
+        {% endif %}
+        <form method="post" action="{% url 'academics:approve_marks' exam_pk=exam.pk %}">
+            {% csrf_token %}
+            <button type="submit"
+                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">
+                ✅ Approve All
+            </button>
+        </form>
+        {% endif %}
+        <a href="{% url 'academics:exam_results' exam_pk=exam.pk %}"
+           class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm hover:bg-slate-50 transition">
+            View Results
+        </a>
+        <a href="{% url 'academics:export_marks' exam_pk=exam.pk %}"
+           class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
+            📥 Export Excel
+        </a>
+    </div>
+</div>
+
+<!-- Status banner -->
+{% if locked %}
+<div class="mb-5 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm font-medium">
+    ✅ Marks are <strong>approved</strong>. Only administrators can unlock them for editing.
+</div>
+{% elif has_approved %}
+<div class="mb-5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+    ⚠️ Some marks are already approved. Entries remain editable by admin.
+</div>
+{% endif %}
+
+{% if messages %}
+{% for msg in messages %}
+<div id="toast"
+     class="fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium
+            {% if msg.tags == 'error' %}bg-red-600 text-white{% else %}bg-green-600 text-white{% endif %}">
+    {{ msg }}
+</div>
+<script>setTimeout(() => { const t = document.getElementById('toast'); if (t) t.remove(); }, 3000);</script>
+{% endfor %}
+{% endif %}
+
+<!-- Marks form -->
+{% if rows %}
+<form method="post" id="marks-form">
+    {% csrf_token %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600 w-8">#</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Student</th>
+                    <th class="px-4 py-3 text-center font-semibold text-slate-600">Absent</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Marks / {{ total_marks }}</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">%</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Grade</th>
+                    <th class="px-4 py-3 text-left font-semibold text-slate-600">Remarks</th>
+                    <th class="px-4 py-3 text-center font-semibold text-slate-600">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+            {% for row in rows %}
+            {% with s=row.student m=row.mark %}
+            <tr id="row-{{ s.pk }}"
+                class="transition-colors
+                       {% if row.is_approved %}bg-green-50
+                       {% elif row.status == 'submitted' %}bg-amber-50
+                       {% else %}hover:bg-slate-50{% endif %}">
+
+                <td class="px-4 py-3 text-slate-400 text-xs">{{ forloop.counter }}</td>
+
+                <td class="px-4 py-3">
+                    <p class="font-medium text-slate-800">{{ s.full_name }}</p>
+                    <p class="text-xs text-slate-400">{{ s.student_id }}{% if s.roll_number %} · Roll {{ s.roll_number }}{% endif %}</p>
+                </td>
+
+                <!-- Absent checkbox -->
+                <td class="px-4 py-3 text-center">
+                    {% if locked and not is_admin %}
+                    <input type="checkbox" disabled {% if row.is_absent %}checked{% endif %}
+                           class="w-4 h-4 rounded">
+                    {% else %}
+                    <input type="checkbox" name="absent_{{ s.pk }}" id="absent_{{ s.pk }}"
+                           {% if row.is_absent %}checked{% endif %}
+                           class="w-4 h-4 rounded text-red-500 border-slate-300 cursor-pointer"
+                           onchange="toggleAbsent('{{ s.pk }}')">
+                    {% endif %}
+                </td>
+
+                <!-- Marks input -->
+                <td class="px-4 py-3">
+                    {% if locked and not is_admin %}
+                    <span class="font-semibold text-slate-700">
+                        {% if row.is_absent %}—{% else %}{{ row.obtained|default:'—' }}{% endif %}
+                    </span>
+                    {% else %}
+                    <input type="number"
+                           name="marks_{{ s.pk }}"
+                           id="marks_{{ s.pk }}"
+                           value="{{ row.obtained }}"
+                           min="0" max="{{ total_marks }}" step="0.5"
+                           {% if row.is_absent %}disabled{% endif %}
+                           class="w-24 border border-slate-300 rounded-lg px-2 py-1.5
+                                  focus:ring-2 focus:ring-primary/40 focus:border-primary focus:outline-none
+                                  disabled:bg-slate-100 disabled:text-slate-400"
+                           oninput="updateGrade('{{ s.pk }}', this.value, {{ total_marks }})">
+                    {% endif %}
+                </td>
+
+                <!-- Live % -->
+                <td class="px-4 py-3 text-slate-600" id="pct-{{ s.pk }}">
+                    {% if row.is_absent %}—
+                    {% elif row.pct is not None %}{{ row.pct }}%
+                    {% else %}—{% endif %}
+                </td>
+
+                <!-- Live Letter grade -->
+                <td class="px-4 py-3" id="grade-{{ s.pk }}">
+                    {% if row.is_absent %}
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-500">AB</span>
+                    {% else %}
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+                        {% if row.letter == 'A+' or row.letter == 'A' %}bg-green-100 text-green-700
+                        {% elif row.letter == 'B+' or row.letter == 'B' %}bg-blue-100 text-blue-700
+                        {% elif row.letter == 'C+' or row.letter == 'C' %}bg-yellow-100 text-yellow-700
+                        {% elif row.letter == 'D' %}bg-orange-100 text-orange-700
+                        {% else %}bg-red-100 text-red-700{% endif %}">
+                        {{ row.letter }}
+                    </span>
+                    {% endif %}
+                </td>
+
+                <!-- Remarks -->
+                <td class="px-4 py-3">
+                    {% if locked and not is_admin %}
+                    <span class="text-slate-500 text-xs">{{ row.remarks|default:'' }}</span>
+                    {% else %}
+                    <input type="text" name="remarks_{{ s.pk }}" value="{{ row.remarks }}"
+                           maxlength="200" placeholder="Optional…"
+                           class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs
+                                  focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    {% endif %}
+                </td>
+
+                <!-- Status badge -->
+                <td class="px-4 py-3 text-center">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold capitalize
+                        {% if row.status == 'approved' %}bg-green-100 text-green-700
+                        {% elif row.status == 'submitted' %}bg-amber-100 text-amber-700
+                        {% else %}bg-slate-100 text-slate-600{% endif %}">
+                        {{ row.status|default:'new' }}
+                    </span>
+                </td>
+            </tr>
+            {% endwith %}
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Action buttons -->
+    {% if not locked or is_admin %}
+    <div class="mt-5 flex flex-wrap gap-3">
+        <button type="submit" name="action" value="draft"
+                class="px-6 py-2.5 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-sm font-semibold transition">
+            💾 Save Draft
+        </button>
+        <button type="submit" name="action" value="submit"
+                class="px-6 py-2.5 bg-primary hover:bg-primary-light text-white rounded-lg text-sm font-semibold transition"
+                onclick="return confirm('Submit marks for admin approval?')">
+            📤 Submit for Approval
+        </button>
+        <a href="{% url 'academics:exam_list' %}"
+           class="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg text-sm hover:bg-slate-50 transition">
+            Cancel
+        </a>
+    </div>
+    {% endif %}
+</form>
+{% else %}
+<div class="bg-white rounded-xl border border-slate-200 py-16 text-center text-slate-400">
+    <p class="text-4xl mb-3">👥</p>
+    <p class="font-medium">No active students in this section.</p>
+</div>
+{% endif %}
+
+<!-- Quick stats bar -->
+{% if rows %}
+<div class="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+    {% with total=rows|length %}
+    <div class="bg-white rounded-xl p-4 border border-slate-200 text-center">
+        <p class="text-2xl font-bold text-slate-800">{{ total }}</p>
+        <p class="text-xs text-slate-500 mt-0.5">Total Students</p>
+    </div>
+    {% endwith %}
+    <div class="bg-green-50 rounded-xl p-4 border border-green-200 text-center" id="stat-approved">
+        <p class="text-2xl font-bold text-green-700">{{ rows|length }}</p>
+        <p class="text-xs text-green-600 mt-0.5">Entered</p>
+    </div>
+    <div class="bg-amber-50 rounded-xl p-4 border border-amber-200 text-center">
+        <p class="text-2xl font-bold text-amber-700">
+            {% with drafted=0 %}{{ exam.marks.filter.count|default:'—' }}{% endwith %}
+        </p>
+        <p class="text-xs text-amber-600 mt-0.5">Submitted</p>
+    </div>
+    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 text-center">
+        <p class="text-2xl font-bold text-slate-700">{{ total_marks }}</p>
+        <p class="text-xs text-slate-500 mt-0.5">Max Marks</p>
+    </div>
+</div>
+{% endif %}
+
+<script>
+// Toggle absent: disable marks input and clear value
+function toggleAbsent(studentId) {
+    const cb    = document.getElementById('absent_' + studentId);
+    const input = document.getElementById('marks_' + studentId);
+    const pct   = document.getElementById('pct_' + studentId);   // may not exist in locked view
+    if (!input) return;
+
+    if (cb.checked) {
+        input.disabled = true;
+        input.value    = '';
+        updateGrade(studentId, null, {{ total_marks }});
+    } else {
+        input.disabled = false;
+        input.focus();
+        updateGrade(studentId, input.value, {{ total_marks }});
+    }
+}
+
+// Live grade calculation
+function letterGrade(pct) {
+    if (pct === null || pct === '') return {letter: '—', css: 'bg-slate-100 text-slate-500'};
+    const p = parseFloat(pct);
+    if (p >= 90) return {letter: 'A+', css: 'bg-green-100 text-green-700'};
+    if (p >= 85) return {letter: 'A',  css: 'bg-green-100 text-green-700'};
+    if (p >= 80) return {letter: 'B+', css: 'bg-blue-100 text-blue-700'};
+    if (p >= 75) return {letter: 'B',  css: 'bg-blue-100 text-blue-700'};
+    if (p >= 70) return {letter: 'C+', css: 'bg-yellow-100 text-yellow-700'};
+    if (p >= 65) return {letter: 'C',  css: 'bg-yellow-100 text-yellow-700'};
+    if (p >= 60) return {letter: 'D',  css: 'bg-orange-100 text-orange-700'};
+    return {letter: 'F', css: 'bg-red-100 text-red-700'};
+}
+
+function updateGrade(studentId, obtained, total) {
+    const pctEl   = document.getElementById('pct-'   + studentId);
+    const gradeEl = document.getElementById('grade-' + studentId);
+    const rowEl   = document.getElementById('row-'   + studentId);
+    if (!pctEl || !gradeEl) return;
+
+    const cb = document.getElementById('absent_' + studentId);
+    if (cb && cb.checked) {
+        pctEl.textContent = '—';
+        gradeEl.innerHTML = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-500">AB</span>';
+        return;
+    }
+
+    if (obtained === null || obtained === '') {
+        pctEl.textContent = '—';
+        gradeEl.innerHTML = '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">—</span>';
+        return;
+    }
+
+    const p   = Math.min(100, (parseFloat(obtained) / total) * 100);
+    const lg  = letterGrade(p);
+    pctEl.textContent = p.toFixed(1) + '%';
+    gradeEl.innerHTML = `<span class="px-2 py-0.5 rounded-full text-xs font-semibold ${lg.css}">${lg.letter}</span>`;
+
+    // Row colour: fail = light red
+    if (rowEl && !rowEl.classList.contains('bg-green-50') && !rowEl.classList.contains('bg-amber-50')) {
+        rowEl.classList.toggle('bg-red-50', lg.letter === 'F');
+    }
+}
+</script>
+{% endblock %}

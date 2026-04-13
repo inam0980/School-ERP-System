@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Student Ledger — {{ student.get_full_name }} — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <a href="{% url 'fees:outstanding' %}"
+               class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition">
+                <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+            </a>
+            <div>
+                <h1 class="text-2xl font-bold text-primary">Student Ledger</h1>
+                <p class="text-sm text-slate-500 mt-0.5">Full fee history for {{ student.get_full_name }}</p>
+            </div>
+        </div>
+        <a href="{% url 'fees:generate_invoice' student.pk %}"
+           onclick="return confirm('Generate a ZATCA tax invoice for all paid fees?')"
+           class="inline-flex items-center gap-2 bg-accent text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition">
+            🧾 Generate Invoice
+        </a>
+    </div>
+
+    <!-- Student Info -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5 flex flex-wrap gap-6">
+        <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-full bg-primary text-white font-bold flex items-center justify-center text-xl">
+                {{ student.first_name|first|upper }}{{ student.last_name|first|upper }}
+            </div>
+            <div>
+                <p class="font-bold text-slate-800 text-lg">{{ student.get_full_name }}</p>
+                <p class="text-sm text-slate-500">{{ student.student_id }}</p>
+                <p class="text-sm text-slate-500">{{ student.current_section.grade }} · {{ student.current_section }}</p>
+            </div>
+        </div>
+        <div class="flex gap-5 ml-auto flex-wrap">
+            <div class="text-center">
+                <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Total Assigned</p>
+                <p class="text-xl font-bold text-slate-700">SAR {{ total_net|floatformat:2 }}</p>
+            </div>
+            <div class="text-center">
+                <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Total Paid</p>
+                <p class="text-xl font-bold text-green-600">SAR {{ total_paid|floatformat:2 }}</p>
+            </div>
+            <div class="text-center">
+                <p class="text-xs text-red-400 uppercase tracking-wide mb-0.5">Balance Due</p>
+                <p class="text-xl font-bold text-red-600">SAR {{ total_balance|floatformat:2 }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fee Records -->
+    {% for sf in fees %}
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <!-- Fee header -->
+        <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="font-semibold text-slate-700">{{ sf.fee_structure.fee_type.name }}</span>
+                <span class="text-xs px-2.5 py-0.5 rounded-full font-medium
+                    {% if sf.status == 'PAID' %}bg-green-100 text-green-700
+                    {% elif sf.status == 'OVERDUE' %}bg-red-100 text-red-700
+                    {% elif sf.status == 'PARTIAL' %}bg-yellow-100 text-yellow-700
+                    {% elif sf.status == 'WAIVED' %}bg-purple-100 text-purple-700
+                    {% else %}bg-slate-100 text-slate-600{% endif %}">
+                    {{ sf.get_status_display }}
+                </span>
+            </div>
+            <div class="text-right text-sm">
+                <span class="text-slate-500">Net: SAR {{ sf.net_amount|floatformat:2 }}</span>
+                <span class="mx-2 text-slate-300">|</span>
+                <span class="text-green-600">Paid: SAR {{ sf.amount_paid|floatformat:2 }}</span>
+                <span class="mx-2 text-slate-300">|</span>
+                <span class="font-bold {% if sf.balance > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                    Bal: SAR {{ sf.balance|floatformat:2 }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Payments -->
+        {% if sf.payments.all %}
+        <table class="w-full text-sm">
+            <thead class="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
+                <tr>
+                    <th class="px-5 py-2 text-left">Receipt #</th>
+                    <th class="px-5 py-2 text-left">Date</th>
+                    <th class="px-5 py-2 text-left">Method</th>
+                    <th class="px-5 py-2 text-left">Ref</th>
+                    <th class="px-5 py-2 text-right">Amount</th>
+                    <th class="px-5 py-2 text-left">Collected By</th>
+                    <th class="px-5 py-2"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for pmt in sf.payments.all %}
+                <tr class="hover:bg-slate-50/50">
+                    <td class="px-5 py-2.5 font-mono text-xs text-slate-600">{{ pmt.receipt_number }}</td>
+                    <td class="px-5 py-2.5 text-slate-600">{{ pmt.payment_date|date:"d M Y" }}</td>
+                    <td class="px-5 py-2.5 text-slate-600">{{ pmt.get_payment_method_display }}</td>
+                    <td class="px-5 py-2.5 text-slate-400 text-xs">{{ pmt.transaction_ref|default:"—" }}</td>
+                    <td class="px-5 py-2.5 text-right font-semibold text-green-600">SAR {{ pmt.paid_amount|floatformat:2 }}</td>
+                    <td class="px-5 py-2.5 text-slate-500 text-xs">{{ pmt.collected_by.get_full_name }}</td>
+                    <td class="px-5 py-2.5 text-right">
+                        <a href="{% url 'fees:receipt_print' pmt.pk %}" target="_blank"
+                           class="text-xs text-primary hover:underline">Print</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="px-5 py-4 text-sm text-slate-400">No payments recorded yet.</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <!-- Invoices -->
+    {% if invoices %}
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div class="px-5 py-3 bg-slate-50 border-b border-slate-200">
+            <h3 class="font-semibold text-slate-700">Tax Invoices</h3>
+        </div>
+        <table class="w-full text-sm">
+            <thead class="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
+                <tr>
+                    <th class="px-5 py-2 text-left">Invoice #</th>
+                    <th class="px-5 py-2 text-left">Date</th>
+                    <th class="px-5 py-2 text-right">Subtotal</th>
+                    <th class="px-5 py-2 text-right">VAT</th>
+                    <th class="px-5 py-2 text-right">Total</th>
+                    <th class="px-5 py-2 text-left">Status</th>
+                    <th class="px-5 py-2"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for inv in invoices %}
+                <tr class="hover:bg-slate-50/50">
+                    <td class="px-5 py-2.5 font-mono text-xs">{{ inv.invoice_number }}</td>
+                    <td class="px-5 py-2.5 text-slate-600">{{ inv.date|date:"d M Y" }}</td>
+                    <td class="px-5 py-2.5 text-right">SAR {{ inv.subtotal|floatformat:2 }}</td>
+                    <td class="px-5 py-2.5 text-right text-orange-600">SAR {{ inv.tax_amount|floatformat:2 }}</td>
+                    <td class="px-5 py-2.5 text-right font-bold">SAR {{ inv.total|floatformat:2 }}</td>
+                    <td class="px-5 py-2.5">
+                        <span class="text-xs px-2 py-0.5 rounded-full
+                            {% if inv.status == 'ISSUED' %}bg-green-100 text-green-700
+                            {% elif inv.status == 'VOIDED' %}bg-red-100 text-red-700
+                            {% else %}bg-slate-100 text-slate-600{% endif %}">
+                            {{ inv.get_status_display }}
+                        </span>
+                    </td>
+                    <td class="px-5 py-2.5">
+                        <a href="{% url 'fees:invoice_print' inv.pk %}" target="_blank"
+                           class="text-xs text-primary hover:underline">Print</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Bulk Report Cards — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-primary">Bulk Report Cards</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Generate report cards for an entire section</p>
+    </div>
+</div>
+
+<form method="get" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+    {% for field in form %}
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+        {{ field }}
+    </div>
+    {% endfor %}
+    <div class="flex items-end">
+        <button type="submit" class="w-full bg-primary text-white rounded-lg py-2 text-sm font-medium hover:bg-primary-light">Generate</button>
+    </div>
+</form>
+
+{% if cards %}
+<div class="flex justify-between items-center mb-4">
+    <p class="text-sm text-slate-600"><strong>{{ cards|length }}</strong> report cards generated</p>
+    <button onclick="window.print()"
+            class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 no-print">
+        🖨️ Print All
+    </button>
+</div>
+
+<style>
+@media print {
+  .no-print { display: none !important; }
+  .page-break { page-break-after: always; }
+  aside, header { display: none !important; }
+}
+</style>
+
+{% for card in cards %}
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 page-break">
+    <!-- Mini header -->
+    <div class="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
+        <div>
+            <p class="font-bold text-primary text-lg">{{ card.student.full_name }}</p>
+            <p class="text-sm text-slate-500">
+                {{ card.student.student_id }} &nbsp;|&nbsp;
+                Roll: {{ card.student.roll_number|default:'—' }}
+            </p>
+        </div>
+        <div class="text-right">
+            <p class="text-sm text-slate-600">GPA: <strong class="text-primary">{{ card.data.overall_gpa|default:'—' }}</strong></p>
+            <span class="px-3 py-0.5 rounded-full text-xs font-bold
+                {% if card.data.passed %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                {% if card.data.passed %}PASS{% else %}FAIL{% endif %}
+            </span>
+        </div>
+    </div>
+
+    <table class="min-w-full text-xs border-collapse">
+        <thead>
+            <tr class="bg-slate-50">
+                <th class="border border-slate-200 px-3 py-2 text-left font-semibold text-slate-600">Subject</th>
+                <th class="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">Avg %</th>
+                <th class="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">Grade</th>
+                <th class="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">GPA</th>
+                <th class="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">Result</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in card.data.subjects %}
+        <tr class="{% if r.passed %}bg-green-50{% else %}bg-red-50{% endif %}">
+            <td class="border border-slate-200 px-3 py-1.5">{{ r.subject.name }}</td>
+            <td class="border border-slate-200 px-3 py-1.5 text-center">
+                {% if r.absent %}AB{% elif r.avg_pct is not None %}{{ r.avg_pct }}%{% else %}—{% endif %}
+            </td>
+            <td class="border border-slate-200 px-3 py-1.5 text-center font-semibold">{{ r.letter }}</td>
+            <td class="border border-slate-200 px-3 py-1.5 text-center">{{ r.gpa }}</td>
+            <td class="border border-slate-200 px-3 py-1.5 text-center">
+                {% if r.absent %}AB{% elif r.passed %}✅{% else %}❌{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="no-print mt-3 flex gap-2">
+        <a href="{% url 'academics:report_card' student_pk=card.student.pk %}?{{ request.GET.urlencode }}"
+           class="text-xs text-primary hover:underline">Full view</a>
+        <span class="text-slate-300">|</span>
+        <a href="{% url 'academics:report_card_pdf' student_pk=card.student.pk %}?{{ request.GET.urlencode }}"
+           class="text-xs text-red-600 hover:underline">PDF</a>
+    </div>
+</div>
+{% endfor %}
+
+{% elif form.is_bound %}
+<div class="bg-white rounded-xl border border-slate-200 py-12 text-center text-slate-400 font-medium">
+    No approved marks found for this selection.
+</div>
+{% endif %}
+{% endblock %}

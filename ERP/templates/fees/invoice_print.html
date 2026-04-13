@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Invoice — {{ invoice.invoice_number }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { font-size: 11pt; }
+            @page { size: A4; margin: 1.5cm; }
+        }
+        body { font-family: 'Segoe UI', Arial, sans-serif; }
+        .ar { font-family: 'Arial', sans-serif; direction: rtl; }
+    </style>
+</head>
+<body class="bg-slate-50 p-6">
+<div class="max-w-2xl mx-auto">
+
+    <!-- Actions (no-print) -->
+    <div class="no-print flex gap-3 mb-5">
+        <button onclick="window.print()"
+                class="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700 transition">
+            🖨️ Print Invoice
+        </button>
+        <a href="{% url 'fees:invoice_list' %}"
+           class="flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition">
+            ← Back
+        </a>
+    </div>
+
+    <!-- Invoice Card -->
+    <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-lg">
+
+        <!-- Header / School Info -->
+        <div class="px-8 py-6 border-b border-slate-200 flex justify-between items-start">
+            <div>
+                <h1 class="text-xl font-bold text-slate-800">Al-Kawthar International Schools</h1>
+                <p class="text-sm text-slate-500 mt-0.5">Jeddah, Saudi Arabia</p>
+                <p class="text-sm text-slate-500">VAT Registration: <span class="font-mono">300XXXXXXXXX</span></p>
+            </div>
+            <div class="text-right">
+                <p class="text-2xl font-bold" style="color:#c8a862;">فاتورة ضريبية</p>
+                <p class="text-lg font-semibold text-slate-700">Tax Invoice</p>
+            </div>
+        </div>
+
+        <!-- Invoice Meta -->
+        <div class="px-8 py-5 bg-slate-50 border-b border-slate-200 grid grid-cols-2 gap-4 text-sm">
+            <div class="space-y-2">
+                <div>
+                    <p class="text-slate-500 text-xs uppercase tracking-wide">Invoice Number / رقم الفاتورة</p>
+                    <p class="font-mono font-bold text-slate-800 text-base">{{ invoice.invoice_number }}</p>
+                </div>
+                <div>
+                    <p class="text-slate-500 text-xs uppercase tracking-wide">Invoice Date / التاريخ</p>
+                    <p class="font-semibold text-slate-800">{{ invoice.date|date:"d F Y" }}</p>
+                </div>
+                <div>
+                    <p class="text-slate-500 text-xs uppercase tracking-wide">Status / الحالة</p>
+                    <span class="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full
+                        {% if invoice.status == 'ISSUED' %}bg-green-100 text-green-700
+                        {% elif invoice.status == 'VOIDED' %}bg-red-100 text-red-700
+                        {% else %}bg-slate-100 text-slate-600{% endif %}">
+                        {{ invoice.get_status_display }}
+                    </span>
+                </div>
+            </div>
+            <div class="space-y-2">
+                <div>
+                    <p class="text-slate-500 text-xs uppercase tracking-wide">Billed To / العميل</p>
+                    <p class="font-semibold text-slate-800">{{ invoice.student.get_full_name }}</p>
+                    <p class="text-slate-500 text-xs">{{ invoice.student.student_id }}</p>
+                </div>
+                <div>
+                    <p class="text-slate-500 text-xs uppercase tracking-wide">Grade / Section</p>
+                    <p class="text-slate-800">{{ invoice.student.current_section.grade }} / {{ invoice.student.current_section }}</p>
+                </div>
+                <div>
+                    <p class="text-slate-500 text-xs uppercase tracking-wide">Issued By</p>
+                    <p class="text-slate-800">{{ invoice.created_by.get_full_name }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Line Items -->
+        <div class="px-8 py-5">
+            <table class="w-full text-sm border border-slate-200 rounded-xl overflow-hidden">
+                <thead style="background:#1e3a5f;" class="text-white text-xs uppercase">
+                    <tr>
+                        <th class="px-4 py-3 text-left">#</th>
+                        <th class="px-4 py-3 text-left">Description / الوصف</th>
+                        <th class="px-4 py-3 text-right">Amount / المبلغ</th>
+                        <th class="px-4 py-3 text-right">VAT / ضريبة</th>
+                        <th class="px-4 py-3 text-right">Total / الإجمالي</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for item in line_items %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-3 text-slate-500">{{ forloop.counter }}</td>
+                        <td class="px-4 py-3 text-slate-700">{{ item.description }}</td>
+                        <td class="px-4 py-3 text-right">SAR {{ item.amount|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-right text-orange-600">SAR {{ item.vat|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-right font-semibold">SAR {{ item.total|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Totals -->
+            <div class="mt-5 flex justify-end">
+                <div class="w-64 space-y-2 text-sm">
+                    <div class="flex justify-between border-b border-slate-100 pb-2">
+                        <span class="text-slate-500">Subtotal (excl. VAT)</span>
+                        <span class="font-medium">SAR {{ invoice.subtotal|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-100 pb-2">
+                        <span class="text-slate-500">VAT 15%</span>
+                        <span class="font-medium text-orange-600">SAR {{ invoice.tax_amount|floatformat:2 }}</span>
+                    </div>
+                    <div class="flex justify-between pt-1">
+                        <span class="font-bold text-slate-800">Grand Total / الإجمالي</span>
+                        <span class="font-bold text-lg" style="color:#1e3a5f;">SAR {{ invoice.total|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Placeholder + Footer -->
+        <div class="px-8 py-5 border-t border-slate-200 flex justify-between items-end">
+            <div class="text-xs text-slate-400 max-w-xs">
+                <p>This is a simplified tax invoice issued in compliance with ZATCA (Zakat, Tax and Customs Authority) requirements.</p>
+                <p class="mt-1">هذه فاتورة ضريبية مبسطة صادرة وفق متطلبات هيئة الزكاة والضريبة والجمارك.</p>
+            </div>
+            <div class="text-center">
+                <!-- QR placeholder -->
+                <div class="w-20 h-20 bg-slate-100 border border-slate-300 rounded flex items-center justify-center text-[9px] text-slate-400">
+                    QR Code<br>(ZATCA)
+                </div>
+            </div>
+        </div>
+
+        {% if invoice.notes %}
+        <div class="px-8 py-4 border-t border-slate-100 bg-amber-50">
+            <p class="text-xs text-amber-700"><strong>Notes:</strong> {{ invoice.notes }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+</body>
+</html>
