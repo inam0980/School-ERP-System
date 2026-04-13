@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+{% block title %}Take Attendance{% endblock %}
+{% block page_title %}Take Attendance / تسجيل الحضور{% endblock %}
+
+{% block content %}
+<div class="space-y-5 max-w-6xl mx-auto">
+
+    <!-- ── Filter Bar ── -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+
+            <!-- Division -->
+            <div>
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Division</label>
+                <select id="sel-division" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30 focus:border-[#1e3a5f] bg-white">
+                    <option value="">Select Division</option>
+                    {% for d in form.division.field.queryset %}
+                    <option value="{{ d.pk }}" {% if form.division.value == d.pk|stringformat:"s" %}selected{% endif %}>{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Grade -->
+            <div>
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Grade</label>
+                <select id="sel-grade" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30 focus:border-[#1e3a5f] bg-white">
+                    <option value="">Select Grade</option>
+                </select>
+            </div>
+
+            <!-- Section -->
+            <div>
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Section</label>
+                <select id="sel-section" class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30 focus:border-[#1e3a5f] bg-white">
+                    <option value="">Select Section</option>
+                </select>
+            </div>
+
+            <!-- Date -->
+            <div>
+                <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 block">Date</label>
+                <input type="date" id="sel-date" value="{{ today }}"
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30 focus:border-[#1e3a5f] bg-white">
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Student Grid ── -->
+    <div id="att-panel" class="hidden">
+
+        <!-- Panel Header -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-5 py-3 bg-[#1e3a5f] text-white flex items-center justify-between flex-wrap gap-2">
+                <div>
+                    <span id="lbl-section" class="font-semibold text-sm">—</span>
+                    <span id="lbl-date"    class="text-xs text-blue-300 ml-2">—</span>
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                    <!-- Mark all buttons -->
+                    <button onclick="markAll('P')" class="px-3 py-1 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white">✔ All Present</button>
+                    <button onclick="markAll('A')" class="px-3 py-1 text-xs font-semibold rounded-lg bg-red-500   hover:bg-red-400   text-white">✖ All Absent</button>
+                </div>
+            </div>
+
+            <!-- Spinner -->
+            <div id="spinner" class="hidden flex items-center justify-center py-16">
+                <div class="w-8 h-8 border-4 border-[#1e3a5f] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+
+            <!-- Already-saved notice -->
+            <div id="saved-notice" class="hidden px-5 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-700 flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Attendance was already saved for this date. You can update any record below.
+            </div>
+
+            <!-- Student rows -->
+            <div id="student-list" class="divide-y divide-slate-50"></div>
+
+            <!-- Empty state -->
+            <div id="empty-state" class="hidden px-5 py-10 text-center text-sm text-slate-400">
+                No active students found in this section.
+            </div>
+
+            <!-- Submit bar -->
+            <div id="submit-bar" class="hidden px-5 py-4 bg-slate-50 border-t border-slate-100 flex items-center gap-3">
+                <button id="btn-submit" onclick="submitAttendance()"
+                        class="px-6 py-2.5 bg-[#1e3a5f] text-white text-sm font-bold rounded-lg hover:bg-[#2a5298] transition shadow-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    Save Attendance
+                </button>
+                <span id="count-lbl" class="text-xs text-slate-400"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Empty placeholder ── -->
+    <div id="placeholder" class="bg-white rounded-xl shadow-sm border border-slate-100 py-20 text-center text-slate-400">
+        <svg class="w-12 h-12 mx-auto mb-3 text-slate-200" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+        <p class="text-sm font-medium">Select Division → Grade → Section to begin</p>
+    </div>
+
+    <!-- ── Toast ── -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 hidden">
+        <div id="toast-inner" class="flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl text-sm font-semibold text-white max-w-xs">
+            <span id="toast-icon"></span>
+            <span id="toast-msg"></span>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const GRADES_API   = '/api/grades/';
+const SECTIONS_API = '/api/sections/';
+const SESSION_API  = '/attendance/api/session/';
+const SUBMIT_API   = '/attendance/api/submit/';
+const CSRF         = '{{ csrf_token }}';
+
+const selDiv  = document.getElementById('sel-division');
+const selGrd  = document.getElementById('sel-grade');
+const selSec  = document.getElementById('sel-section');
+const selDate = document.getElementById('sel-date');
+
+// ─── Cascade selectors ───────────────────────────────────────────────────────
+async function loadGrades(divId) {
+    selGrd.innerHTML = '<option value="">Select Grade</option>';
+    selSec.innerHTML = '<option value="">Select Section</option>';
+    if (!divId) return;
+    const r = await fetch(`${GRADES_API}?division_id=${divId}`);
+    const d = await r.json();
+    d.grades.forEach(g => selGrd.innerHTML += `<option value="${g.id}">${g.name}</option>`);
+}
+
+async function loadSections(gradeId) {
+    selSec.innerHTML = '<option value="">Select Section</option>';
+    if (!gradeId) return;
+    const r = await fetch(`${SECTIONS_API}?grade_id=${gradeId}`);
+    const d = await r.json();
+    d.sections.forEach(s => selSec.innerHTML += `<option value="${s.id}">${s.name}</option>`);
+}
+
+selDiv.addEventListener('change', () => loadGrades(selDiv.value));
+selGrd.addEventListener('change', () => loadSections(selGrd.value));
+selSec.addEventListener('change', () => loadStudents());
+selDate.addEventListener('change', () => { if (selSec.value) loadStudents(); });
+
+// ─── Load student list via AJAX ──────────────────────────────────────────────
+async function loadStudents() {
+    const secId = selSec.value;
+    const dt    = selDate.value;
+    if (!secId || !dt) return;
+
+    document.getElementById('placeholder').classList.add('hidden');
+    document.getElementById('att-panel').classList.remove('hidden');
+    document.getElementById('spinner').classList.remove('hidden');
+    document.getElementById('student-list').innerHTML = '';
+    document.getElementById('submit-bar').classList.add('hidden');
+    document.getElementById('saved-notice').classList.add('hidden');
+    document.getElementById('empty-state').classList.add('hidden');
+
+    const r = await fetch(`${SESSION_API}?section_id=${secId}&date=${dt}`);
+    const d = await r.json();
+
+    document.getElementById('spinner').classList.add('hidden');
+    document.getElementById('lbl-section').textContent = d.section;
+    document.getElementById('lbl-date').textContent    = d.date;
+
+    if (d.already_saved) {
+        document.getElementById('saved-notice').classList.remove('hidden');
+    }
+
+    if (!d.students.length) {
+        document.getElementById('empty-state').classList.remove('hidden');
+        return;
+    }
+
+    renderStudents(d.students);
+    updateCountLabel();
+    document.getElementById('submit-bar').classList.remove('hidden');
+}
+
+const STATUS_META = {
+    P: { label: 'Present', cls: 'bg-emerald-100 text-emerald-800 border-emerald-300 checked:bg-emerald-500' },
+    A: { label: 'Absent',  cls: 'bg-red-100    text-red-700    border-red-300    checked:bg-red-500'    },
+    L: { label: 'Late',    cls: 'bg-amber-100  text-amber-800  border-amber-300  checked:bg-amber-500'  },
+    E: { label: 'Excused', cls: 'bg-blue-100   text-blue-800   border-blue-300   checked:bg-blue-500'   },
+};
+
+function renderStudents(students) {
+    const list = document.getElementById('student-list');
+    list.innerHTML = '';
+    students.forEach(s => {
+        const photoEl = s.photo
+            ? `<img src="${s.photo}" class="w-10 h-10 rounded-lg object-cover border border-slate-200" alt="">`
+            : `<div class="w-10 h-10 rounded-lg bg-[#1e3a5f] flex items-center justify-center text-white font-bold text-base">${s.name[0].toUpperCase()}</div>`;
+
+        const radios = ['P','A','L','E'].map(v => `
+            <label class="flex items-center gap-1.5 cursor-pointer px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition
+                          ${s.status === v ? STATUS_META[v].cls + ' ring-2 ring-offset-1' : 'border-slate-200 text-slate-500 hover:border-slate-300'}
+                          att-radio-label-${s.id}-${v}">
+                <input type="radio" name="att-${s.id}" value="${v}" class="hidden" ${s.status === v ? 'checked' : ''}
+                       onchange="onRadioChange(${s.id}, '${v}', this)">
+                ${STATUS_META[v].label}
+            </label>
+        `).join('');
+
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition att-row';
+        row.dataset.studentId = s.id;
+        row.innerHTML = `
+            <div class="flex-shrink-0">${photoEl}</div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-slate-800 truncate">${s.name}</p>
+                <p class="text-xs text-slate-400" dir="rtl">${s.arabic_name}</p>
+            </div>
+            <div class="text-xs text-slate-400 hidden sm:block w-12 text-center">${s.roll}</div>
+            <div class="flex flex-wrap gap-1.5 justify-end">${radios}</div>
+            <div>
+                <input type="text" placeholder="Remarks…" value="${s.remarks}"
+                       class="w-28 lg:w-40 px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]/30 text-slate-600"
+                       id="rem-${s.id}">
+            </div>
+        `;
+        list.appendChild(row);
+    });
+}
+
+function onRadioChange(studentId, newVal, inputEl) {
+    // Update label styling
+    ['P','A','L','E'].forEach(v => {
+        const lbl = document.querySelector(`.att-radio-label-${studentId}-${v}`);
+        if (!lbl) return;
+        // Reset
+        lbl.className = lbl.className
+            .replace(/bg-\w+-\d+\s*/g,'')
+            .replace(/text-\w+-\d+\s*/g,'')
+            .replace(/border-\w+-\d+\s*/g,'')
+            .replace(/ring-\d+\s*ring-offset-\d+\s*/g,'');
+        lbl.className += ' border-slate-200 text-slate-500';
+    });
+    const activeLbl = document.querySelector(`.att-radio-label-${studentId}-${newVal}`);
+    if (activeLbl) {
+        activeLbl.className += ` ${STATUS_META[newVal].cls} ring-2 ring-offset-1`;
+    }
+    updateCountLabel();
+}
+
+function markAll(status) {
+    document.querySelectorAll('.att-row').forEach(row => {
+        const sid = row.dataset.studentId;
+        const radio = row.querySelector(`input[value="${status}"]`);
+        if (radio) {
+            radio.checked = true;
+            onRadioChange(sid, status, radio);
+        }
+    });
+}
+
+function updateCountLabel() {
+    const rows = document.querySelectorAll('.att-row');
+    const counts = {P:0, A:0, L:0, E:0};
+    rows.forEach(row => {
+        const checked = row.querySelector('input[type=radio]:checked');
+        if (checked) counts[checked.value]++;
+    });
+    document.getElementById('count-lbl').textContent =
+        `${rows.length} students · Present: ${counts.P} · Late: ${counts.L} · Absent: ${counts.A} · Excused: ${counts.E}`;
+}
+
+// ─── Submit via AJAX ─────────────────────────────────────────────────────────
+async function submitAttendance() {
+    const btn   = document.getElementById('btn-submit');
+    const secId = selSec.value;
+    const dt    = selDate.value;
+
+    const records = [];
+    document.querySelectorAll('.att-row').forEach(row => {
+        const sid     = parseInt(row.dataset.studentId);
+        const checked = row.querySelector('input[type=radio]:checked');
+        const remarks = document.getElementById(`rem-${sid}`)?.value || '';
+        if (checked) {
+            records.push({ student_id: sid, status: checked.value, remarks });
+        }
+    });
+
+    if (!records.length) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    try {
+        const res = await fetch(SUBMIT_API, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body:    JSON.stringify({ date: dt, section_id: secId, records }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`✔ Saved ${data.total} records (${data.created} new, ${data.updated} updated)`, 'success');
+            document.getElementById('saved-notice').classList.remove('hidden');
+        } else {
+            showToast(`✖ Error: ${data.error}`, 'error');
+        }
+    } catch(e) {
+        showToast('Network error. Please try again.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Save Attendance';
+    }
+}
+
+// ─── Toast helper ────────────────────────────────────────────────────────────
+function showToast(msg, type) {
+    const toast  = document.getElementById('toast');
+    const inner  = document.getElementById('toast-inner');
+    const msgEl  = document.getElementById('toast-msg');
+    msgEl.textContent = msg;
+    inner.className = inner.className.replace(/(bg-\w+-\d+)/g, '');
+    inner.classList.add(type === 'success' ? 'bg-emerald-600' : 'bg-red-600');
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 4000);
+}
+</script>
+{% endblock %}

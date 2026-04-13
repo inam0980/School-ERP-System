@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'core',
     'accounts',
     'students',
+    'attendance',
     'academics',
     'fees',
     'staff',
@@ -65,7 +66,7 @@ ROOT_URLCONF = 'ERP.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': ['templates'],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

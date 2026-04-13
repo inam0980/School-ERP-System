@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+
+    <!-- Back -->
+    <div class="mb-5 flex items-center gap-2">
+        <a href="{% url 'students:list' %}" class="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            Back to Students
+        </a>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" class="space-y-6" id="studentForm">
+        {% csrf_token %}
+
+        <!-- ── SECTION 1: Personal ───────────────────────────────── -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-3.5 bg-[#1e3a5f] text-white flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                <span class="text-sm font-semibold">Personal Information / المعلومات الشخصية</span>
+            </div>
+            <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                {% include 'students/_field.html' with field=form.full_name %}
+                {% include 'students/_field.html' with field=form.arabic_name rtl=True %}
+                {% include 'students/_field.html' with field=form.dob %}
+                {% include 'students/_field.html' with field=form.gender %}
+                {% include 'students/_field.html' with field=form.nationality %}
+                {% include 'students/_field.html' with field=form.national_id %}
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                        Photo / الصورة الشخصية
+                    </label>
+                    {% if student and student.photo %}
+                    <div class="mb-2 flex items-center gap-3">
+                        <img src="{{ student.photo.url }}" class="w-16 h-16 rounded-xl object-cover border border-slate-200" alt="Current photo">
+                        <span class="text-xs text-slate-400">Current photo — upload new to replace</span>
+                    </div>
+                    {% endif %}
+                    {{ form.photo }}
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SECTION 2: Academic ───────────────────────────────── -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-3.5 bg-indigo-700 text-white flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6"/></svg>
+                <span class="text-sm font-semibold">Academic Information / المعلومات الأكاديمية</span>
+            </div>
+            <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                <!-- Division triggers JS cascade -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5" for="{{ form.division.id_for_label }}">
+                        {{ form.division.label }} <span class="text-red-400">*</span>
+                    </label>
+                    {{ form.division }}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5" for="{{ form.grade.id_for_label }}">
+                        {{ form.grade.label }} <span class="text-red-400">*</span>
+                    </label>
+                    {{ form.grade }}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5" for="{{ form.section.id_for_label }}">
+                        {{ form.section.label }} <span class="text-red-400">*</span>
+                    </label>
+                    {{ form.section }}
+                </div>
+                {% include 'students/_field.html' with field=form.academic_year %}
+                {% include 'students/_field.html' with field=form.roll_number %}
+            </div>
+        </div>
+
+        <!-- ── SECTION 3: Guardian ───────────────────────────────── -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-3.5 bg-emerald-700 text-white flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0h6"/></svg>
+                <span class="text-sm font-semibold">Guardian Information / معلومات ولي الأمر</span>
+            </div>
+            <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                {% include 'students/_field.html' with field=form.father_name %}
+                {% include 'students/_field.html' with field=form.arabic_father rtl=True %}
+                {% include 'students/_field.html' with field=form.mother_name %}
+                {% include 'students/_field.html' with field=form.arabic_mother rtl=True %}
+                {% include 'students/_field.html' with field=form.guardian_phone %}
+                {% include 'students/_field.html' with field=form.guardian_phone2 %}
+                <div class="md:col-span-2">
+                    {% include 'students/_field.html' with field=form.guardian_email %}
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SECTION 4: Address ───────────────────────────────── -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-3.5 bg-amber-600 text-white flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span class="text-sm font-semibold">Address / العنوان</span>
+            </div>
+            <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                {% include 'students/_field.html' with field=form.address %}
+                {% include 'students/_field.html' with field=form.arabic_address rtl=True %}
+            </div>
+        </div>
+
+        <!-- ── SECTION 5: Status & Enrollment ──────────────────── -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-3.5 bg-slate-700 text-white flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <span class="text-sm font-semibold">Enrollment Status / حالة القيد</span>
+            </div>
+            <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                {% include 'students/_field.html' with field=form.enrollment_type %}
+                {% include 'students/_field.html' with field=form.admission_date %}
+                <div class="md:col-span-2">
+                    {% include 'students/_field.html' with field=form.previous_school %}
+                </div>
+                <div class="md:col-span-2 flex items-center gap-3">
+                    {{ form.is_active }}
+                    <label class="text-sm font-medium text-slate-700 cursor-pointer" for="{{ form.is_active.id_for_label }}">
+                        {{ form.is_active.label }}
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="flex gap-3 pb-2">
+            <button type="submit"
+                    class="px-6 py-2.5 bg-[#1e3a5f] text-white text-sm font-semibold rounded-lg hover:bg-[#2a5298] transition shadow-sm">
+                Save Student / حفظ بيانات الطالب
+            </button>
+            <a href="{% url 'students:list' %}"
+               class="px-6 py-2.5 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-200 transition">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+{% block extra_scripts %}
+<script>
+// Dynamic Division → Grade → Section cascade
+const divisionSel = document.getElementById('{{ form.division.id_for_label }}');
+const gradeSel    = document.getElementById('{{ form.grade.id_for_label }}');
+const sectionSel  = document.getElementById('{{ form.section.id_for_label }}');
+
+function resetSelect(sel, placeholder) {
+    sel.innerHTML = `<option value="">${placeholder}</option>`;
+}
+
+async function loadGrades(divId) {
+    resetSelect(gradeSel, 'Select Grade / اختر الصف');
+    resetSelect(sectionSel, 'Select Section / اختر الفصل');
+    if (!divId) return;
+    const res  = await fetch(`/api/grades/?division_id=${divId}`);
+    const data = await res.json();
+    data.grades.forEach(g => {
+        gradeSel.innerHTML += `<option value="${g.id}">${g.name}</option>`;
+    });
+    {% if student %}
+    gradeSel.value = "{{ student.grade_id|default:'' }}";
+    if (gradeSel.value) loadSections(gradeSel.value);
+    {% endif %}
+}
+
+async function loadSections(gradeId) {
+    resetSelect(sectionSel, 'Select Section / اختر الفصل');
+    if (!gradeId) return;
+    const res  = await fetch(`/api/sections/?grade_id=${gradeId}`);
+    const data = await res.json();
+    data.sections.forEach(s => {
+        sectionSel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+    });
+    {% if student %}
+    sectionSel.value = "{{ student.section_id|default:'' }}";
+    {% endif %}
+}
+
+divisionSel.addEventListener('change', () => loadGrades(divisionSel.value));
+gradeSel.addEventListener('change',   () => loadSections(gradeSel.value));
+
+// On edit, auto-load existing values
+{% if student %}
+if (divisionSel.value) loadGrades(divisionSel.value);
+{% endif %}
+</script>
+{% endblock %}
+{% endblock %}

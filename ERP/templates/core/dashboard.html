@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard — Al-Kawthar ERP{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Welcome Banner -->
+    <div class="bg-gradient-to-r from-[#1e3a5f] to-[#2a5298] rounded-2xl px-6 py-6 text-white shadow-lg">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <div>
+                <p class="text-blue-200 text-sm">Welcome back,</p>
+                <h2 class="text-2xl font-bold mt-0.5">{{ user.full_name }}</h2>
+                <span class="inline-block mt-2 px-3 py-0.5 rounded-full bg-white/10 text-xs font-semibold tracking-wide border border-white/20">
+                    {{ user.get_role_display }}
+                    {% if user.division %} &mdash; {{ user.division }}{% endif %}
+                </span>
+            </div>
+            <div class="text-right text-sm text-blue-200">
+                <p id="clock" class="text-3xl font-mono font-bold text-white"></p>
+                <p id="dateline" class="mt-1"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Quick Stats (visible to Admin / Super Admin) ===== -->
+    {% if user.role == 'SUPER_ADMIN' or user.role == 'ADMIN' %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+
+        <!-- Total Students -->
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M17 20h5v-2a4 4 0 00-5-3.87M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857
+                             M7 20H2v-2a4 4 0 015-3.87M7 20v-2c0-.656.126-1.283.356-1.857
+                             m0 0A5.002 5.002 0 0112 11a5 5 0 014.644 7.143"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-bold text-slate-800">{{ stats.total_students|default:"—" }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">Total Students</p>
+            </div>
+        </div>
+
+        <!-- Today Attendance -->
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-bold text-slate-800">{{ stats.attendance_today|default:"—" }}%</p>
+                <p class="text-xs text-slate-500 mt-0.5">Today's Attendance</p>
+            </div>
+        </div>
+
+        <!-- Pending Fees -->
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
+                <svg class="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2
+                             m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1
+                             m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-bold text-slate-800">{{ stats.pending_fees|default:"—" }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">Pending Fee Cases</p>
+            </div>
+        </div>
+
+        <!-- Total Staff -->
+        <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-100 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
+                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-bold text-slate-800">{{ stats.total_staff|default:"—" }}</p>
+                <p class="text-xs text-slate-500 mt-0.5">Total Staff</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ===== Module Cards ===== -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        <!-- Students — Admin, Super Admin -->
+        {% if user.role == 'SUPER_ADMIN' or user.role == 'ADMIN' %}
+        <a href="/students/"
+           class="group bg-white rounded-xl p-6 shadow-sm border border-slate-100
+                  hover:shadow-md hover:border-blue-200 transition-all duration-200">
+            <div class="w-10 h-10 rounded-lg bg-blue-50 group-hover:bg-blue-100 flex items-center justify-center mb-4 transition">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M17 20h5v-2a4 4 0 00-5-3.87M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857
+                             M7 20H2v-2a4 4 0 015-3.87M7 20v-2c0-.656.126-1.283.356-1.857
+                             m0 0A5.002 5.002 0 0112 11a5 5 0 014.644 7.143"/>
+                </svg>
+            </div>
+            <h3 class="font-semibold text-slate-800 text-sm">Students</h3>
+            <p class="text-xs text-slate-400 mt-1">Enrollment, profiles, documents</p>
+        </a>
+        {% endif %}
+
+        <!-- Academics — Admin, Super Admin, Teacher -->
+        {% if user.role in 'SUPER_ADMIN,ADMIN,TEACHER' %}
+        <a href="/academics/"
+           class="group bg-white rounded-xl p-6 shadow-sm border border-slate-100
+                  hover:shadow-md hover:border-indigo-200 transition-all duration-200">
+            <div class="w-10 h-10 rounded-lg bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center mb-4 transition">
+                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0-6l-3-1.667M12 20l-9-5"/>
+                </svg>
+            </div>
+            <h3 class="font-semibold text-slate-800 text-sm">Academics</h3>
+            <p class="text-xs text-slate-400 mt-1">Classes, subjects, timetable, grades</p>
+        </a>
+        {% endif %}
+
+        <!-- Staff — Admin, Super Admin -->
+        {% if user.role == 'SUPER_ADMIN' or user.role == 'ADMIN' %}
+        <a href="/staff/"
+           class="group bg-white rounded-xl p-6 shadow-sm border border-slate-100
+                  hover:shadow-md hover:border-purple-200 transition-all duration-200">
+            <div class="w-10 h-10 rounded-lg bg-purple-50 group-hover:bg-purple-100 flex items-center justify-center mb-4 transition">
+                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+            </div>
+            <h3 class="font-semibold text-slate-800 text-sm">Staff</h3>
+            <p class="text-xs text-slate-400 mt-1">HR, attendance, payroll</p>
+        </a>
+        {% endif %}
+
+        <!-- Fees — Admin, Super Admin, Accountant -->
+        {% if user.role == 'SUPER_ADMIN' or user.role == 'ADMIN' or user.role == 'ACCOUNTANT' %}
+        <a href="/fees/"
+           class="group bg-white rounded-xl p-6 shadow-sm border border-slate-100
+                  hover:shadow-md hover:border-orange-200 transition-all duration-200">
+            <div class="w-10 h-10 rounded-lg bg-orange-50 group-hover:bg-orange-100 flex items-center justify-center mb-4 transition">
+                <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2
+                             m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1
+                             m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <h3 class="font-semibold text-slate-800 text-sm">Fees &amp; Payments</h3>
+            <p class="text-xs text-slate-400 mt-1">Invoices, receipts, pending dues</p>
+        </a>
+        {% endif %}
+
+        <!-- AI Assistant — all roles -->
+        <a href="/ai/"
+           class="group bg-white rounded-xl p-6 shadow-sm border border-slate-100
+                  hover:shadow-md hover:border-teal-200 transition-all duration-200">
+            <div class="w-10 h-10 rounded-lg bg-teal-50 group-hover:bg-teal-100 flex items-center justify-center mb-4 transition">
+                <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3
+                             m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547
+                             A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531
+                             c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+            </div>
+            <h3 class="font-semibold text-slate-800 text-sm">AI Assistant</h3>
+            <p class="text-xs text-slate-400 mt-1">Smart insights &amp; predictions</p>
+        </a>
+
+    </div>
+</div>
+
+<script>
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clock').textContent = now.toLocaleTimeString('en-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        document.getElementById('dateline').textContent = now.toLocaleDateString('en-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+</script>
+{% endblock %}
