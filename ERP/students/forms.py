@@ -47,7 +47,7 @@ class StudentForm(forms.ModelForm):
         model  = Student
         fields = [
             # Identity
-            'full_name', 'arabic_name', 'dob', 'gender', 'nationality', 'national_id',
+            'full_name', 'arabic_name', 'dob', 'gender', 'nationality', 'id_type', 'national_id',
             # Academic
             'division', 'grade', 'section', 'academic_year', 'roll_number',
             # Guardian

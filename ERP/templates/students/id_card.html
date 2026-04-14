@@ -51,7 +51,7 @@
                 <!-- Photo -->
                 <div class="flex-shrink-0">
                     {% if student.photo %}
-                        <img src="{{ request.build_absolute_uri }}{{ student.photo.url }}"
+                        <img src="{{ student.photo.url }}"
                              class="w-16 h-20 object-cover rounded-lg border-2 border-white/40"
                              alt="{{ student.full_name }}">
                     {% else %}
@@ -125,6 +125,12 @@
                         <p class="text-[9px] text-slate-400 uppercase tracking-wider">Nationality</p>
                         <p class="font-semibold text-slate-700">{{ student.nationality }}</p>
                     </div>
+                    {% if student.national_id %}
+                    <div>
+                        <p class="text-[9px] text-slate-400 uppercase tracking-wider">{{ student.get_id_type_display }}</p>
+                        <p class="font-semibold text-slate-700 font-mono tracking-wide">{{ student.national_id }}</p>
+                    </div>
+                    {% endif %}
                 </div>
                 <!-- Barcode placeholder -->
                 <div class="ml-4 text-center">

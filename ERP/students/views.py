@@ -68,7 +68,7 @@ def student_add(request):
         student = form.save(commit=False)
         student.created_by = request.user
         student.save()
-        messages.success(request, f"Student {student.full_name} added successfully. ID: {student.student_id}")
+        messages.success(request, f"Student {student.full_name} added (ID: {student.student_id}). Please upload identity documents (National ID / Iqama / Passport) below.")
         return redirect('students:detail', pk=student.pk)
     return render(request, 'students/student_form.html', {'form': form, 'title': 'Add Student / إضافة طالب'})
 
