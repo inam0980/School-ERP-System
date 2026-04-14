@@ -28,6 +28,16 @@ class Student(models.Model):
         (RETURNING, 'Returning / عائد'),
     ]
 
+    # ── ID type choices ───────────────────────────────────────────────
+    NATIONAL_ID_TYPE = 'NATIONAL_ID'
+    IQAMA            = 'IQAMA'
+    PASSPORT_ID      = 'PASSPORT'
+    ID_TYPE_CHOICES  = [
+        (NATIONAL_ID_TYPE, 'National ID / هوية وطنية'),
+        (IQAMA,            'Iqama / إقامة'),
+        (PASSPORT_ID,      'Passport / جواز السفر'),
+    ]
+
     # ── Identity ──────────────────────────────────────────────────────
     student_id   = models.CharField(max_length=20, unique=True, editable=False)
     full_name    = models.CharField(max_length=200, verbose_name="Full Name (English)")
@@ -35,7 +45,12 @@ class Student(models.Model):
     dob          = models.DateField(verbose_name="Date of Birth / تاريخ الميلاد")
     gender       = models.CharField(max_length=1, choices=GENDER_CHOICES, verbose_name="Gender / الجنس")
     nationality  = models.CharField(max_length=100, verbose_name="Nationality / الجنسية")
-    national_id  = models.CharField(max_length=50, blank=True, verbose_name="National ID / الهوية الوطنية")
+    id_type      = models.CharField(
+        max_length=15, choices=ID_TYPE_CHOICES, default=NATIONAL_ID_TYPE,
+        verbose_name="ID Type / نوع الهوية",
+        help_text="Saudi students: National ID (هوية وطنية)  ·  Residents: Iqama (إقامة)  ·  Others: Passport"
+    )
+    national_id  = models.CharField(max_length=50, blank=True, verbose_name="ID Number / رقم الهوية")
 
     # ── Academic ──────────────────────────────────────────────────────
     division      = models.ForeignKey(Division,     on_delete=models.PROTECT, related_name='students', verbose_name="Division / القسم")
@@ -108,14 +123,16 @@ class Student(models.Model):
 class StudentDocument(models.Model):
     PASSPORT     = 'PASSPORT'
     NATIONAL_ID  = 'NATIONAL_ID'
+    IQAMA        = 'IQAMA'
     BIRTH_CERT   = 'BIRTH_CERT'
     TRANSFER_CERT = 'TRANSFER_CERT'
     PHOTO        = 'PHOTO'
     OTHER        = 'OTHER'
 
     DOC_TYPES = [
-        (PASSPORT,      'Passport / جواز السفر'),
         (NATIONAL_ID,   'National ID / الهوية الوطنية'),
+        (IQAMA,         'Iqama / إقامة'),
+        (PASSPORT,      'Passport / جواز السفر'),
         (BIRTH_CERT,    'Birth Certificate / شهادة الميلاد'),
         (TRANSFER_CERT, 'Transfer Certificate / شهادة النقل'),
         (PHOTO,         'Photograph / صورة شخصية'),
