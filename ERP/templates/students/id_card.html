@@ -1,151 +1,378 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>ID Card — {{ student.full_name }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @page { size: 85.6mm 54mm; margin: 0; }
-        body { margin: 0; background: #f1f5f9; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        /* ── Reset ──────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        /* ── Print page setup ───────────────────────────────── */
+        @page {
+            size: A4 portrait;
+            margin: 15mm 15mm;
+        }
+
+        /* ── Screen layout ──────────────────────────────────── */
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f1f5f9;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 40px 20px 60px;
+            gap: 0;
+        }
+
+        /* ── Toolbar (screen only) ──────────────────────────── */
+        .toolbar {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+        }
+        .btn-print {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: #1e3a5f;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,.25);
+        }
+        .btn-print:hover { background: #2a5298; }
+        .btn-back {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: white;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,.08);
+        }
+        .btn-back:hover { background: #f8fafc; }
+
+        /* ── Card container ─────────────────────────────────── */
+        .cards-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 32px;
+            margin-top: 20px;
+        }
+
+        .card-label {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 6px;
+            align-self: flex-start;
+        }
+
+        /* ── ID Card (physical: 85.6mm × 54mm) ─────────────── */
+        .id-card {
+            width: 85.6mm;
+            height: 54mm;
+            border-radius: 3mm;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 8px 32px rgba(0,0,0,.18);
+        }
+
+        /* ════════════════════ FRONT ════════════════════════ */
+        .card-front {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2a5298 100%);
+            display: flex;
+            flex-direction: column;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+
+        .cf-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3mm 4mm 2mm;
+        }
+        .cf-logo {
+            width: 11mm;
+            height: 11mm;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+        .cf-logo img {
+            width: 10mm;
+            height: 10mm;
+            object-fit: contain;
+        }
+        .cf-school-name { color: white; flex: 1; }
+        .cf-school-name p:first-child { font-size: 7px; font-weight: 700; line-height: 1.3; }
+        .cf-school-name p:last-child  { font-size: 6.5px; color: #bfdbfe; direction: rtl; }
+        .cf-id-label { text-align: right; color: white; }
+        .cf-id-label p:first-child { font-size: 6.5px; color: #bfdbfe; }
+        .cf-id-label p:last-child  { font-size: 7.5px; font-weight: 700; font-family: monospace; letter-spacing: .05em; }
+
+        .cf-divider { height: 0.3mm; background: rgba(255,255,255,.2); margin: 0 4mm; }
+
+        .cf-body {
+            display: flex;
+            gap: 3mm;
+            padding: 2.5mm 4mm;
+            flex: 1;
+        }
+        .cf-photo {
+            flex-shrink: 0;
+            width: 18mm;
+            height: 23mm;
+        }
+        .cf-photo img {
+            width: 18mm;
+            height: 23mm;
+            object-fit: cover;
+            border-radius: 2mm;
+            border: 0.5mm solid rgba(255,255,255,.4);
+        }
+        .cf-photo-placeholder {
+            width: 18mm;
+            height: 23mm;
+            border-radius: 2mm;
+            border: 0.5mm solid rgba(255,255,255,.4);
+            background: rgba(255,255,255,.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+        .cf-info { color: white; flex: 1; min-width: 0; }
+        .cf-info .name-en { font-size: 9px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cf-info .name-ar { font-size: 7.5px; color: #bfdbfe; direction: rtl; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0.5mm; }
+        .cf-rows { margin-top: 2mm; display: flex; flex-direction: column; gap: 1mm; }
+        .cf-row { display: flex; gap: 1mm; font-size: 7px; }
+        .cf-row .lbl { color: #93c5fd; width: 14mm; flex-shrink: 0; }
+        .cf-row .val { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .cf-footer {
+            padding: 1.5mm 4mm 2.5mm;
+        }
+        .cf-footer-inner {
+            background: rgba(255,255,255,.1);
+            border-radius: 1.5mm;
+            padding: 1mm 3mm;
+            text-align: center;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+        .cf-footer-inner p { font-size: 6px; color: #bfdbfe; }
+
+        /* ════════════════════ BACK ═════════════════════════ */
+        .card-back {
+            background: #f8fafc;
+            border: 0.3mm solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+        }
+        .cb-stripe {
+            height: 3.5mm;
+            background: linear-gradient(90deg, #1e3a5f, #2a5298);
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+        .cb-body {
+            flex: 1;
+            padding: 2.5mm 4mm;
+            display: flex;
+            align-items: flex-start;
+            gap: 3mm;
+        }
+        .cb-info { flex: 1; display: flex; flex-direction: column; gap: 1.8mm; }
+        .cb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; }
+        .cb-field p.lbl { font-size: 6px; color: #94a3b8; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 0.5mm; }
+        .cb-field p.val { font-size: 8px; font-weight: 600; color: #1e293b; }
+        .cb-field p.val-ar { font-size: 7px; color: #64748b; direction: rtl; }
+        .cb-field p.val-mono { font-size: 7.5px; font-weight: 600; color: #1e293b; font-family: monospace; letter-spacing: .04em; }
+
+        .cb-barcode { display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+        .cb-bars { display: flex; align-items: flex-end; gap: 0.6mm; }
+        .cb-bars span {
+            display: inline-block;
+            width: 0.8mm;
+            background: #1e293b;
+            border-radius: 0.3mm;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+        .cb-barcode-id { font-size: 5.5px; color: #64748b; font-family: monospace; margin-top: 1mm; text-align: center; }
+
+        /* ── Print overrides ────────────────────────────────── */
         @media print {
-            body { background: white; display: block; }
-            .no-print { display: none !important; }
-            .card { box-shadow: none !important; }
-            .page-break { page-break-after: always; }
+            body {
+                background: white !important;
+                padding: 0;
+                display: block;
+            }
+            .toolbar { display: none !important; }
+            .cards-wrapper {
+                gap: 20mm;
+                margin-top: 0;
+            }
+            .card-label { display: none; }
+            .id-card {
+                box-shadow: none !important;
+                border: 0.3mm solid #cbd5e1;
+            }
+            /* Force backgrounds and colors to print */
+            * {
+                print-color-adjust: exact !important;
+                -webkit-print-color-adjust: exact !important;
+            }
         }
     </style>
 </head>
 <body>
 
-    <!-- Print Button -->
-    <button onclick="window.print()" class="no-print fixed top-4 right-4 px-4 py-2 bg-[#1e3a5f] text-white text-sm rounded-lg shadow hover:bg-[#2a5298] flex items-center gap-2">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
-        Print Card
-    </button>
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <button class="btn-print" onclick="window.print()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4"/></svg>
+            Print Card
+        </button>
+        <a class="btn-back" href="{% url 'students:detail' student.pk %}">
+            ← Back to Profile
+        </a>
+    </div>
 
-    <!-- ID Card wrapper -->
-    <div class="flex flex-col items-center gap-8 py-10">
+    <div class="cards-wrapper">
 
-        <!-- FRONT -->
-        <div class="card w-[340px] h-[214px] rounded-xl shadow-2xl overflow-hidden relative flex flex-col"
-             style="background: linear-gradient(135deg, #1e3a5f 0%, #2a5298 100%);">
-            <!-- Header -->
-            <div class="flex items-center gap-2 px-4 pt-3 pb-2">
-                <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-black">AK</div>
-                <div class="text-white">
-                    <p class="text-[9px] font-semibold leading-tight">Al-Kawthar International Schools</p>
-                    <p class="text-[8px] text-blue-200" dir="rtl">مدارس الكوثر الدولية</p>
-                </div>
-                <div class="ml-auto text-right text-white">
-                    <p class="text-[8px] text-blue-200">STUDENT ID</p>
-                    <p class="text-[9px] font-bold font-mono tracking-wider">{{ student.student_id }}</p>
-                </div>
-            </div>
-
-            <!-- Divider -->
-            <div class="h-px bg-white/20 mx-4"></div>
-
-            <!-- Body -->
-            <div class="flex gap-3 px-4 pt-3 flex-1">
-                <!-- Photo -->
-                <div class="flex-shrink-0">
-                    {% if student.photo %}
-                        <img src="{{ student.photo.url }}"
-                             class="w-16 h-20 object-cover rounded-lg border-2 border-white/40"
-                             alt="{{ student.full_name }}">
-                    {% else %}
-                        <div class="w-16 h-20 rounded-lg bg-white/20 border-2 border-white/40 flex items-center justify-center text-white text-2xl font-bold">
-                            {{ student.full_name|first|upper }}
-                        </div>
-                    {% endif %}
+        <!-- ══ FRONT ══ -->
+        <div>
+            <p class="card-label">Front / الوجه الأمامي</p>
+            <div class="id-card card-front">
+                <!-- Header -->
+                <div class="cf-header">
+                    <div class="cf-logo">
+                        <img src="{% static 'images/logo.png' %}" alt="Logo">
+                    </div>
+                    <div class="cf-school-name">
+                        <p>Al-Kawthar International Schools</p>
+                        <p>مدارس الكوثر الدولية</p>
+                    </div>
+                    <div class="cf-id-label">
+                        <p>STUDENT ID</p>
+                        <p>{{ student.student_id }}</p>
+                    </div>
                 </div>
 
-                <!-- Info -->
-                <div class="flex-1 min-w-0 text-white">
-                    <p class="text-sm font-bold truncate">{{ student.full_name }}</p>
-                    <p class="text-[10px] text-blue-200 truncate" dir="rtl">{{ student.arabic_name }}</p>
+                <div class="cf-divider"></div>
 
-                    <div class="mt-2 space-y-0.5">
-                        <div class="flex gap-1 text-[9px]">
-                            <span class="text-blue-300 w-14">Division</span>
-                            <span class="font-medium truncate">{{ student.division }}</span>
-                        </div>
-                        <div class="flex gap-1 text-[9px]">
-                            <span class="text-blue-300 w-14">Grade</span>
-                            <span class="font-medium truncate">{{ student.grade }}</span>
-                        </div>
-                        <div class="flex gap-1 text-[9px]">
-                            <span class="text-blue-300 w-14">Section</span>
-                            <span class="font-medium truncate">{{ student.section }}</span>
-                        </div>
-                        <div class="flex gap-1 text-[9px]">
-                            <span class="text-blue-300 w-14">Year</span>
-                            <span class="font-medium">{{ student.academic_year }}</span>
+                <!-- Body -->
+                <div class="cf-body">
+                    <div class="cf-photo">
+                        {% if student.photo %}
+                            <img src="{{ student.photo.url }}" alt="{{ student.full_name }}">
+                        {% else %}
+                            <div class="cf-photo-placeholder">{{ student.full_name|first|upper }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="cf-info">
+                        <p class="name-en">{{ student.full_name }}</p>
+                        <p class="name-ar">{{ student.arabic_name }}</p>
+                        <div class="cf-rows">
+                            <div class="cf-row"><span class="lbl">Division</span><span class="val">{{ student.division }}</span></div>
+                            <div class="cf-row"><span class="lbl">Grade</span><span class="val">{{ student.grade.name }}</span></div>
+                            <div class="cf-row"><span class="lbl">Section</span><span class="val">{{ student.section.name }}</span></div>
+                            <div class="cf-row"><span class="lbl">Year</span><span class="val">{{ student.academic_year }}</span></div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Footer strip -->
-            <div class="px-4 pb-3 pt-2">
-                <div class="bg-white/10 rounded-lg px-3 py-1 text-center">
-                    <p class="text-[8px] text-blue-200">Jeddah, Saudi Arabia · For school use only</p>
+                <!-- Footer -->
+                <div class="cf-footer">
+                    <div class="cf-footer-inner">
+                        <p>Jeddah, Saudi Arabia · For school use only · للاستخدام المدرسي فقط</p>
+                    </div>
                 </div>
             </div>
-
-            <!-- Decorative circles -->
-            <div class="absolute -top-6 -right-6 w-20 h-20 rounded-full bg-white/5"></div>
-            <div class="absolute -bottom-4 -left-4 w-16 h-16 rounded-full bg-white/5"></div>
         </div>
 
-        <!-- BACK -->
-        <div class="card w-[340px] h-[214px] rounded-xl shadow-2xl overflow-hidden flex flex-col"
-             style="background: #f8fafc; border: 1px solid #e2e8f0;">
-            <div class="h-3" style="background: linear-gradient(90deg, #1e3a5f, #2a5298);"></div>
-            <div class="flex-1 px-5 py-4 flex items-center">
-                <div class="flex-1 text-xs text-slate-600 space-y-2">
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <p class="text-[9px] text-slate-400 uppercase tracking-wider">Father Name</p>
-                            <p class="font-semibold text-slate-700">{{ student.father_name }}</p>
-                            <p class="text-[10px] text-slate-500" dir="rtl">{{ student.arabic_father }}</p>
+        <!-- ══ BACK ══ -->
+        <div>
+            <p class="card-label">Back / الوجه الخلفي</p>
+            <div class="id-card card-back">
+                <div class="cb-stripe"></div>
+                <div class="cb-body">
+                    <div class="cb-info">
+                        <div class="cb-grid">
+                            <div class="cb-field">
+                                <p class="lbl">Father Name</p>
+                                <p class="val">{{ student.father_name|default:"—" }}</p>
+                                {% if student.arabic_father %}<p class="val-ar">{{ student.arabic_father }}</p>{% endif %}
+                            </div>
+                            <div class="cb-field">
+                                <p class="lbl">Contact</p>
+                                <p class="val">{{ student.guardian_phone|default:"—" }}</p>
+                                {% if student.guardian_phone2 %}<p class="val" style="font-size:7px;color:#64748b;">{{ student.guardian_phone2 }}</p>{% endif %}
+                            </div>
                         </div>
-                        <div>
-                            <p class="text-[9px] text-slate-400 uppercase tracking-wider">Contact</p>
-                            <p class="font-semibold text-slate-700">{{ student.guardian_phone }}</p>
-                            {% if student.guardian_phone2 %}<p class="text-slate-500">{{ student.guardian_phone2 }}</p>{% endif %}
+                        <div class="cb-field">
+                            <p class="lbl">Date of Birth · الجنس</p>
+                            <p class="val">{{ student.dob|date:"d F Y" }} · {{ student.get_gender_display }}</p>
                         </div>
+                        <div class="cb-field">
+                            <p class="lbl">Nationality</p>
+                            <p class="val">{{ student.nationality }}</p>
+                        </div>
+                        {% if student.national_id %}
+                        <div class="cb-field">
+                            <p class="lbl">{{ student.get_id_type_display }}</p>
+                            <p class="val-mono">{{ student.national_id }}</p>
+                        </div>
+                        {% endif %}
                     </div>
-                    <div>
-                        <p class="text-[9px] text-slate-400 uppercase tracking-wider">Date of Birth</p>
-                        <p class="font-semibold text-slate-700">{{ student.dob|date:"d F Y" }} · {{ student.get_gender_display }}</p>
+                    <!-- Barcode -->
+                    <div class="cb-barcode">
+                        <div class="cb-bars">
+                            {% for h in "3568245378524163" %}
+                            <span style="height: {{ forloop.counter0|add:14 }}px;"></span>
+                            {% endfor %}
+                        </div>
+                        <p class="cb-barcode-id">{{ student.student_id }}</p>
                     </div>
-                    <div>
-                        <p class="text-[9px] text-slate-400 uppercase tracking-wider">Nationality</p>
-                        <p class="font-semibold text-slate-700">{{ student.nationality }}</p>
-                    </div>
-                    {% if student.national_id %}
-                    <div>
-                        <p class="text-[9px] text-slate-400 uppercase tracking-wider">{{ student.get_id_type_display }}</p>
-                        <p class="font-semibold text-slate-700 font-mono tracking-wide">{{ student.national_id }}</p>
-                    </div>
-                    {% endif %}
                 </div>
-                <!-- Barcode placeholder -->
-                <div class="ml-4 text-center">
-                    <div class="flex gap-0.5">
-                        {% for i in "12345678901234" %}
-                        <div class="w-0.5 bg-slate-800 rounded-sm" style="height: {{ forloop.counter|add:'20' }}px;"></div>
-                        {% endfor %}
-                    </div>
-                    <p class="text-[7px] text-slate-500 mt-1 font-mono">{{ student.student_id }}</p>
-                </div>
+                <div class="cb-stripe"></div>
             </div>
-            <div class="h-3" style="background: linear-gradient(90deg, #1e3a5f, #2a5298);"></div>
         </div>
 
-        <a href="{% url 'students:detail' student.pk %}" class="no-print text-sm text-slate-500 hover:text-slate-700">← Back to Profile</a>
     </div>
 
 </body>

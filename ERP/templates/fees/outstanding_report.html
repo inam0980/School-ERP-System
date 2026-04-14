@@ -72,7 +72,7 @@
             <tr class="hover:bg-slate-50 transition">
                 <td class="px-4 py-3">
                     <a href="{% url 'fees:student_ledger' sf.student.pk %}"
-                       class="font-medium text-primary hover:underline">{{ sf.student.get_full_name }}</a>
+                       class="font-medium text-primary hover:underline">{{ sf.student.full_name }}</a>
                     <p class="text-xs text-slate-400">{{ sf.student.student_id }}</p>
                 </td>
                 <td class="px-4 py-3 text-slate-600">

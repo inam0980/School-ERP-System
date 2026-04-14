@@ -48,25 +48,6 @@
         <span class="text-sm font-semibold text-slate-700 group-hover:text-primary transition">{{ label }}</span>
     </a>
     {% endfor %}
-
-    <a href="{% url 'fees:outstanding' %}" class="flex items-center gap-3 bg-white rounded-xl p-4 border border-slate-200 hover:shadow-md transition group">
-        <span class="text-2xl">📋</span><span class="text-sm font-semibold text-slate-700 group-hover:text-primary">Outstanding Report</span>
-    </a>
-    <a href="{% url 'fees:defaulters' %}" class="flex items-center gap-3 bg-white rounded-xl p-4 border border-slate-200 hover:shadow-md transition group">
-        <span class="text-2xl">⚠️</span><span class="text-sm font-semibold text-slate-700 group-hover:text-primary">Defaulters List</span>
-    </a>
-    <a href="{% url 'fees:payroll_list' %}" class="flex items-center gap-3 bg-white rounded-xl p-4 border border-slate-200 hover:shadow-md transition group">
-        <span class="text-2xl">💼</span><span class="text-sm font-semibold text-slate-700 group-hover:text-primary">Payroll</span>
-    </a>
-    <a href="{% url 'fees:bulk_assign' %}" class="flex items-center gap-3 bg-white rounded-xl p-4 border border-slate-200 hover:shadow-md transition group">
-        <span class="text-2xl">📌</span><span class="text-sm font-semibold text-slate-700 group-hover:text-primary">Bulk Assign Fees</span>
-    </a>
-    <a href="{% url 'fees:fee_structure_list' %}" class="flex items-center gap-3 bg-white rounded-xl p-4 border border-slate-200 hover:shadow-md transition group">
-        <span class="text-2xl">🗂️</span><span class="text-sm font-semibold text-slate-700 group-hover:text-primary">Fee Structures</span>
-    </a>
-    <a href="{% url 'fees:invoice_list' %}" class="flex items-center gap-3 bg-white rounded-xl p-4 border border-slate-200 hover:shadow-md transition group">
-        <span class="text-2xl">🧾</span><span class="text-sm font-semibold text-slate-700 group-hover:text-primary">Tax Invoices</span>
-    </a>
 </div>
 
 <!-- Recent payments -->
@@ -99,7 +80,7 @@
             <td class="px-5 py-3 text-right font-semibold text-green-700">SAR {{ p.paid_amount }}</td>
             <td class="px-5 py-3 text-slate-500">{{ p.get_payment_method_display }}</td>
             <td class="px-5 py-3 text-slate-500">{{ p.payment_date|date:"d M Y" }}</td>
-            <td class="px-5 py-3 text-slate-500 text-xs">{{ p.collected_by.get_full_name|default:p.collected_by.username }}</td>
+            <td class="px-5 py-3 text-slate-500 text-xs">{{ p.collected_by.full_name|default:p.collected_by.username }}</td>
         </tr>
         {% endfor %}
         </tbody>

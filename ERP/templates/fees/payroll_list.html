@@ -81,7 +81,7 @@
             {% for sal in salaries %}
             <tr class="hover:bg-slate-50 transition">
                 <td class="px-4 py-3">
-                    <p class="font-medium text-slate-700">{{ sal.staff.get_full_name }}</p>
+                    <p class="font-medium text-slate-700">{{ sal.staff.full_name }}</p>
                     <p class="text-xs text-slate-400">{{ sal.staff.username }}</p>
                 </td>
                 <td class="px-4 py-3 text-slate-600">{{ sal.month|date:"F Y" }}</td>

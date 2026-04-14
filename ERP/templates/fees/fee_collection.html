@@ -2,49 +2,51 @@
 {% block title %}Fee Collection — Al-Kawthar{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-6">
+<div class="max-w-5xl mx-auto space-y-6">
+
     <div>
-        <h1 class="text-2xl font-bold text-primary">Fee Collection</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Search a student → select a due fee → record payment</p>
+        <h1 class="text-2xl font-bold text-primary">Fee Collection / تحصيل الرسوم</h1>
+        <p class="text-sm text-slate-500 mt-0.5">Search a student → tick the fees to pay → enter amounts → submit</p>
     </div>
 
+    <!-- SUCCESS BANNER with print links -->
     {% if messages %}
     {% for msg in messages %}
-    <div id="receipt-flash" class="flex items-center gap-3 px-5 py-4 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm">
-        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-        <span>{{ msg }}</span>
-        {% if receipt %}
-        <a href="{% url 'fees:receipt_print' receipt.pk %}" target="_blank"
-           class="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg transition">
-            🖨️ Print Receipt
+    <div class="flex flex-wrap items-center gap-3 px-5 py-4 rounded-xl
+                {% if msg.tags == 'error' %}bg-red-50 border border-red-200 text-red-700
+                {% else %}bg-green-50 border border-green-200 text-green-700{% endif %} text-sm">
+        <span class="flex-1">{{ msg }}</span>
+        {% if receipts and forloop.last %}
+        {% for r in receipts %}
+        <a href="{% url 'fees:receipt_print' r.pk %}" target="_blank"
+           class="inline-flex items-center gap-1 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg transition">
+            🖨️ Receipt — {{ r.student_fee.fee_structure.fee_type.name }}
         </a>
+        {% endfor %}
         {% endif %}
     </div>
     {% endfor %}
     {% endif %}
 
-    <!-- 1. SEARCH -->
+    <!-- SEARCH -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
         <form method="get" class="flex gap-3">
             <input type="hidden" name="student_id" value="{{ student.pk|default:'' }}">
-            <input type="hidden" name="fee_id" value="">
             <input type="text" name="q" value="{{ query|default:'' }}"
                    placeholder="Search by student name or ID…"
                    class="flex-1 border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
             <button type="submit"
                     class="bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-light transition">
-                Search
+                🔍 Search
             </button>
         </form>
     </div>
 
-    <!-- 2. SEARCH RESULTS -->
+    <!-- SEARCH RESULTS -->
     {% if students %}
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wide">
-            Search Results — {{ students|length }} student(s) found
+            {{ students|length }} student(s) found
         </div>
         <ul class="divide-y divide-slate-100">
             {% for s in students %}
@@ -52,11 +54,11 @@
                 <a href="?student_id={{ s.pk }}"
                    class="flex items-center gap-4 px-5 py-3.5 hover:bg-primary/5 transition {% if student.pk == s.pk %}bg-primary/5 border-l-4 border-primary{% endif %}">
                     <div class="w-9 h-9 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-sm">
-                        {{ s.first_name|first|upper }}{{ s.last_name|first|upper }}
+                        {{ s.full_name|first|upper }}
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="font-medium text-slate-800 text-sm">{{ s.get_full_name }}</p>
-                        <p class="text-xs text-slate-500">{{ s.student_id }} · {{ s.current_section }}</p>
+                        <p class="font-medium text-slate-800 text-sm">{{ s.full_name }}</p>
+                        <p class="text-xs text-slate-500">{{ s.student_id }} · {{ s.grade.name }} / {{ s.section.name }}</p>
                     </div>
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
@@ -68,85 +70,208 @@
     </div>
     {% endif %}
 
-    <!-- 3. STUDENT DUES -->
     {% if student %}
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200">
-        <div class="px-5 py-4 border-b border-slate-200 flex items-center gap-4">
-            <div class="w-10 h-10 rounded-full bg-primary text-white font-bold flex items-center justify-center text-sm">
-                {{ student.first_name|first|upper }}{{ student.last_name|first|upper }}
-            </div>
-            <div>
-                <p class="font-semibold text-slate-800">{{ student.get_full_name }}</p>
-                <p class="text-xs text-slate-500">{{ student.student_id }} · {{ student.current_section }}</p>
-            </div>
-        </div>
+    <form method="post" action="{% url 'fees:collection' %}" id="payForm">
+        {% csrf_token %}
+        <input type="hidden" name="student_id" value="{{ student.pk }}">
 
-        <div class="px-5 py-4">
-            <h3 class="text-sm font-semibold text-slate-600 mb-3">Outstanding Fees</h3>
-            {% if student_fees %}
-            <div class="space-y-2">
-                {% for sf in dues %}
-                <a href="?student_id={{ student.pk }}&fee_id={{ sf.pk }}"
-                   class="group flex items-center justify-between px-4 py-3 rounded-lg border
-                          {% if selected_fee.pk == sf.pk %}border-primary bg-primary/5{% else %}border-slate-200 hover:border-primary/40 hover:bg-slate-50{% endif %}
-                          transition cursor-pointer">
+        <!-- STUDENT HEADER + FEE TABLE -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+
+            <!-- Student banner -->
+            <div class="px-5 py-4 bg-primary/5 border-b border-slate-200 flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-full bg-primary text-white font-bold flex items-center justify-center">
+                        {{ student.full_name|first|upper }}
+                    </div>
                     <div>
-                        <p class="text-sm font-medium text-slate-700">{{ sf.fee_structure.fee_type.name }}</p>
-                        <p class="text-xs text-slate-500">
-                            Due: {{ sf.due_date|date:"d M Y" }} ·
-                            Paid: SAR {{ sf.amount_paid|floatformat:2 }}
-                        </p>
+                        <p class="font-semibold text-slate-800">{{ student.full_name }}</p>
+                        <p class="text-xs text-slate-500">{{ student.student_id }} · {{ student.grade.name }} / {{ student.section.name }}</p>
                     </div>
-                    <div class="text-right">
-                        <p class="text-sm font-bold text-red-600">SAR {{ sf.balance|floatformat:2 }}</p>
-                        <span class="text-xs font-medium px-2 py-0.5 rounded-full
-                            {% if sf.status == 'OVERDUE' %}bg-red-100 text-red-700
-                            {% elif sf.status == 'PARTIAL' %}bg-yellow-100 text-yellow-700
-                            {% else %}bg-slate-100 text-slate-500{% endif %}">
-                            {{ sf.get_status_display }}
-                        </span>
-                    </div>
-                </a>
-                {% endfor %}
+                </div>
+                <a href="{% url 'fees:student_ledger' student.pk %}"
+                   class="text-xs text-primary hover:underline">View Full Ledger →</a>
             </div>
+
+            {% if dues %}
+            <!-- Fee rows table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200 text-xs text-slate-600 uppercase tracking-wide">
+                        <tr>
+                            <th class="px-4 py-3 w-10">
+                                <input type="checkbox" id="selectAll" checked title="Select all"
+                                       class="w-4 h-4 accent-primary cursor-pointer">
+                            </th>
+                            <th class="px-4 py-3 text-left">Fee / الرسوم</th>
+                            <th class="px-4 py-3 text-left">Due Date</th>
+                            <th class="px-4 py-3 text-right">Balance (SAR)</th>
+                            <th class="px-4 py-3 text-right w-36">Discount (SAR)</th>
+                            <th class="px-4 py-3 text-right w-40">Amount to Pay</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100" id="feeRows">
+                        {% for sf in dues %}
+                        <tr class="fee-row hover:bg-slate-50/60 transition" data-balance="{{ sf.balance }}">
+                            <td class="px-4 py-3">
+                                <input type="checkbox" name="selected_fees" value="{{ sf.pk }}"
+                                       class="fee-checkbox w-4 h-4 accent-primary cursor-pointer" checked
+                                       onchange="onCheckChange(this)">
+                            </td>
+                            <td class="px-4 py-3">
+                                <p class="font-medium text-slate-800">{{ sf.fee_structure.fee_type.name }}</p>
+                                <p class="text-xs text-slate-400">
+                                    Paid: SAR {{ sf.amount_paid|floatformat:2 }} ·
+                                    <span class="font-medium
+                                        {% if sf.status == 'OVERDUE' %}text-red-500
+                                        {% elif sf.status == 'PARTIAL' %}text-yellow-600
+                                        {% else %}text-slate-500{% endif %}">
+                                        {{ sf.get_status_display }}
+                                    </span>
+                                </p>
+                            </td>
+                            <td class="px-4 py-3 text-slate-600 whitespace-nowrap">{{ sf.due_date|date:"d M Y" }}</td>
+                            <td class="px-4 py-3 text-right font-bold text-red-600 balance-cell whitespace-nowrap">
+                                SAR {{ sf.balance|floatformat:2 }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <input type="number" name="discount_{{ sf.pk }}"
+                                       min="0" max="{{ sf.balance }}" step="0.01"
+                                       placeholder="0.00"
+                                       class="w-full border border-amber-300 bg-amber-50 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
+                                       oninput="onDiscountChange(this, {{ sf.pk }}, {{ sf.balance }})">
+                                <input type="text" name="discount_note_{{ sf.pk }}"
+                                       placeholder="Reason…"
+                                       class="w-full mt-1 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300">
+                            </td>
+                            <td class="px-4 py-3">
+                                <input type="number" name="amount_{{ sf.pk }}" id="amt_{{ sf.pk }}"
+                                       min="0.01" max="{{ sf.balance }}" step="0.01"
+                                       value="{{ sf.balance }}"
+                                       required
+                                       class="amount-input w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-right font-semibold focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                                       oninput="recalcTotal()">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="bg-slate-50 border-t-2 border-slate-200">
+                        <tr>
+                            <td colspan="5" class="px-4 py-3 text-right text-sm font-semibold text-slate-600">
+                                Total to Collect:
+                            </td>
+                            <td class="px-4 py-3 text-right font-bold text-primary text-base" id="grandTotal">
+                                SAR 0.00
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- SHARED PAYMENT DETAILS -->
+            <div class="px-5 py-5 border-t border-slate-100 space-y-4">
+                <h3 class="text-sm font-semibold text-slate-600 uppercase tracking-wide">Payment Details / تفاصيل الدفع</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Payment Method</label>
+                        <select name="payment_method"
+                                class="border border-slate-300 rounded-lg px-3 py-2 w-full text-sm bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                            {% for val, label in payment_methods %}
+                            <option value="{{ val }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Payment Date</label>
+                        <input type="date" name="payment_date" value="{{ today }}"
+                               class="border border-slate-300 rounded-lg px-3 py-2 w-full text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Bank Ref / Cheque No.</label>
+                        <input type="text" name="transaction_ref" placeholder="Optional"
+                               class="border border-slate-300 rounded-lg px-3 py-2 w-full text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1.5">Notes</label>
+                        <input type="text" name="notes" placeholder="Optional"
+                               class="border border-slate-300 rounded-lg px-3 py-2 w-full text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    </div>
+                </div>
+
+                <button type="submit"
+                        class="w-full py-3.5 bg-primary text-white font-bold rounded-xl text-base hover:bg-primary-light transition flex items-center justify-center gap-2">
+                    💳 Pay Selected Fees
+                    <span id="submitTotal" class="bg-white/20 px-3 py-0.5 rounded-full text-sm font-semibold"></span>
+                </button>
+            </div>
+
             {% else %}
-            <p class="text-sm text-slate-400 py-4 text-center">No outstanding fees found.</p>
+            <div class="px-5 py-12 text-center">
+                <p class="text-slate-400 text-sm">✅ No outstanding fees for this student.</p>
+                <a href="{% url 'fees:student_ledger' student.pk %}"
+                   class="mt-3 inline-block text-xs text-primary hover:underline">View full ledger →</a>
+            </div>
             {% endif %}
         </div>
-    </div>
+    </form>
     {% endif %}
 
-    <!-- 4. PAYMENT FORM -->
-    {% if selected_fee and payment_form %}
-    <div class="bg-white rounded-xl shadow-sm border border-primary/30">
-        <div class="px-5 py-4 border-b border-primary/20 bg-primary/5">
-            <h3 class="font-semibold text-primary">Record Payment — {{ selected_fee.fee_structure.fee_type.name }}</h3>
-            <p class="text-xs text-slate-500 mt-0.5">
-                Net amount: SAR {{ selected_fee.net_amount|floatformat:2 }} ·
-                Paid: SAR {{ selected_fee.amount_paid|floatformat:2 }} ·
-                Balance: SAR {{ selected_fee.balance|floatformat:2 }}
-            </p>
-        </div>
-
-        <form method="post" action="{% url 'fees:collection' %}" class="px-5 py-5 space-y-4">
-            {% csrf_token %}
-            <input type="hidden" name="student_id" value="{{ student.pk }}">
-            <input type="hidden" name="fee_id" value="{{ selected_fee.pk }}">
-
-            {% for field in pay_form %}
-            <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1.5">{{ field.label }}</label>
-                {{ field }}
-                {% if field.errors %}<p class="mt-1 text-xs text-red-600">{{ field.errors.0 }}</p>{% endif %}
-            </div>
-            {% endfor %}
-
-            <button type="submit"
-                    class="w-full bg-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-light transition">
-                💳 Record Payment
-            </button>
-        </form>
-    </div>
-    {% endif %}
 </div>
+
+<script>
+// ── Select All ──────────────────────────────────────────────────
+document.getElementById('selectAll')?.addEventListener('change', function() {
+    document.querySelectorAll('.fee-checkbox').forEach(cb => {
+        cb.checked = this.checked;
+        toggleRow(cb);
+    });
+    recalcTotal();
+});
+
+function onCheckChange(cb) { toggleRow(cb); recalcTotal(); }
+
+function toggleRow(cb) {
+    const row   = cb.closest('tr');
+    const amtEl = row.querySelector('.amount-input');
+    if (cb.checked) {
+        row.classList.remove('opacity-40');
+        amtEl.disabled = false;
+    } else {
+        row.classList.add('opacity-40');
+        amtEl.disabled = true;
+    }
+}
+
+// ── Discount changes balance for that row ───────────────────────
+function onDiscountChange(discEl, pk, grossBalance) {
+    const disc   = parseFloat(discEl.value) || 0;
+    const newBal = Math.max(0, grossBalance - disc);
+    const amtEl  = document.getElementById('amt_' + pk);
+    const row    = discEl.closest('tr');
+    // Update max and pre-fill amount with new balance
+    amtEl.max   = newBal.toFixed(2);
+    amtEl.value = newBal.toFixed(2);
+    // Update the displayed balance cell
+    row.querySelector('.balance-cell').textContent = 'SAR ' + newBal.toFixed(2);
+    recalcTotal();
+}
+
+// ── Running total ───────────────────────────────────────────────
+function recalcTotal() {
+    let total = 0;
+    document.querySelectorAll('.fee-checkbox:checked').forEach(cb => {
+        const row    = cb.closest('tr');
+        const amtEl  = row.querySelector('.amount-input');
+        total += parseFloat(amtEl?.value) || 0;
+    });
+    const fmt = 'SAR ' + total.toFixed(2);
+    const gt  = document.getElementById('grandTotal');
+    const st  = document.getElementById('submitTotal');
+    if (gt) gt.textContent = fmt;
+    if (st) st.textContent = fmt;
+}
+
+// Init
+recalcTotal();
+</script>
 {% endblock %}

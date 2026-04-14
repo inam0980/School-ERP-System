@@ -17,7 +17,7 @@
 
     <!-- Info header -->
     <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5 text-sm space-y-1">
-        <p class="font-semibold text-slate-700">{{ fee.student.get_full_name }}</p>
+        <p class="font-semibold text-slate-700">{{ fee.student.full_name }}</p>
         <p class="text-slate-500">{{ fee.student.student_id }} · {{ fee.student.current_section }}</p>
         <p class="text-slate-500">Fee: <strong>{{ fee.fee_structure.fee_type.name }}</strong></p>
         <p class="text-slate-500">Original Amount: <strong>SAR {{ fee.amount|floatformat:2 }}</strong></p>

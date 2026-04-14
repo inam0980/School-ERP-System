@@ -82,20 +82,41 @@ class StudentFeeEditForm(forms.ModelForm):
 
 
 class PaymentForm(forms.ModelForm):
+    # Optional discount to apply on the spot (updates StudentFee.discount)
+    apply_discount = forms.DecimalField(
+        required=False, min_value=0, decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            'class': _INPUT, 'step': '0.01', 'min': '0',
+            'placeholder': '0.00', 'id': 'id_apply_discount',
+        }),
+        label='Discount to Apply (SAR)',
+    )
+    discount_note = forms.CharField(
+        required=False, max_length=200,
+        widget=forms.TextInput(attrs={
+            'class': _INPUT, 'placeholder': 'e.g. Sibling discount, scholarship…',
+        }),
+        label='Discount Reason',
+    )
+
     class Meta:
         model  = Payment
         fields = ['paid_amount', 'payment_date', 'payment_method', 'transaction_ref', 'notes']
         widgets = {
-            'paid_amount':     forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0.01'}),
+            'paid_amount':     forms.NumberInput(attrs={
+                'class': _INPUT, 'step': '0.01', 'min': '0.01',
+                'id': 'id_paid_amount', 'placeholder': 'Enter amount collected',
+            }),
             'payment_date':    forms.DateInput(attrs={'class': _INPUT, 'type': 'date'}),
             'payment_method':  forms.Select(attrs={'class': _SELECT}),
-            'transaction_ref': forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'Ref / cheque no.'}),
+            'transaction_ref': forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'Bank ref / cheque no.'}),
             'notes':           forms.Textarea(attrs={'class': _INPUT, 'rows': 2}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['payment_date'].initial = timezone.localdate()
+        # paid_amount is intentionally NOT pre-filled — accountant enters what was collected
 
 
 class FeeReportFilterForm(forms.Form):
@@ -134,6 +155,12 @@ class FeeReportFilterForm(forms.Form):
         empty_label='All Fee Types',
         widget=forms.Select(attrs={'class': _SMALL}),
     )
+    as_of_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'class': _SMALL, 'type': 'date'}),
+        label='As of Date',
+        help_text='Show fees due on or before this date',
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -170,7 +197,7 @@ class SalaryForm(forms.ModelForm):
         self.fields['staff'].queryset = CustomUser.objects.filter(
             role__in=['TEACHER', 'ACCOUNTANT', 'STAFF', 'ADMIN', 'SUPER_ADMIN'],
             is_active=True,
-        ).order_by('first_name', 'last_name')
+        ).order_by('full_name')
 
 
 class SalaryMonthFilterForm(forms.Form):
@@ -178,4 +205,61 @@ class SalaryMonthFilterForm(forms.Form):
         required=False,
         widget=forms.DateInput(attrs={'class': _INPUT, 'type': 'month'}),
         label='Month',
+    )
+
+
+class ManualInvoiceLineForm(forms.Form):
+    """One line item on a manually-entered tax invoice."""
+    description = forms.CharField(
+        max_length=200,
+        widget=forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'e.g. Reservation Seat Fee'}),
+    )
+    amount = forms.DecimalField(
+        min_value=0, decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0'}),
+    )
+    is_taxable = forms.BooleanField(required=False, label='Subject to 15% VAT')
+    is_credit  = forms.BooleanField(required=False, label='Credit / Deduction (negative line)')
+
+
+class ManualInvoiceHeaderForm(forms.Form):
+    """Header fields for a manually-entered tax invoice."""
+    INVOICE_TYPES = [
+        ('STANDARD',    'Tax Invoice (Standard)'),
+        ('CREDIT_NOTE', 'Tax Credit Note (Discount / Refund)'),
+    ]
+    invoice_type = forms.ChoiceField(
+        choices=INVOICE_TYPES,
+        widget=forms.Select(attrs={'class': _SELECT}),
+        label='Invoice Type',
+    )
+    date = forms.DateField(
+        widget=forms.DateInput(attrs={'class': _INPUT, 'type': 'date'}),
+        initial=__import__('datetime').date.today,
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': _INPUT, 'rows': 2,
+                                     'placeholder': 'Optional notes…'}),
+    )
+
+
+class DefaultersFilterForm(forms.Form):
+    """Filter form for the defaulters list."""
+    as_of_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'class': _SMALL, 'type': 'date'}),
+        label='As of Date',
+    )
+    grade = forms.ModelChoiceField(
+        queryset=__import__('core.models', fromlist=['Grade']).Grade.objects.all(),
+        required=False,
+        empty_label='All Grades',
+        widget=forms.Select(attrs={'class': _SMALL}),
+    )
+    division = forms.ModelChoiceField(
+        queryset=__import__('core.models', fromlist=['Division']).Division.objects.all(),
+        required=False,
+        empty_label='All Divisions',
+        widget=forms.Select(attrs={'class': _SMALL}),
     )

@@ -8,15 +8,228 @@
     <style>
         @media print {
             .no-print { display: none !important; }
-            body { font-size: 11pt; }
-            @page { size: A4; margin: 1.5cm; }
+            body { font-size: 9pt; background: white; padding: 0; }
+            @page { size: A4; margin: 1cm 1.2cm; }
         }
-        body { font-family: 'Segoe UI', Arial, sans-serif; }
-        .ar { font-family: 'Arial', sans-serif; direction: rtl; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f1f5f9; }
+        th, td { border: 1px solid #cbd5e1; }
     </style>
 </head>
-<body class="bg-slate-50 p-6">
-<div class="max-w-2xl mx-auto">
+<body class="p-4">
+
+<!-- Actions bar (no-print) -->
+<div class="no-print flex gap-3 mb-4 max-w-4xl mx-auto">
+    <button onclick="window.print()"
+            class="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700 transition">
+        🖨️ Print Invoice
+    </button>
+    <a href="{% url 'fees:invoice_list' %}"
+       class="flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition">
+        ← Back to Invoices
+    </a>
+    <a href="{% url 'fees:student_ledger' invoice.student.pk %}"
+       class="flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition">
+        📋 Student Ledger
+    </a>
+</div>
+
+<div class="max-w-4xl mx-auto bg-white border border-slate-300 shadow-lg">
+
+    <!-- ══════════════════════  SCHOOL HEADER  ═══════════════════════ -->
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;">
+        <tr>
+            <td class="px-4 py-3 align-top border border-slate-300" style="width:35%;direction:rtl;text-align:right;font-size:11px;line-height:1.7;">
+                <div style="font-size:14px;font-weight:bold;">مدارس الكوثر العالمية</div>
+                <div>جدة - طريق الملك عبد العزيز - حي المحمدية</div>
+                <div>الرقم الضريبي : 310706514800003</div>
+                <div>رقم السجل التجاري : 4030218023</div>
+                <div>جوال : 966506561717+ · 966506359280+</div>
+                <div>Info@alkawthar.edu.sa</div>
+                <div>www.alkawthar.edu.sa</div>
+            </td>
+            <td class="px-4 py-3 align-middle text-center border border-slate-300" style="width:30%;">
+                <div class="mx-auto flex items-center justify-center rounded-full bg-slate-100 border-2 border-slate-300" style="width:80px;height:80px;">
+                    <span class="text-slate-400 text-xs font-bold">LOGO</span>
+                </div>
+            </td>
+            <td class="px-4 py-3 align-top border border-slate-300" style="width:35%;font-size:11px;line-height:1.7;">
+                <div style="font-size:14px;font-weight:bold;">AL - KAWTHAR INTERNATIONAL SCHOOL</div>
+                <div>Jeddah, King Abdulaziz Road, Al Mohamamdiya</div>
+                <div>VAT Reg. 310706514800003</div>
+                <div>CR Number : 4030218023</div>
+                <div>Mobile : +966506359280 +966506561717</div>
+                <div>Info@alkawthar.edu.sa</div>
+                <div>www.alkawthar.edu.sa</div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ════════════════════  INVOICE TITLE  ════════════════════ -->
+    <div class="text-center py-3 border border-t-0 border-slate-300">
+        <div style="font-size:16px;font-weight:bold;">فاتورة ضريبية مبسطة</div>
+        <div style="font-size:15px;font-weight:bold;">
+            {% if invoice.invoice_type == 'CREDIT_NOTE' %}Tax Credit Note / إشعار دائن ضريبي{% else %}Simplified Tax Invoice{% endif %}
+        </div>
+        {% if request.GET.reprint %}
+        <div class="text-slate-500" style="font-size:12px;">(RE-PRINTED)</div>
+        {% endif %}
+    </div>
+
+    <!-- ══════════════════  STUDENT / TRANSACTION INFO  ══════════════════ -->
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;border-top:none;font-size:11px;">
+        <tr>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="width:12%;direction:rtl;text-align:right;">
+                رقم الفاتورة<br><span class="text-slate-500" style="direction:ltr;">Transaction No.</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono font-bold" style="width:20%;">{{ invoice.invoice_number }}</td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="width:10%;direction:rtl;text-align:right;">
+                اسم الأب<br><span class="text-slate-500" style="direction:ltr;">Father Name</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold uppercase" style="width:22%;">{{ invoice.student.father_name }}</td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="width:11%;direction:rtl;text-align:right;">
+                رقم هوية الأب<br><span class="text-slate-500" style="direction:ltr;">Father's ID</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono" style="width:25%;">{{ invoice.student.father_national_id }}</td>
+        </tr>
+        <tr>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                التاريخ<br><span class="text-slate-500" style="direction:ltr;">Date</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold">{{ invoice.date|date:"d/m/Y" }}</td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                اسم الطالب<br><span class="text-slate-500" style="direction:ltr;">Student Name</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold uppercase">{{ invoice.student.full_name }}</td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                رقم هوية الطالب<br><span class="text-slate-500" style="direction:ltr;">Student National ID</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono">{{ invoice.student.national_id }}</td>
+        </tr>
+        <tr>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50 text-slate-400" colspan="2" style="font-size:10px;">
+                Status: {{ invoice.get_status_display }}
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                المرحلة الدراسية<br><span class="text-slate-500" style="direction:ltr;">Grade</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold uppercase">{{ invoice.student.grade.name }}</td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                رقم ملف الطالب<br><span class="text-slate-500" style="direction:ltr;">Student File No.</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono">{{ invoice.student.student_id }}</td>
+        </tr>
+    </table>
+
+    <!-- ════════════════════  LINE ITEMS TABLE  ════════════════════ -->
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;border-top:none;font-size:10.5px;">
+        <thead>
+            <tr style="background:#1e3a5f;color:white;">
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:4%;">م<br>#</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:24%;">البيان<br>Description</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:6%;">الكمية<br>Qty</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:11%;">القيمة<br>Gross Amount</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:10%;">مبلغ الخصم<br>Discount</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:13%;">صافي القيمة قبل الضريبة<br>Net Amt Before VAT</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:7%;">معدل الضريبة %<br>VAT Rate (%)</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:11%;">مبلغ ضريبة القيمة المضافة<br>VAT Amount</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:14%;">الإجمالي مع ضريبة القيمة المضافة<br>Total Amt with VAT</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in line_items %}
+            <tr style="background:{% cycle '#ffffff' '#f8fafc' %};">
+                <td class="border border-slate-300 px-2 py-2 text-center">{{ forloop.counter }}</td>
+                <td class="border border-slate-300 px-2 py-2">
+                    {% if item.is_credit %}<span class="text-red-600 text-xs">(Credit) </span>{% endif %}
+                    {{ item.description }}
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-center">{{ item.qty|default:1 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.gross_amount|default:item.net_before_vat|default:item.amount|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.discount|default:"0.00"|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.net_before_vat|default:item.amount|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-center font-semibold
+                    {% if item.vat_rate == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
+                    {{ item.vat_rate|default:0 }}
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right
+                    {% if item.vat_rate == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
+                    {{ item.vat|floatformat:2 }}
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right font-semibold">{{ item.total|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9" class="border border-slate-300 px-4 py-6 text-center text-slate-400 italic">No line items.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- ════════  QR + REMARKS + SUMMARY TOTALS  ════════ -->
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;border-top:none;font-size:10.5px;">
+        <tr>
+            <!-- QR Code -->
+            <td class="border border-slate-300 p-3 align-middle text-center" style="width:18%;">
+                <div class="flex items-center justify-center border border-slate-300 bg-slate-50 text-slate-400 text-xs mx-auto"
+                     style="width:90px;height:90px;">
+                    QR Code<br>(ZATCA)
+                </div>
+            </td>
+            <!-- Remarks -->
+            <td class="border border-slate-300 p-3 align-top" style="width:47%;">
+                <div class="text-slate-500 text-xs mb-1 font-semibold">Remarks / ملاحظات</div>
+                {% if invoice.notes %}
+                <div class="text-sm text-slate-700">{{ invoice.notes }}</div>
+                {% endif %}
+                {% if invoice.created_by %}
+                <div class="text-xs text-slate-400 mt-3">Issued by: {{ invoice.created_by.full_name }}</div>
+                {% endif %}
+            </td>
+            <!-- Summary totals -->
+            <td class="border border-slate-300 p-0 align-top" style="width:35%;">
+                <table class="w-full border-collapse">
+                    <tr>
+                        <td class="border border-slate-300 px-3 py-2" style="direction:rtl;text-align:right;font-size:10px;line-height:1.4;">
+                            المبلغ قبل الضريبة القيمة المضافة<br>
+                            <span style="direction:ltr;display:block;text-align:left;color:#64748b;">Net Amount Before VAT</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-right font-semibold">
+                            {{ invoice.subtotal|floatformat:2 }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="border border-slate-300 px-3 py-2" style="direction:rtl;text-align:right;font-size:10px;line-height:1.4;">
+                            مبلغ ضريبة القيمة المضافة<br>
+                            <span style="direction:ltr;display:block;text-align:left;color:#64748b;">VAT Amount</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-right font-semibold
+                            {% if invoice.tax_amount == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
+                            {{ invoice.tax_amount|floatformat:2 }}
+                        </td>
+                    </tr>
+                    <tr style="background:#f8fafc;">
+                        <td class="border border-slate-300 px-3 py-2 font-bold" style="direction:rtl;text-align:right;font-size:10px;line-height:1.4;">
+                            الإجمالي يشمل ضريبة القيمة المضافة<br>
+                            <span style="direction:ltr;display:block;text-align:left;">Total Amount with VAT</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-right font-bold text-base" style="color:#1e3a5f;">
+                            {{ invoice.total|floatformat:2 }}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ════════  ZERO-RATING FOOTER (ZATCA Saudi education exemption)  ════════ -->
+    <div class="border border-slate-300 border-t-0 px-4 py-2 text-center"
+         style="font-size:9.5px;direction:rtl;line-height:1.6;color:#374151;">
+        الخدمات الخاضعة لنسبة الضريبة الصفرية تحمل الدولة الضريبة المستحقة على الخدمات التعليمية الأهلية المقدمة إلى المواطنين.
+    </div>
+</div>
+
+</body>
+</html>
 
     <!-- Actions (no-print) -->
     <div class="no-print flex gap-3 mb-5">
@@ -61,25 +274,30 @@
                     <p class="text-slate-500 text-xs uppercase tracking-wide">Status / الحالة</p>
                     <span class="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full
                         {% if invoice.status == 'ISSUED' %}bg-green-100 text-green-700
+                        {% elif invoice.status == 'CREDIT_NOTE' %}bg-orange-100 text-orange-700
                         {% elif invoice.status == 'VOIDED' %}bg-red-100 text-red-700
                         {% else %}bg-slate-100 text-slate-600{% endif %}">
                         {{ invoice.get_status_display }}
                     </span>
                 </div>
+                <div>
+                    <p class="text-slate-500 text-xs uppercase tracking-wide">Type / النوع</p>
+                    <p class="text-sm font-medium text-slate-700">{{ invoice.get_invoice_type_display }}</p>
+                </div>
             </div>
             <div class="space-y-2">
                 <div>
                     <p class="text-slate-500 text-xs uppercase tracking-wide">Billed To / العميل</p>
-                    <p class="font-semibold text-slate-800">{{ invoice.student.get_full_name }}</p>
+                    <p class="font-semibold text-slate-800">{{ invoice.student.full_name }}</p>
                     <p class="text-slate-500 text-xs">{{ invoice.student.student_id }}</p>
                 </div>
                 <div>
                     <p class="text-slate-500 text-xs uppercase tracking-wide">Grade / Section</p>
-                    <p class="text-slate-800">{{ invoice.student.current_section.grade }} / {{ invoice.student.current_section }}</p>
+                    <p class="text-slate-800">{{ invoice.student.grade.name }} / {{ invoice.student.section.name }}</p>
                 </div>
                 <div>
                     <p class="text-slate-500 text-xs uppercase tracking-wide">Issued By</p>
-                    <p class="text-slate-800">{{ invoice.created_by.get_full_name }}</p>
+                    <p class="text-slate-800">{{ invoice.created_by.full_name }}</p>
                 </div>
             </div>
         </div>
