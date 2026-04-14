@@ -12,26 +12,69 @@ from students.models import Student
 # ════════════════════════════════════════════════════════════════
 
 class FeeType(models.Model):
-    TUITION        = 'TUITION'
-    TRANSPORT      = 'TRANSPORT'
-    UNIFORM        = 'UNIFORM'
-    BOOKS          = 'BOOKS'
-    EXTRACURRICULAR = 'EXTRACURRICULAR'
-    OTHER          = 'OTHER'
+    TUITION          = 'TUITION'
+    ADMISSION        = 'ADMISSION'
+    REGISTRATION     = 'REGISTRATION'
+    EXAMINATION      = 'EXAMINATION'
+    TRANSPORT        = 'TRANSPORT'
+    UNIFORM          = 'UNIFORM'
+    BOOKS            = 'BOOKS'
+    EXTRACURRICULAR  = 'EXTRACURRICULAR'
+    LIBRARY          = 'LIBRARY'
+    LABORATORY       = 'LABORATORY'
+    SPORTS           = 'SPORTS'
+    ANNUAL_FUNCTION  = 'ANNUAL_FUNCTION'
+    DEVELOPMENT      = 'DEVELOPMENT'
+    SMART_CLASS      = 'SMART_CLASS'
+    ID_CARD          = 'ID_CARD'
+    SECURITY_DEPOSIT = 'SECURITY_DEPOSIT'
+    HOSTEL           = 'HOSTEL'
+    MESS             = 'MESS'
+    LATE_FEE         = 'LATE_FEE'
+    RESERVATION      = 'RESERVATION'
+    ENTRANCE_EXAM    = 'ENTRANCE_EXAM'
+    OTHER            = 'OTHER'
 
     FEE_CATEGORIES = [
-        (TUITION,         'Tuition / رسوم دراسية'),
-        (TRANSPORT,       'Transport / مواصلات'),
-        (UNIFORM,         'Uniform / زي مدرسي'),
-        (BOOKS,           'Books & Supplies / كتب ومستلزمات'),
-        (EXTRACURRICULAR, 'Extracurricular / أنشطة'),
-        (OTHER,           'Other / أخرى'),
+        (TUITION,          'Tuition / رسوم دراسية'),
+        (ADMISSION,        'Admission Fee / رسوم القبول'),
+        (REGISTRATION,     'Registration Fee / رسوم التسجيل'),
+        (EXAMINATION,      'Examination Fee / رسوم الامتحان'),
+        (TRANSPORT,        'Transport / مواصلات'),
+        (UNIFORM,          'Uniform / زي مدرسي'),
+        (BOOKS,            'Books & Supplies / كتب ومستلزمات'),
+        (EXTRACURRICULAR,  'Extracurricular / أنشطة'),
+        (LIBRARY,          'Library Fee / رسوم المكتبة'),
+        (LABORATORY,       'Laboratory Fee / رسوم المختبر'),
+        (SPORTS,           'Sports Fee / رسوم الرياضة'),
+        (ANNUAL_FUNCTION,  'Annual Function Fee / رسوم الحفل السنوي'),
+        (DEVELOPMENT,      'Development Fee / رسوم التطوير'),
+        (SMART_CLASS,      'Smart Class / IT Fee / رسوم الفصل الذكي'),
+        (ID_CARD,          'ID Card Fee / رسوم البطاقة'),
+        (SECURITY_DEPOSIT, 'Security Deposit (Refundable) / تأمين'),
+        (HOSTEL,           'Hostel Fee / رسوم السكن'),
+        (MESS,             'Mess / Food Fee / رسوم الطعام'),
+        (LATE_FEE,         'Late Fee / Fine / غرامة تأخير'),
+        (RESERVATION,      'Reservation / حجز مقعد'),
+        (ENTRANCE_EXAM,    'Entrance Exam / اختبار قبول'),
+        (OTHER,            'Other / أخرى'),
     ]
 
     name        = models.CharField(max_length=100)
     category    = models.CharField(max_length=20, choices=FEE_CATEGORIES, default=OTHER)
-    is_taxable  = models.BooleanField(default=False, help_text="Subject to 15% VAT (ZATCA)")
+    is_taxable  = models.BooleanField(default=False, help_text="Subject to VAT (ZATCA)")
     description = models.TextField(blank=True)
+
+    # Categories that are zero-rated (0%) for Saudi nationals but 15% for non-Saudis
+    SAUDI_ZERO_RATED = frozenset({TUITION, BOOKS})
+
+    def vat_rate_for(self, is_saudi: bool) -> 'Decimal':
+        """Return applicable VAT rate (0 or 0.15) based on fee type and student nationality."""
+        if not self.is_taxable:
+            return Decimal('0')
+        if is_saudi and self.category in self.SAUDI_ZERO_RATED:
+            return Decimal('0')
+        return Decimal('0.15')
 
     class Meta:
         ordering = ['category', 'name']
@@ -65,7 +108,7 @@ class FeeStructure(models.Model):
 
     class Meta:
         unique_together = ['academic_year', 'grade', 'division', 'fee_type']
-        ordering = ['grade', 'fee_type']
+        ordering = ['grade__name', 'fee_type__name']
 
     def __str__(self):
         return f"{self.fee_type.name} — {self.grade} ({self.academic_year}) — SAR {self.amount}"
@@ -119,7 +162,7 @@ class StudentFee(models.Model):
 
     class Meta:
         unique_together = ['student', 'fee_structure']
-        ordering = ['due_date', 'student']
+        ordering = ['due_date', 'student__full_name']
 
     def __str__(self):
         return f"{self.student} — {self.fee_structure.fee_type.name} — {self.status}"
@@ -129,10 +172,8 @@ class StudentFee(models.Model):
         base = self.amount - self.discount
         if base < 0:
             base = Decimal('0.00')
-        if self.fee_structure.fee_type.is_taxable:
-            self.net_amount = (base * Decimal('1.15')).quantize(Decimal('0.01'))
-        else:
-            self.net_amount = base.quantize(Decimal('0.01'))
+        rate = self.fee_structure.fee_type.vat_rate_for(self.student.is_saudi)
+        self.net_amount = (base * (1 + rate)).quantize(Decimal('0.01'))
         super().save(*args, **kwargs)
 
     @property
@@ -188,6 +229,9 @@ class Payment(models.Model):
                                       default=_receipt_number, editable=False)
     transaction_ref = models.CharField(max_length=100, blank=True,
                                        help_text="Bank ref / cheque no.")
+    bank_verified    = models.BooleanField(default=False,
+                                           help_text="Confirmed against bank statement")
+    bank_verified_at = models.DateField(null=True, blank=True)
     notes          = models.TextField(blank=True)
     collected_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
                                        null=True, blank=True, related_name='payments_collected')
@@ -223,10 +267,20 @@ class TaxInvoice(models.Model):
     ISSUED  = 'ISSUED'
     VOIDED  = 'VOIDED'
 
+    CREDIT_NOTE = 'CREDIT_NOTE'
+
     STATUS_CHOICES = [
-        (DRAFT,  'Draft'),
-        (ISSUED, 'Issued'),
-        (VOIDED, 'Voided'),
+        (DRAFT,       'Draft'),
+        (ISSUED,      'Issued'),
+        (VOIDED,      'Voided'),
+        (CREDIT_NOTE, 'Credit Note / إشعار دائن'),
+    ]
+
+    INVOICE_TYPE_STANDARD    = 'STANDARD'
+    INVOICE_TYPE_CREDIT_NOTE = 'CREDIT_NOTE'
+    INVOICE_TYPES = [
+        (INVOICE_TYPE_STANDARD,    'Tax Invoice / فاتورة ضريبية'),
+        (INVOICE_TYPE_CREDIT_NOTE, 'Tax Credit Note / إشعار دائن ضريبي'),
     ]
 
     student        = models.ForeignKey(Student, on_delete=models.PROTECT,
@@ -237,7 +291,9 @@ class TaxInvoice(models.Model):
     subtotal       = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     tax_amount     = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total          = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    status         = models.CharField(max_length=10, choices=STATUS_CHOICES, default=DRAFT)
+    status         = models.CharField(max_length=15, choices=STATUS_CHOICES, default=DRAFT)
+    invoice_type   = models.CharField(max_length=15, choices=INVOICE_TYPES,
+                                      default=INVOICE_TYPE_STANDARD)
     notes          = models.TextField(blank=True)
     created_by     = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
                                        null=True, blank=True, related_name='invoices_created')
@@ -283,7 +339,7 @@ class Salary(models.Model):
         ordering = ['-month']
 
     def __str__(self):
-        return f"{self.staff.get_full_name() or self.staff.username} — {self.month.strftime('%b %Y')} — SAR {self.net_salary}"
+        return f"{self.staff.full_name or self.staff.username} — {self.month.strftime('%b %Y')} — SAR {self.net_salary}"
 
     def save(self, *args, **kwargs):
         allowances    = self.housing + self.transport + self.other_allowances

@@ -5,13 +5,37 @@
 <div class="flex items-center justify-between mb-6">
     <div>
         <h1 class="text-2xl font-bold text-primary">Defaulters List</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Students with fees overdue by more than 30 days (cutoff: {{ cutoff|date:"d M Y" }})</p>
+        <p class="text-sm text-slate-500 mt-0.5">Students with outstanding fees as of
+            <span class="font-semibold text-slate-700">{{ as_of|date:"d M Y" }}</span>
+        </p>
     </div>
-    <a href="?export=csv"
+    <a href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv"
        class="inline-flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition font-medium">
         📥 Export CSV
     </a>
 </div>
+
+<!-- Filter form -->
+<form method="get" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-6">
+    <div class="grid grid-cols-3 gap-4">
+        {% for field in filter_form %}
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{{ field.label }}</label>
+            {{ field }}
+        </div>
+        {% endfor %}
+    </div>
+    <div class="flex gap-3 mt-4">
+        <button type="submit"
+                class="bg-primary text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-primary-light transition">
+            Apply Filters
+        </button>
+        <a href="{% url 'fees:defaulters' %}"
+           class="border border-slate-300 text-slate-600 px-5 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition">
+            Reset
+        </a>
+    </div>
+</form>
 
 {% if total_overdue %}
 <div class="mb-5 flex items-center gap-4 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
@@ -20,7 +44,7 @@
     </svg>
     <div>
         <p class="font-semibold text-red-700">Total Overdue Balance: SAR {{ total_overdue|floatformat:2 }}</p>
-        <p class="text-xs text-red-500">{{ student_fees|length }} overdue record(s) flagged</p>
+        <p class="text-xs text-red-500">{{ fees|length }} overdue record(s) flagged</p>
     </div>
 </div>
 {% endif %}
@@ -45,10 +69,10 @@
             <tr class="hover:bg-red-50/30 transition">
                 <td class="px-4 py-3">
                     <a href="{% url 'fees:student_ledger' sf.student.pk %}"
-                       class="font-medium text-primary hover:underline">{{ sf.student.get_full_name }}</a>
+                       class="font-medium text-primary hover:underline">{{ sf.student.full_name }}</a>
                     <p class="text-xs text-slate-400">{{ sf.student.student_id }}</p>
                 </td>
-                <td class="px-4 py-3 text-slate-600">{{ sf.student.current_section }}</td>
+                <td class="px-4 py-3 text-slate-600">{{ sf.student.grade.name }} / {{ sf.student.section.name }}</td>
                 <td class="px-4 py-3 text-slate-600">{{ sf.fee_structure.fee_type.name }}</td>
                 <td class="px-4 py-3 text-right font-medium">SAR {{ sf.net_amount|floatformat:2 }}</td>
                 <td class="px-4 py-3 text-right text-green-600">SAR {{ sf.amount_paid|floatformat:2 }}</td>

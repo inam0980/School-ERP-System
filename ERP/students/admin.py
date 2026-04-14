@@ -20,7 +20,7 @@ class StudentAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Identity / الهوية',       {'fields': ('student_id', 'full_name', 'arabic_name', 'dob', 'gender', 'nationality', 'national_id', 'photo')}),
         ('Academic / أكاديمي',     {'fields': ('division', 'grade', 'section', 'academic_year', 'roll_number')}),
-        ('Guardian / ولي الأمر',   {'fields': ('father_name', 'arabic_father', 'mother_name', 'arabic_mother', 'guardian_phone', 'guardian_phone2', 'guardian_email')}),
+        ('Guardian / ولي الأمر',   {'fields': ('father_name', 'arabic_father', 'father_national_id', 'mother_name', 'arabic_mother', 'guardian_phone', 'guardian_phone2', 'guardian_email')}),
         ('Address / العنوان',      {'fields': ('address', 'arabic_address')}),
         ('Status / الحالة',        {'fields': ('enrollment_type', 'admission_date', 'previous_school', 'is_active', 'created_by', 'created_at', 'updated_at')}),
     )

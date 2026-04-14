@@ -16,7 +16,7 @@
 <body class="bg-slate-50 p-6">
 <div class="max-w-xl mx-auto">
     <!-- Print / Back buttons -->
-    <div class="no-print flex gap-3 mb-5">
+    <div class="no-print flex flex-wrap gap-3 mb-5">
         <button onclick="window.print()"
                 class="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700 transition">
             🖨️ Print Receipt
@@ -25,6 +25,22 @@
            class="flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition">
             ← Back to Collection
         </a>
+        {% if not payment.bank_verified %}
+        <form method="post" action="{% url 'fees:bank_verify' payment_pk=payment.pk %}" class="flex items-center gap-2">
+            {% csrf_token %}
+            <input type="text" name="bank_ref" placeholder="Bank Ref (optional)"
+                   value="{{ payment.transaction_ref }}"
+                   class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-48">
+            <button type="submit"
+                    class="flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition">
+                ✅ Verify Bank Receipt
+            </button>
+        </form>
+        {% else %}
+        <span class="inline-flex items-center gap-1.5 border border-green-400 text-green-700 px-3 py-2 rounded-lg text-sm bg-green-50">
+            ✅ Bank Verified — {{ payment.bank_verified_at|date:"d M Y" }}
+        </span>
+        {% endif %}
     </div>
 
     <!-- Receipt Card -->
@@ -47,7 +63,7 @@
                 <div class="grid grid-cols-2 gap-2 text-sm">
                     <div>
                         <p class="text-slate-500">Name</p>
-                        <p class="font-semibold text-slate-800">{{ payment.student_fee.student.get_full_name }}</p>
+                        <p class="font-semibold text-slate-800">{{ payment.student_fee.student.full_name }}</p>
                     </div>
                     <div>
                         <p class="text-slate-500">Student ID</p>
@@ -55,11 +71,11 @@
                     </div>
                     <div>
                         <p class="text-slate-500">Grade</p>
-                        <p class="font-semibold text-slate-800">{{ payment.student_fee.student.current_section.grade }}</p>
+                        <p class="font-semibold text-slate-800">{{ payment.student_fee.student.grade.name }}</p>
                     </div>
                     <div>
                         <p class="text-slate-500">Section</p>
-                        <p class="font-semibold text-slate-800">{{ payment.student_fee.student.current_section }}</p>
+                        <p class="font-semibold text-slate-800">{{ payment.student_fee.student.section.name }}</p>
                     </div>
                 </div>
             </div>
@@ -119,7 +135,7 @@
                 {% endif %}
                 <div>
                     <p class="text-slate-500">Collected By</p>
-                    <p class="font-semibold text-slate-800">{{ payment.collected_by.get_full_name }}</p>
+                    <p class="font-semibold text-slate-800">{{ payment.collected_by.full_name }}</p>
                 </div>
             </div>
         </div>

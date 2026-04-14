@@ -60,8 +60,9 @@ class Student(models.Model):
     roll_number   = models.CharField(max_length=10, blank=True, verbose_name="Roll No. / رقم السجل")
 
     # ── Guardian ──────────────────────────────────────────────────────
-    father_name     = models.CharField(max_length=200, blank=True, verbose_name="Father's Name / اسم الأب")
-    arabic_father   = models.CharField(max_length=200, blank=True, verbose_name="اسم الأب (عربي)")
+    father_name        = models.CharField(max_length=200, blank=True, verbose_name="Father's Name / اسم الأب")
+    arabic_father      = models.CharField(max_length=200, blank=True, verbose_name="اسم الأب (عربي)")
+    father_national_id = models.CharField(max_length=50, blank=True, verbose_name="Father's ID / هوية الأب")
     mother_name     = models.CharField(max_length=200, blank=True, verbose_name="Mother's Name / اسم الأم")
     arabic_mother   = models.CharField(max_length=200, blank=True, verbose_name="اسم الأم (عربي)")
     guardian_phone  = models.CharField(max_length=20,  blank=True, verbose_name="Guardian Phone / هاتف ولي الأمر")
@@ -110,6 +111,11 @@ class Student(models.Model):
             uid  = str(uuid.uuid4().int)[:5]
             self.student_id = f"AKS-{year}-{div}-{uid}"
         super().save(*args, **kwargs)
+
+    @property
+    def is_saudi(self):
+        """True if the student holds a Saudi National ID (not Iqama/Passport)."""
+        return self.id_type == self.NATIONAL_ID_TYPE
 
     @property
     def age(self):

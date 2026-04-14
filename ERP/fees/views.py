@@ -20,6 +20,7 @@ from .forms import (
     FeeTypeForm, FeeStructureForm, BulkAssignFeeForm,
     StudentFeeEditForm, PaymentForm, FeeReportFilterForm,
     SalaryForm, SalaryMonthFilterForm,
+    ManualInvoiceHeaderForm, ManualInvoiceLineForm, DefaultersFilterForm,
 )
 
 _ADMIN       = ('SUPER_ADMIN', 'ADMIN')
@@ -192,16 +193,13 @@ def bulk_assign_fees(request):
 @role_required(*_ACCOUNTANT)
 def fee_collection(request):
     """
-    Search student → show all outstanding fees → collect payment on one fee.
-    GET with ?student_id=X shows the student's dues.
-    POST with student_fee_id + payment data records the payment.
+    Multi-fee payment: search student → see all outstanding fees with
+    checkboxes and per-row amount/discount → one submit pays them all.
     """
-    query      = request.GET.get('q', '').strip()
-    students   = []
-    student    = None
-    dues       = []
-    pay_form   = None
-    selected_fee = None
+    query    = request.GET.get('q', '').strip()
+    students = []
+    student  = None
+    dues     = []
 
     if query:
         students = Student.objects.filter(
@@ -213,56 +211,113 @@ def fee_collection(request):
 
     student_pk = request.GET.get('student_id') or request.POST.get('student_id')
     if student_pk:
-        student = get_object_or_404(Student.objects.select_related(
-            'grade', 'section', 'division', 'academic_year'), pk=student_pk)
-        dues = StudentFee.objects.filter(
-            student=student,
-        ).exclude(status='WAIVED').select_related(
-            'fee_structure', 'fee_structure__fee_type'
-        ).order_by('due_date')
+        student = get_object_or_404(
+            Student.objects.select_related('grade', 'section', 'division', 'academic_year'),
+            pk=student_pk,
+        )
+        dues = list(
+            StudentFee.objects.filter(student=student)
+            .exclude(status__in=['WAIVED', 'PAID'])
+            .select_related('fee_structure', 'fee_structure__fee_type')
+            .order_by('due_date')
+        )
 
-    # Which fee to pay?
-    fee_pk = request.GET.get('fee_id') or request.POST.get('student_fee_id')
-    if fee_pk:
-        selected_fee = get_object_or_404(StudentFee.objects.select_related(
-            'student', 'fee_structure__fee_type'), pk=fee_pk)
+    # ── MULTI-FEE POST ──────────────────────────────────────────
+    receipts = []
+    if request.method == 'POST' and student:
+        selected_pks = request.POST.getlist('selected_fees')
+        if not selected_pks:
+            messages.error(request, "Please select at least one fee to pay.")
+        else:
+            date_str = request.POST.get('payment_date', '')
+            try:
+                payment_date = date.fromisoformat(date_str) if date_str else timezone.localdate()
+            except ValueError:
+                payment_date = timezone.localdate()
 
-    if request.method == 'POST' and selected_fee:
-        pay_form = PaymentForm(request.POST)
-        if pay_form.is_valid():
-            payment = pay_form.save(commit=False)
-            payment.student_fee  = selected_fee
-            payment.collected_by = request.user
-            # Clamp to balance
-            if payment.paid_amount > selected_fee.balance:
-                payment.paid_amount = selected_fee.balance
-            payment.save()
-            messages.success(
-                request,
-                f"Payment of SAR {payment.paid_amount} recorded. Receipt: {payment.receipt_number}"
-            )
-            return redirect(
-                f"{request.path}?student_id={student.pk}&receipt={payment.pk}"
-            )
-    else:
-        if selected_fee:
-            pay_form = PaymentForm(initial={'paid_amount': selected_fee.balance})
+            payment_method  = request.POST.get('payment_method', Payment.CASH)
+            transaction_ref = request.POST.get('transaction_ref', '').strip()
+            notes           = request.POST.get('notes', '').strip()
+            errors          = []
 
-    receipt = None
-    receipt_pk = request.GET.get('receipt')
-    if receipt_pk:
-        receipt = get_object_or_404(Payment.objects.select_related(
-            'student_fee__student', 'student_fee__fee_structure__fee_type',
-            'collected_by'), pk=receipt_pk)
+            for pk in selected_pks:
+                try:
+                    fee = StudentFee.objects.select_related(
+                        'fee_structure__fee_type').get(pk=pk, student=student)
+                except StudentFee.DoesNotExist:
+                    continue
+
+                # Apply inline discount
+                raw_disc = request.POST.get(f'discount_{pk}', '').strip()
+                try:
+                    disc = Decimal(raw_disc) if raw_disc else Decimal('0')
+                except Exception:
+                    disc = Decimal('0')
+                if disc > 0:
+                    fee.discount      = (fee.discount or Decimal('0')) + disc
+                    fee.discount_note = request.POST.get(f'discount_note_{pk}', '').strip()
+                    fee.save()          # recalculates net_amount
+
+                raw_amt = request.POST.get(f'amount_{pk}', '').strip()
+                try:
+                    amount = Decimal(raw_amt)
+                except Exception:
+                    errors.append(f"{fee.fee_structure.fee_type.name}: invalid amount entered.")
+                    continue
+
+                if amount <= 0:
+                    errors.append(f"{fee.fee_structure.fee_type.name}: amount must be greater than 0.")
+                    continue
+                if amount > fee.balance:
+                    errors.append(
+                        f"{fee.fee_structure.fee_type.name}: SAR {amount} exceeds "
+                        f"balance of SAR {fee.balance:.2f}."
+                    )
+                    continue
+
+                payment = Payment.objects.create(
+                    student_fee     = fee,
+                    paid_amount     = amount,
+                    payment_date    = payment_date,
+                    payment_method  = payment_method,
+                    transaction_ref = transaction_ref,
+                    notes           = notes,
+                    collected_by    = request.user,
+                )
+                receipts.append(payment)
+
+            for e in errors:
+                messages.error(request, e)
+
+            if receipts:
+                total = sum(p.paid_amount for p in receipts)
+                messages.success(
+                    request,
+                    f"{len(receipts)} payment(s) recorded — Total collected: SAR {total:.2f}"
+                )
+                receipt_pks = ','.join(str(p.pk) for p in receipts)
+                return redirect(
+                    f"{request.path}?student_id={student.pk}&receipts={receipt_pks}"
+                )
+
+    # Load receipts if redirected back after payment
+    receipt_pks_str = request.GET.get('receipts', '')
+    if receipt_pks_str and not receipts:
+        pks = [int(x) for x in receipt_pks_str.split(',') if x.strip().isdigit()]
+        receipts = list(
+            Payment.objects.filter(pk__in=pks)
+            .select_related('student_fee__fee_structure__fee_type')
+            .order_by('pk')
+        )
 
     return render(request, 'fees/fee_collection.html', {
-        'query':        query,
-        'students':     students,
-        'student':      student,
-        'dues':         dues,
-        'selected_fee': selected_fee,
-        'pay_form':     pay_form,
-        'receipt':      receipt,
+        'query':           query,
+        'students':        students,
+        'student':         student,
+        'dues':            dues,
+        'receipts':        receipts,
+        'payment_methods': Payment.PAYMENT_METHODS,
+        'today':           timezone.localdate().isoformat(),
     })
 
 
@@ -339,6 +394,9 @@ def outstanding_report(request):
             qs = qs.filter(status=status)
         if ftype:
             qs = qs.filter(fee_structure__fee_type=ftype)
+        as_of = data.get('as_of_date')
+        if as_of:
+            qs = qs.filter(due_date__lte=as_of)
 
     qs = qs.order_by('student__grade', 'student__section', 'student__full_name', 'due_date')
 
@@ -416,52 +474,69 @@ def student_ledger(request, student_pk):
 
 
 # ════════════════════════════════════════════════════════════════
-#  DEFAULTERS LIST  (overdue > 30 days)
+#  DEFAULTERS LIST  (overdue fees, filterable by date)
 # ════════════════════════════════════════════════════════════════
 
 @login_required
 @role_required(*_ACCOUNTANT)
 def defaulters_list(request):
-    cutoff = timezone.localdate() - timedelta(days=30)
-    fees   = StudentFee.objects.filter(
-        due_date__lte=cutoff,
+    filter_form = DefaultersFilterForm(request.GET or None)
+    as_of       = timezone.localdate()
+    grade_f     = None
+    division_f  = None
+
+    if filter_form.is_valid():
+        as_of      = filter_form.cleaned_data.get('as_of_date') or as_of
+        grade_f    = filter_form.cleaned_data.get('grade')
+        division_f = filter_form.cleaned_data.get('division')
+
+    fees = StudentFee.objects.filter(
+        due_date__lte=as_of,
     ).exclude(
         status__in=['PAID', 'WAIVED'],
     ).select_related(
-        'student', 'student__grade', 'student__section',
+        'student', 'student__grade', 'student__section', 'student__division',
         'fee_structure__fee_type',
-    ).order_by('due_date', 'student__full_name')
+    )
 
-    # Refresh status on-the-fly
-    for f in fees:
-        if f.status != 'OVERDUE':
-            f.status = 'OVERDUE'
-            StudentFee.objects.filter(pk=f.pk).update(status='OVERDUE')
+    if grade_f:
+        fees = fees.filter(student__grade=grade_f)
+    if division_f:
+        fees = fees.filter(student__division=division_f)
+
+    fees = fees.order_by('due_date', 'student__full_name')
+
+    # Mark overdue on the fly
+    pks_to_mark = [f.pk for f in fees if f.status != 'OVERDUE']
+    if pks_to_mark:
+        StudentFee.objects.filter(pk__in=pks_to_mark).update(status='OVERDUE')
 
     total_overdue = fees.aggregate(s=Sum('net_amount'))['s'] or 0
 
     if request.GET.get('export') == 'csv':
         response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
-        response['Content-Disposition'] = 'attachment; filename="defaulters.csv"'
+        response['Content-Disposition'] = (
+            f'attachment; filename="defaulters_{as_of}.csv"'
+        )
         response.write('\ufeff')
         writer = csv.writer(response)
         writer.writerow(['Student ID', 'Name', 'Grade', 'Section',
                          'Fee Type', 'Net Amount', 'Paid', 'Balance', 'Due Date', 'Days Overdue'])
-        today = timezone.localdate()
         for f in fees:
             writer.writerow([
                 f.student.student_id, f.student.full_name,
                 f.student.grade, f.student.section,
                 f.fee_structure.fee_type.name,
                 f.net_amount, f.amount_paid, f.balance,
-                f.due_date, (today - f.due_date).days,
+                f.due_date, (as_of - f.due_date).days,
             ])
         return response
 
     return render(request, 'fees/defaulters_list.html', {
         'fees':          fees,
         'total_overdue': total_overdue,
-        'cutoff':        cutoff,
+        'as_of':         as_of,
+        'filter_form':   filter_form,
     })
 
 
@@ -508,15 +583,19 @@ def generate_invoice(request, student_pk):
         base = f.amount - f.discount
         if base < 0:
             base = Decimal('0')
-        tax = (base * Decimal('0.15')).quantize(Decimal('0.01')) if f.fee_structure.fee_type.is_taxable else Decimal('0')
+        rate = f.fee_structure.fee_type.vat_rate_for(student.is_saudi)
+        tax  = (base * rate).quantize(Decimal('0.01'))
         subtotal  += base
         tax_total += tax
         line_items.append({
-            'description': f.fee_structure.fee_type.name,
-            'amount':      float(base),
-            'is_taxable':  f.fee_structure.fee_type.is_taxable,
-            'tax':         float(tax),
-            'total':       float(base + tax),
+            'description':    f.fee_structure.fee_type.name,
+            'qty':            1,
+            'gross_amount':   float(f.amount),
+            'discount':       float(f.discount),
+            'net_before_vat': float(base),
+            'vat_rate':       int(rate * 100),
+            'vat':            float(tax),
+            'total':          float(base + tax),
         })
 
     invoice = TaxInvoice.objects.create(
@@ -555,7 +634,7 @@ def invoice_print(request, pk):
 def payroll_list(request):
     form      = SalaryMonthFilterForm(request.GET or None)
     month_str = request.GET.get('month')
-    salaries  = Salary.objects.select_related('staff').order_by('-month', 'staff__first_name')
+    salaries  = Salary.objects.select_related('staff').order_by('-month', 'staff__full_name')
 
     selected_month = None
     if month_str:
@@ -597,7 +676,7 @@ def _export_payroll_csv(salaries, month):
                      'Basic', 'Housing', 'Transport', 'Other Allow.',
                      'Deductions', 'Net Salary', 'Paid?'])
     for sal in salaries:
-        name = sal.staff.get_full_name() or sal.staff.username
+        name = sal.staff.full_name or sal.staff.username
         writer.writerow([
             name, sal.staff.username, sal.bank_ref,
             sal.month.strftime('%Y-%m'),
@@ -644,7 +723,7 @@ def mark_salary_paid(request, pk):
     sal.paid_date = timezone.localdate()
     sal.bank_ref  = request.POST.get('bank_ref', sal.bank_ref)
     sal.save()
-    messages.success(request, f"Salary marked as paid for {sal.staff.get_full_name() or sal.staff.username}.")
+    messages.success(request, f"Salary marked as paid for {sal.staff.full_name or sal.staff.username}.")
     return redirect('fees:payroll_list')
 
 
@@ -684,4 +763,118 @@ def fees_dashboard(request):
                            if total_assigned else 0,
         'recent_payments': recent_payments,
         'year':            year,
+        'actions': [
+            ('Collect Payment',      '/fees/collection/',                   '💳', 'primary'),
+            ('Fee Structures',       '/fees/structures/',                   '🗂️',  'slate'),
+            ('Bulk Assign Fees',     '/fees/assign/',                       '📌', 'slate'),
+            ('Outstanding Report',   '/fees/outstanding/',                  '📋', 'slate'),
+            ('Defaulters List',      '/fees/defaulters/',                   '⚠️',  'red'),
+            ('Tax Invoices',         '/fees/invoices/',                     '🧾', 'slate'),
+            ('Payroll',              '/fees/payroll/',                      '💼', 'slate'),
+            ('Fee Types',            '/fees/fee-types/',                    '🏷️',  'slate'),
+        ],
     })
+
+
+# ════════════════════════════════════════════════════════════════
+#  MANUAL TAX INVOICE ENTRY
+#  Handles: Cash Collection, Reservation Seat, Entrance Exam,
+#           Tax Credit Note, Custom items
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def manual_invoice(request, student_pk):
+    """
+    Create a manual tax invoice (or credit note) for a student
+    with arbitrary line items — used for cash collection, reservation
+    seat, entrance exam, discounts, etc.
+    """
+    student     = get_object_or_404(Student, pk=student_pk)
+    header_form = ManualInvoiceHeaderForm(request.POST or None)
+
+    # Build dynamic line-item formset from POST
+    line_count = int(request.POST.get('line_count', 1))
+    line_forms = [ManualInvoiceLineForm(request.POST or None, prefix=f'line_{i}')
+                  for i in range(line_count)]
+
+    if request.method == 'POST' and header_form.is_valid() and all(f.is_valid() for f in line_forms):
+        subtotal  = Decimal('0')
+        tax_total = Decimal('0')
+        items     = []
+
+        for lf in line_forms:
+            d   = lf.cleaned_data
+            amt = d['amount']
+            if d.get('is_credit'):
+                amt = -amt
+            # Apply Saudi zero-rating: tuition/books are 0% for Saudi students
+            effective_taxable = d.get('is_taxable', False)
+            if effective_taxable and student.is_saudi:
+                desc_lower = d['description'].lower()
+                if any(kw in desc_lower for kw in ('tuition', 'رسوم دراسية', 'book', 'كتاب')):
+                    effective_taxable = False
+            tax = (amt * Decimal('0.15')).quantize(Decimal('0.01')) if effective_taxable else Decimal('0')
+            subtotal  += amt
+            tax_total += tax
+            items.append({
+                'description':    d['description'],
+                'qty':            1,
+                'gross_amount':   float(abs(amt)),
+                'discount':       0,
+                'net_before_vat': float(amt),
+                'vat_rate':       15 if effective_taxable else 0,
+                'vat':            float(tax),
+                'total':          float(amt + tax),
+                'is_credit':      d.get('is_credit', False),
+            })
+
+        hd           = header_form.cleaned_data
+        inv_type     = hd['invoice_type']
+        inv_status   = TaxInvoice.ISSUED
+        if inv_type == TaxInvoice.INVOICE_TYPE_CREDIT_NOTE:
+            inv_status = TaxInvoice.CREDIT_NOTE
+
+        invoice = TaxInvoice.objects.create(
+            student         = student,
+            date            = hd['date'],
+            subtotal        = subtotal,
+            tax_amount      = tax_total,
+            total           = subtotal + tax_total,
+            status          = inv_status,
+            invoice_type    = inv_type,
+            notes           = hd.get('notes', ''),
+            created_by      = request.user,
+            line_items_json = items,
+        )
+        messages.success(request, f"Invoice {invoice.invoice_number} created.")
+        return redirect('fees:invoice_print', pk=invoice.pk)
+
+    return render(request, 'fees/manual_invoice_form.html', {
+        'student':     student,
+        'header_form': header_form,
+        'line_forms':  line_forms,
+        'line_count':  line_count,
+        'is_saudi':    student.is_saudi,
+    })
+
+
+# ════════════════════════════════════════════════════════════════
+#  BANK VERIFICATION  (mark payment verified against bank stmt)
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+@require_POST
+def bank_verify_payment(request, payment_pk):
+    payment = get_object_or_404(Payment, pk=payment_pk)
+    payment.bank_verified    = True
+    payment.bank_verified_at = timezone.localdate()
+    # Allow updating bank ref from POST
+    ref = request.POST.get('bank_ref', '').strip()
+    if ref:
+        payment.transaction_ref = ref
+    payment.save(update_fields=['bank_verified', 'bank_verified_at', 'transaction_ref'])
+    messages.success(request, f"Receipt {payment.receipt_number} marked as bank-verified.")
+    return redirect('fees:receipt_print', payment_pk=payment_pk)
+
