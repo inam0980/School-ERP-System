@@ -1,7 +1,10 @@
 from django import forms
 from django.utils import timezone
 from core.models import AcademicYear, Division, Grade, Section
-from .models import FeeType, FeeStructure, StudentFee, Payment, TaxInvoice, Salary
+from .models import (
+    FeeType, FeeStructure, StudentFee, Payment, TaxInvoice, Salary,
+    TuitionFeeConfig, TuitionInstallment,
+)
 
 _INPUT  = ('border border-slate-300 rounded-lg px-3 py-2 w-full text-sm '
            'focus:ring-2 focus:ring-primary/40 focus:border-primary focus:outline-none')
@@ -263,3 +266,115 @@ class DefaultersFilterForm(forms.Form):
         empty_label='All Divisions',
         widget=forms.Select(attrs={'class': _SMALL}),
     )
+
+
+# ════════════════════════════════════════════════════════════════
+#  TUITION FEE CONFIG FORMS
+# ════════════════════════════════════════════════════════════════
+
+class TuitionFeeConfigForm(forms.ModelForm):
+    class Meta:
+        model  = TuitionFeeConfig
+        fields = [
+            'academic_year', 'division', 'grade', 'structure_type',
+            'num_payments', 'includes_books',
+            'entrance_exam_fee', 'registration_fee', 'reservation_fee',
+            'gross_tuition_fee',
+            'group_discount_enabled', 'group_discount_pct',
+            'vat_pct',
+            'from_academic_year', 'to_academic_year',
+            'notes',
+        ]
+        widgets = {
+            'academic_year':          forms.Select(attrs={'class': _SELECT}),
+            'division':               forms.Select(attrs={'class': _SELECT}),
+            'grade':                  forms.Select(attrs={'class': _SELECT}),
+            'structure_type':         forms.Select(attrs={'class': _SELECT}),
+            'num_payments':           forms.Select(attrs={'class': _SELECT}),
+            'includes_books':         forms.CheckboxInput(),
+            'entrance_exam_fee':      forms.NumberInput(attrs={
+                'class': _INPUT, 'step': '0.01', 'min': '0'}),
+            'registration_fee':       forms.NumberInput(attrs={
+                'class': _INPUT, 'step': '0.01', 'min': '0'}),
+            'reservation_fee':        forms.NumberInput(attrs={
+                'class': _INPUT, 'step': '0.01', 'min': '0'}),
+            'gross_tuition_fee':      forms.NumberInput(attrs={
+                'class': _INPUT, 'step': '0.01', 'min': '0'}),
+            'group_discount_enabled': forms.CheckboxInput(),
+            'group_discount_pct':     forms.NumberInput(attrs={
+                'class': _INPUT, 'step': '0.01', 'min': '0', 'max': '100'}),
+            'vat_pct':                forms.NumberInput(attrs={
+                'class': _INPUT, 'step': '0.01', 'min': '0', 'max': '100'}),
+            'from_academic_year':     forms.Select(attrs={'class': _SELECT}),
+            'to_academic_year':       forms.Select(attrs={'class': _SELECT}),
+            'notes':                  forms.Textarea(attrs={'class': _INPUT, 'rows': 2}),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        disc_enabled = cleaned.get('group_discount_enabled')
+        disc_pct     = cleaned.get('group_discount_pct') or 0
+        if disc_enabled and disc_pct <= 0:
+            self.add_error('group_discount_pct',
+                           'Enter a discount percentage when group discount is enabled.')
+        if not disc_enabled:
+            cleaned['group_discount_pct'] = 0
+        gross = cleaned.get('gross_tuition_fee')
+        res   = cleaned.get('reservation_fee', 0) or 0
+        if gross and res > gross:
+            self.add_error('reservation_fee',
+                           'Reservation fee cannot exceed gross tuition fee.')
+        return cleaned
+
+
+class TuitionInstallmentForm(forms.ModelForm):
+    class Meta:
+        model  = TuitionInstallment
+        fields = ['installment_type', 'amount', 'due_date', 'notes']
+        widgets = {
+            'installment_type': forms.Select(attrs={'class': _SELECT}),
+            'amount':           forms.NumberInput(attrs={
+                'class': _INPUT, 'step': '0.01', 'min': '0'}),
+            'due_date':         forms.DateInput(attrs={'class': _INPUT, 'type': 'date'}),
+            'notes':            forms.TextInput(attrs={'class': _INPUT}),
+        }
+
+
+TuitionInstallmentFormSet = forms.inlineformset_factory(
+    TuitionFeeConfig,
+    TuitionInstallment,
+    form=TuitionInstallmentForm,
+    extra=4,
+    can_delete=True,
+    max_num=4,
+)
+
+
+class TuitionConfigFilterForm(forms.Form):
+    """Filter form for tuition config list."""
+    academic_year = forms.ModelChoiceField(
+        queryset=AcademicYear.objects.all(),
+        required=False,
+        empty_label='All Years',
+        widget=forms.Select(attrs={'class': _SMALL}),
+    )
+    division = forms.ModelChoiceField(
+        queryset=Division.objects.filter(is_active=True),
+        required=False,
+        empty_label='All Divisions',
+        widget=forms.Select(attrs={'class': _SMALL}),
+    )
+    structure_type = forms.ChoiceField(
+        choices=[('', 'All Types')] + TuitionFeeConfig.STRUCTURE_TYPE_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': _SMALL}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            current = AcademicYear.objects.filter(is_current=True).first()
+            if current:
+                self.fields['academic_year'].initial = current.pk
+        except Exception:
+            pass

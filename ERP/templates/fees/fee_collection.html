@@ -6,7 +6,7 @@
 
     <div>
         <h1 class="text-2xl font-bold text-primary">Fee Collection / تحصيل الرسوم</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Search a student → tick the fees to pay → enter amounts → submit</p>
+        <p class="text-sm text-slate-500 mt-0.5">Search a student or browse by Division → Grade → Section → then select a student to collect fees</p>
     </div>
 
     <!-- SUCCESS BANNER with print links -->
@@ -28,39 +28,144 @@
     {% endfor %}
     {% endif %}
 
-    <!-- SEARCH -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-        <form method="get" class="flex gap-3">
-            <input type="hidden" name="student_id" value="{{ student.pk|default:'' }}">
-            <input type="text" name="q" value="{{ query|default:'' }}"
-                   placeholder="Search by student name or ID…"
-                   class="flex-1 border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
-            <button type="submit"
-                    class="bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-light transition">
-                🔍 Search
-            </button>
-        </form>
-    </div>
+    <!-- ═══ TAB SWITCHER ══════════════════════════════════════════ -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
 
-    <!-- SEARCH RESULTS -->
+        <!-- Tab headers -->
+        <div class="flex border-b border-slate-200">
+            <button type="button" id="tab-search"
+                    onclick="switchTab('search')"
+                    class="tab-btn flex-1 py-3 text-sm font-semibold text-center transition focus:outline-none">
+                🔍 Search by Name / ID
+            </button>
+            <button type="button" id="tab-browse"
+                    onclick="switchTab('browse')"
+                    class="tab-btn flex-1 py-3 text-sm font-semibold text-center transition focus:outline-none">
+                🏫 Browse by Division / Grade / Section
+            </button>
+        </div>
+
+        <!-- ── TAB 1: Name / ID search ──────────────────────────── -->
+        <div id="panel-search" class="tab-panel p-5">
+            <form method="get" class="flex gap-3">
+                <input type="hidden" name="student_id" value="{{ student.pk|default:'' }}">
+                <input type="text" name="q" value="{{ query|default:'' }}"
+                       placeholder="Enter student name or student ID…"
+                       autofocus
+                       class="flex-1 border border-slate-300 rounded-lg px-4 py-2.5 text-sm
+                              focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
+                <button type="submit"
+                        class="bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-medium
+                               hover:bg-primary-light transition">
+                    Search
+                </button>
+            </form>
+        </div>
+
+        <!-- ── TAB 2: Division → Grade → Section browse ─────────── -->
+        <div id="panel-browse" class="tab-panel p-5">
+            <form method="get" id="browseForm" class="space-y-4">
+                <input type="hidden" name="student_id" value="{{ student.pk|default:'' }}">
+
+                <!-- Step 1: Division -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        Step 1 — Select Division
+                    </label>
+                    <div id="div-buttons" class="flex flex-wrap gap-2">
+                        {% for div in all_divisions %}
+                        <button type="button"
+                                onclick="selectDiv({{ div.pk }}, this)"
+                                data-div="{{ div.pk }}"
+                                class="div-btn px-4 py-2 rounded-lg border text-sm font-medium transition
+                                       {% if browse_div_id == div.pk|stringformat:'s' %}
+                                           bg-primary text-white border-primary
+                                       {% else %}
+                                           border-slate-300 text-slate-600 hover:border-primary hover:text-primary
+                                       {% endif %}">
+                            {{ div }}
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" name="div" id="input-div" value="{{ browse_div_id }}">
+                </div>
+
+                <!-- Step 2: Grade (shown after division selected) -->
+                <div id="grade-step"
+                     class="{% if not browse_div_id %}hidden{% endif %} transition-all">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        Step 2 — Select Grade
+                    </label>
+                    <div id="grade-buttons" class="flex flex-wrap gap-2">
+                        <!-- Populated by JS -->
+                    </div>
+                    <input type="hidden" name="grade" id="input-grade" value="{{ browse_grade_id }}">
+                </div>
+
+                <!-- Step 3: Section (shown after grade selected) -->
+                <div id="section-step"
+                     class="{% if not browse_grade_id %}hidden{% endif %} transition-all">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+                        Step 3 — Select Section
+                    </label>
+                    <div id="section-buttons" class="flex flex-wrap gap-2">
+                        <!-- Populated by JS -->
+                    </div>
+                    <input type="hidden" name="section" id="input-section" value="{{ browse_section_id }}">
+                </div>
+
+                <!-- Show Students button -->
+                <div id="browse-submit-wrap"
+                     class="{% if not browse_grade_id %}hidden{% endif %}">
+                    <button type="submit"
+                            class="px-6 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold
+                                   hover:bg-primary-light transition">
+                        Show Students →
+                    </button>
+                    <a href="{% url 'fees:collection' %}"
+                       class="ml-3 text-sm text-slate-400 hover:text-slate-600">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div><!-- end tab card -->
+
+    <!-- STUDENT RESULTS LIST -->
     {% if students %}
     <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wide">
-            {{ students|length }} student(s) found
+        <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                {{ students|length }} student(s) found
+            </span>
+            {% if browse_section_id or browse_grade_id %}
+            <span class="text-xs text-slate-400">
+                Browsing:
+                {% if browse_div_id %}{{ browse_div_id }} ·{% endif %}
+                {% if browse_grade_id %} Grade {{ browse_grade_id }} ·{% endif %}
+                {% if browse_section_id %} Section {{ browse_section_id }}{% endif %}
+            </span>
+            {% endif %}
         </div>
-        <ul class="divide-y divide-slate-100">
+        <ul class="divide-y divide-slate-100 max-h-80 overflow-y-auto">
             {% for s in students %}
             <li>
-                <a href="?student_id={{ s.pk }}"
-                   class="flex items-center gap-4 px-5 py-3.5 hover:bg-primary/5 transition {% if student.pk == s.pk %}bg-primary/5 border-l-4 border-primary{% endif %}">
-                    <div class="w-9 h-9 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-sm">
+                <a href="?student_id={{ s.pk }}{% if browse_div_id %}&div={{ browse_div_id }}{% endif %}{% if browse_grade_id %}&grade={{ browse_grade_id }}{% endif %}{% if browse_section_id %}&section={{ browse_section_id }}{% endif %}"
+                   class="flex items-center gap-4 px-5 py-3.5 hover:bg-primary/5 transition
+                          {% if student.pk == s.pk %}bg-primary/5 border-l-4 border-primary{% endif %}">
+                    <div class="w-9 h-9 rounded-full bg-primary/10 text-primary font-bold
+                                flex items-center justify-center text-sm flex-shrink-0">
                         {{ s.full_name|first|upper }}
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="font-medium text-slate-800 text-sm">{{ s.full_name }}</p>
-                        <p class="text-xs text-slate-500">{{ s.student_id }} · {{ s.grade.name }} / {{ s.section.name }}</p>
+                        <p class="font-medium text-slate-800 text-sm truncate">{{ s.full_name }}</p>
+                        <p class="text-xs text-slate-500">
+                            {{ s.student_id }}
+                            · <span class="text-slate-600 font-medium">{{ s.division }}</span>
+                            · {{ s.grade.name }}
+                            / Sec {{ s.section.name }}
+                        </p>
                     </div>
-                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor"
+                         stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
                     </svg>
                 </a>
@@ -112,6 +217,82 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100" id="feeRows">
                         {% for sf in dues %}
+
+                        {% if sf.payment_plan %}
+                        {# ── Fee has an installment plan: show plan header + installment rows ── #}
+                        <tr class="bg-indigo-50/60">
+                            <td colspan="6" class="px-4 py-2">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
+                                            📋 Installment Plan
+                                        </span>
+                                        <span class="font-medium text-slate-800 text-sm">{{ sf.fee_structure.fee_type.name }}</span>
+                                        <span class="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap
+                                            {% if sf.fee_structure.frequency == 'MONTHLY' %}bg-blue-100 text-blue-700
+                                            {% elif sf.fee_structure.frequency == 'TERM' %}bg-purple-100 text-purple-700
+                                            {% elif sf.fee_structure.frequency == 'ANNUAL' %}bg-green-100 text-green-700
+                                            {% else %}bg-slate-100 text-slate-500{% endif %}">
+                                            {{ sf.fee_structure.get_frequency_display }}
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-xs text-slate-500">
+                                            Paid: SAR {{ sf.amount_paid|floatformat:2 }} of SAR {{ sf.net_amount|floatformat:2 }}
+                                        </span>
+                                        <a href="{% url 'fees:payment_plan_setup' sf.pk %}"
+                                           class="text-xs text-indigo-600 hover:underline">Edit plan</a>
+                                        <form method="post"
+                                              action="{% url 'fees:payment_plan_delete' sf.payment_plan.pk %}"
+                                              class="inline">{% csrf_token %}
+                                            <button type="submit"
+                                                    onclick="return confirm('Delete this installment plan?')"
+                                                    class="text-xs text-red-500 hover:underline">Delete plan</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% for inst in sf.payment_plan.installments.all %}
+                        {% if inst.status != 'PAID' %}
+                        <tr class="fee-row hover:bg-indigo-50/30 transition" data-balance="{{ inst.balance }}">
+                            <td class="px-4 py-3 pl-8">
+                                <input type="checkbox" name="selected_installments" value="{{ inst.pk }}"
+                                       class="fee-checkbox w-4 h-4 accent-primary cursor-pointer" checked
+                                       onchange="onCheckChange(this)">
+                            </td>
+                            <td class="px-4 py-3">
+                                <p class="text-sm font-medium text-slate-700">
+                                    Installment {{ inst.installment_no }}
+                                    <span class="text-xs ml-1 font-normal text-slate-400">of {{ sf.payment_plan.installments.count }}</span>
+                                </p>
+                                <span class="text-xs px-1.5 py-0.5 rounded font-medium
+                                    {% if inst.status == 'OVERDUE' %}bg-red-100 text-red-600
+                                    {% elif inst.status == 'PARTIAL' %}bg-yellow-100 text-yellow-700
+                                    {% else %}bg-slate-100 text-slate-500{% endif %}">
+                                    {{ inst.get_status_display }}
+                                    {% if inst.paid_amount > 0 %} · Paid SAR {{ inst.paid_amount|floatformat:2 }}{% endif %}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-slate-600 whitespace-nowrap">{{ inst.due_date|date:"d M Y" }}</td>
+                            <td class="px-4 py-3 text-right font-bold text-red-600 balance-cell whitespace-nowrap">
+                                SAR {{ inst.balance|floatformat:2 }}
+                            </td>
+                            <td class="px-4 py-3 text-xs text-slate-400 text-center">—</td>
+                            <td class="px-4 py-3">
+                                <input type="number" name="inst_amount_{{ inst.pk }}" id="amt_inst_{{ inst.pk }}"
+                                       min="0.01" max="{{ inst.balance }}" step="0.01"
+                                       value="{{ inst.balance }}"
+                                       required
+                                       class="amount-input w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-right font-semibold focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary"
+                                       oninput="recalcTotal()">
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% else %}
+                        {# ── Normal fee row (no plan) ── #}
                         <tr class="fee-row hover:bg-slate-50/60 transition" data-balance="{{ sf.balance }}">
                             <td class="px-4 py-3">
                                 <input type="checkbox" name="selected_fees" value="{{ sf.pk }}"
@@ -119,8 +300,19 @@
                                        onchange="onCheckChange(this)">
                             </td>
                             <td class="px-4 py-3">
-                                <p class="font-medium text-slate-800">{{ sf.fee_structure.fee_type.name }}</p>
-                                <p class="text-xs text-slate-400">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <p class="font-medium text-slate-800">{{ sf.fee_structure.fee_type.name }}</p>
+                                    <span class="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap
+                                        {% if sf.fee_structure.frequency == 'MONTHLY' %}bg-blue-100 text-blue-700
+                                        {% elif sf.fee_structure.frequency == 'TERM' %}bg-purple-100 text-purple-700
+                                        {% elif sf.fee_structure.frequency == 'ANNUAL' %}bg-green-100 text-green-700
+                                        {% else %}bg-slate-100 text-slate-500{% endif %}">
+                                        {{ sf.fee_structure.get_frequency_display }}
+                                    </span>
+                                    <a href="{% url 'fees:payment_plan_setup' sf.pk %}"
+                                       class="text-xs text-indigo-500 hover:underline ml-1">+ Installment plan</a>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-0.5">
                                     Paid: SAR {{ sf.amount_paid|floatformat:2 }} ·
                                     <span class="font-medium
                                         {% if sf.status == 'OVERDUE' %}text-red-500
@@ -153,6 +345,8 @@
                                        oninput="recalcTotal()">
                             </td>
                         </tr>
+                        {% endif %}
+
                         {% endfor %}
                     </tbody>
                     <tfoot class="bg-slate-50 border-t-2 border-slate-200">
@@ -219,7 +413,164 @@
 </div>
 
 <script>
-// ── Select All ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  BROWSE DATA (Division → Grade → Section hierarchy)
+// ═══════════════════════════════════════════════════════
+const BROWSE_DATA = {{ browse_data_json|safe }};
+
+// Pre-selected values from URL (if user browsed and then picked a student)
+const INIT_DIV     = "{{ browse_div_id }}";
+const INIT_GRADE   = "{{ browse_grade_id }}";
+const INIT_SECTION = "{{ browse_section_id }}";
+
+// ── Tab switching ────────────────────────────────────────────────
+function switchTab(tab) {
+    ['search','browse'].forEach(t => {
+        document.getElementById('panel-' + t).classList.toggle('hidden', t !== tab);
+        const btn = document.getElementById('tab-' + t);
+        if (t === tab) {
+            btn.classList.add('text-primary', 'border-b-2', 'border-primary', 'bg-primary/5');
+            btn.classList.remove('text-slate-500');
+        } else {
+            btn.classList.remove('text-primary', 'border-b-2', 'border-primary', 'bg-primary/5');
+            btn.classList.add('text-slate-500');
+        }
+    });
+}
+
+// ── Division select ──────────────────────────────────────────────
+function selectDiv(divId, el) {
+    // Highlight button
+    document.querySelectorAll('.div-btn').forEach(b => {
+        b.classList.remove('bg-primary','text-white','border-primary');
+        b.classList.add('border-slate-300','text-slate-600');
+    });
+    el.classList.add('bg-primary','text-white','border-primary');
+    el.classList.remove('border-slate-300','text-slate-600');
+
+    document.getElementById('input-div').value   = divId;
+    document.getElementById('input-grade').value = '';
+    document.getElementById('input-section').value = '';
+
+    // Render grade buttons
+    const div = BROWSE_DATA.find(d => d.id === divId);
+    const gradeWrap = document.getElementById('grade-buttons');
+    gradeWrap.innerHTML = '';
+    if (div && div.grades.length) {
+        div.grades.forEach(gr => {
+            const b = document.createElement('button');
+            b.type      = 'button';
+            b.textContent = gr.name;
+            b.dataset.grade = gr.id;
+            b.className = 'grade-btn px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:border-primary hover:text-primary transition';
+            b.onclick   = () => selectGrade(gr.id, b);
+            gradeWrap.appendChild(b);
+        });
+    } else {
+        gradeWrap.innerHTML = '<span class="text-xs text-slate-400">No grades found for this division.</span>';
+    }
+    document.getElementById('grade-step').classList.remove('hidden');
+    document.getElementById('section-step').classList.add('hidden');
+    document.getElementById('browse-submit-wrap').classList.add('hidden');
+}
+
+// ── Grade select ─────────────────────────────────────────────────
+function selectGrade(gradeId, el) {
+    document.querySelectorAll('.grade-btn').forEach(b => {
+        b.classList.remove('bg-primary','text-white','border-primary');
+        b.classList.add('border-slate-300','text-slate-600');
+    });
+    el.classList.add('bg-primary','text-white','border-primary');
+    el.classList.remove('border-slate-300','text-slate-600');
+
+    document.getElementById('input-grade').value   = gradeId;
+    document.getElementById('input-section').value = '';
+
+    const divId = document.getElementById('input-div').value;
+    const div   = BROWSE_DATA.find(d => d.id == divId);
+    const gr    = div ? div.grades.find(g => g.id == gradeId) : null;
+
+    const secWrap = document.getElementById('section-buttons');
+    secWrap.innerHTML = '';
+
+    // "All sections" button
+    const allBtn = document.createElement('button');
+    allBtn.type = 'button';
+    allBtn.textContent = 'All Sections';
+    allBtn.className = 'section-btn px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:border-primary hover:text-primary transition';
+    allBtn.onclick = () => selectSection('', allBtn);
+    secWrap.appendChild(allBtn);
+
+    if (gr && gr.sections.length) {
+        gr.sections.forEach(sec => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = 'Section ' + sec.name;
+            b.dataset.section = sec.id;
+            b.className = 'section-btn px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm font-medium hover:border-primary hover:text-primary transition';
+            b.onclick = () => selectSection(sec.id, b);
+            secWrap.appendChild(b);
+        });
+    } else {
+        secWrap.innerHTML += '<span class="text-xs text-slate-400 self-center ml-2">No sections found.</span>';
+    }
+
+    document.getElementById('section-step').classList.remove('hidden');
+    document.getElementById('browse-submit-wrap').classList.remove('hidden');
+}
+
+// ── Section select ───────────────────────────────────────────────
+function selectSection(sectionId, el) {
+    document.querySelectorAll('.section-btn').forEach(b => {
+        b.classList.remove('bg-primary','text-white','border-primary');
+        b.classList.add('border-slate-300','text-slate-600');
+    });
+    el.classList.add('bg-primary','text-white','border-primary');
+    el.classList.remove('border-slate-300','text-slate-600');
+    document.getElementById('input-section').value = sectionId;
+}
+
+// ── Restore browse state from URL on page load ───────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    // Default: show search tab
+    const isQuerySearch = !!("{{ query }}");
+    const isBrowsing    = !!(INIT_DIV || INIT_GRADE || INIT_SECTION);
+
+    if (isBrowsing) {
+        switchTab('browse');
+        // Restore division
+        if (INIT_DIV) {
+            const divEl = document.querySelector(`.div-btn[data-div="${INIT_DIV}"]`);
+            if (divEl) {
+                selectDiv(parseInt(INIT_DIV), divEl);
+                // Restore grade
+                if (INIT_GRADE) {
+                    setTimeout(() => {
+                        const grEl = document.querySelector(`.grade-btn[data-grade="${INIT_GRADE}"]`);
+                        if (grEl) {
+                            selectGrade(parseInt(INIT_GRADE), grEl);
+                            // Restore section
+                            if (INIT_SECTION) {
+                                setTimeout(() => {
+                                    const secEl = document.querySelector(`.section-btn[data-section="${INIT_SECTION}"]`);
+                                    if (secEl) selectSection(parseInt(INIT_SECTION), secEl);
+                                }, 0);
+                            }
+                        }
+                    }, 0);
+                }
+            }
+        }
+    } else {
+        switchTab('search');
+    }
+});
+
+// ═══════════════════════════════════════════════════════
+//  FEE PAYMENT LOGIC
+// ═══════════════════════════════════════════════════════
+
+// ── Select All ──────────────────────────────────────────
 document.getElementById('selectAll')?.addEventListener('change', function() {
     document.querySelectorAll('.fee-checkbox').forEach(cb => {
         cb.checked = this.checked;
@@ -242,21 +593,19 @@ function toggleRow(cb) {
     }
 }
 
-// ── Discount changes balance for that row ───────────────────────
+// ── Discount changes balance for that row ───────────────
 function onDiscountChange(discEl, pk, grossBalance) {
     const disc   = parseFloat(discEl.value) || 0;
     const newBal = Math.max(0, grossBalance - disc);
     const amtEl  = document.getElementById('amt_' + pk);
     const row    = discEl.closest('tr');
-    // Update max and pre-fill amount with new balance
     amtEl.max   = newBal.toFixed(2);
     amtEl.value = newBal.toFixed(2);
-    // Update the displayed balance cell
     row.querySelector('.balance-cell').textContent = 'SAR ' + newBal.toFixed(2);
     recalcTotal();
 }
 
-// ── Running total ───────────────────────────────────────────────
+// ── Running total ───────────────────────────────────────
 function recalcTotal() {
     let total = 0;
     document.querySelectorAll('.fee-checkbox:checked').forEach(cb => {
@@ -271,7 +620,7 @@ function recalcTotal() {
     if (st) st.textContent = fmt;
 }
 
-// Init
+// Init total
 recalcTotal();
 </script>
 {% endblock %}

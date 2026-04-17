@@ -23,19 +23,22 @@ class AcademicYear(models.Model):
 
 
 class Division(models.Model):
-    AMERICAN = 'AMERICAN'
-    BRITISH  = 'BRITISH'
-    FRENCH   = 'FRENCH'
+    AMERICAN   = 'AMERICAN'
+    BRITISH    = 'BRITISH'
+    FRENCH     = 'FRENCH'
+    HOME_STUDY = 'HOME_STUDY'
 
     NAME_CHOICES = [
-        (AMERICAN, 'American'),
-        (BRITISH,  'British'),
-        (FRENCH,   'French'),
+        (AMERICAN,   'American'),
+        (BRITISH,    'British'),
+        (FRENCH,     'French'),
+        (HOME_STUDY, 'Home Study'),
     ]
     CURRICULUM_CHOICES = [
-        (AMERICAN, 'American Common Core'),
-        (BRITISH,  'British National Curriculum'),
-        (FRENCH,   'French National Curriculum'),
+        (AMERICAN,   'American Common Core'),
+        (BRITISH,    'British National Curriculum'),
+        (FRENCH,     'French National Curriculum'),
+        (HOME_STUDY, 'Home Study Programme'),
     ]
 
     name            = models.CharField(max_length=20, choices=NAME_CHOICES, unique=True)

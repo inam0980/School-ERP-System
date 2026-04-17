@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tuition Fee Structure — {{ config }}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; font-size: 11pt; }
+    .page { max-width: 900px; margin: 0 auto; padding: 20mm; }
+    h1 { font-size: 18pt; font-weight: 700; color: #1e3a5f; margin-bottom: 2px; }
+    h2 { font-size: 10pt; color: #475569; margin-bottom: 16px; }
+    .section-title {
+      background: #334155; color: #fff;
+      font-size: 9pt; font-weight: 600;
+      padding: 6px 12px; text-transform: uppercase;
+      letter-spacing: 0.05em; margin-bottom: 0;
+    }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+    th {
+      background: #f1f5f9; font-size: 9pt; font-weight: 600;
+      color: #475569; padding: 7px 10px; text-align: left;
+      border-bottom: 2px solid #cbd5e1;
+    }
+    th.right, td.right { text-align: right; }
+    td { padding: 6px 10px; font-size: 10pt; border-bottom: 1px solid #e2e8f0; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    .label-col { width: 220px; font-weight: 500; color: #475569; }
+    .value-col { font-weight: 600; color: #0f172a; }
+    .green-row td { background: #f0fdf4 !important; color: #166534; font-weight: 700; }
+    .blue-row  td { background: #eff6ff !important; color: #1d4ed8; font-weight: 700; }
+    .amber-row td { background: #fffbeb !important; color: #92400e; }
+    .total-row td { background: #f1f5f9 !important; font-weight: 700; }
+    .badge {
+      display: inline-block; padding: 1px 8px; border-radius: 20px;
+      font-size: 8pt; font-weight: 600;
+    }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-blue  { background: #dbeafe; color: #1d4ed8; }
+    .badge-amber { background: #fef3c7; color: #92400e; }
+    .badge-gray  { background: #f1f5f9; color: #475569; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 18px; }
+    .summary-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; text-align: center; }
+    .summary-card .label { font-size: 8pt; color: #94a3b8; margin-bottom: 4px; }
+    .summary-card .value { font-size: 14pt; font-weight: 700; }
+    .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px;
+              font-size: 8pt; color: #94a3b8; display: flex; justify-content: space-between; }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div style="border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 18px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div>
+        <h1>Tuition Fee Structure</h1>
+        <h2>{{ config.division }} Division · {{ config.grade }} · {{ config.get_structure_type_display }}
+          · Academic Year {{ config.academic_year }}</h2>
+      </div>
+      <div style="text-align:right; font-size:9pt; color:#64748b;">
+        <div>Generated: {{ "now"|date:"d M Y" }}</div>
+        {% if config.from_academic_year or config.to_academic_year %}
+        <div>Applicable: {{ config.from_academic_year|default:"—" }} → {{ config.to_academic_year|default:"—" }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 1: General Configuration -->
+  <div class="section-title">1 · General Configuration</div>
+  <table>
+    <tbody>
+      <tr>
+        <td class="label-col">Academic Year</td>
+        <td class="value-col">{{ config.academic_year }}</td>
+        <td class="label-col">Division</td>
+        <td class="value-col">{{ config.division }}</td>
+      </tr>
+      <tr>
+        <td class="label-col">Grade</td>
+        <td class="value-col">{{ config.grade }}</td>
+        <td class="label-col">Structure Type</td>
+        <td class="value-col">
+          {% if config.structure_type == 'SPECIAL' %}
+          <span class="badge badge-amber">Special / New Students</span>
+          {% else %}
+          <span class="badge badge-gray">Regular</span>
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td class="label-col">Number of Payments</td>
+        <td class="value-col">{{ config.num_payments }} installment(s)</td>
+        <td class="label-col">Tuition Includes Books</td>
+        <td class="value-col">{% if config.includes_books %}Yes{% else %}No{% endif %}</td>
+      </tr>
+      <tr>
+        <td class="label-col">VAT Rate</td>
+        <td class="value-col">{{ config.vat_pct }}% (Non-Saudi only)</td>
+        <td class="label-col">Group Discount</td>
+        <td class="value-col">
+          {% if config.group_discount_enabled %}
+          <span class="badge badge-amber">{{ config.group_discount_pct }}% Enabled</span>
+          {% else %}Not Applicable{% endif %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Section 2: Fee Components -->
+  <div class="section-title">2 · Fee Components</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30px">#</th>
+        <th>Fee Component</th>
+        <th class="right">Amount (SAR)</th>
+        <th>Remarks</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Entrance Exam Fee</td>
+        <td class="right">{{ config.entrance_exam_fee|floatformat:2 }}</td>
+        <td>One-time (new applicants)</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Registration Fee</td>
+        <td class="right">{{ config.registration_fee|floatformat:2 }}</td>
+        <td>One-time</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Reservation Fee (Down Payment / حجز مقعد)</td>
+        <td class="right">{{ config.reservation_fee|floatformat:2 }}</td>
+        <td>Deducted from 1st installment</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><strong>Gross Tuition Fee</strong></td>
+        <td class="right"><strong>{{ config.gross_tuition_fee|floatformat:2 }}</strong></td>
+        <td>{% if config.includes_books %}Includes books{% else %}Excludes books{% endif %}</td>
+      </tr>
+      <tr class="{% if config.group_discount_enabled %}amber-row{% endif %}">
+        <td>5</td>
+        <td>Group Discount {% if config.group_discount_enabled %}({{ config.group_discount_pct }}%){% endif %}</td>
+        <td class="right">
+          {% if config.group_discount_enabled %}({{ config.group_discount_amount|floatformat:2 }}){% else %}—{% endif %}
+        </td>
+        <td>{% if config.group_discount_enabled %}Applied{% else %}Not applicable{% endif %}</td>
+      </tr>
+      <tr class="green-row">
+        <td>6</td>
+        <td><strong>Net Tuition Fee — Saudi Nationals</strong></td>
+        <td class="right"><strong>{{ config.net_tuition_fee|floatformat:2 }}</strong></td>
+        <td>VAT zero-rated (National ID holders)</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>VAT ({{ config.vat_pct }}%)</td>
+        <td class="right">+ {{ config.vat_amount_non_saudi|floatformat:2 }}</td>
+        <td>Non-Saudi students only (ZATCA)</td>
+      </tr>
+      <tr class="blue-row">
+        <td>8</td>
+        <td><strong>Final Net Tuition — Non-Saudi Students</strong></td>
+        <td class="right"><strong>{{ config.final_net_non_saudi|floatformat:2 }}</strong></td>
+        <td>Includes {{ config.vat_pct }}% VAT</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Section 3: Student Categories -->
+  <div class="section-title">3 · Tuition by Student Category</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th class="right">Net Tuition (SAR)</th>
+        <th class="right">VAT (SAR)</th>
+        <th class="right">Total Payable (SAR)</th>
+        <th>Basis</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="green-row">
+        <td>Saudi Nationals (هوية وطنية)</td>
+        <td class="right">{{ config.net_tuition_fee|floatformat:2 }}</td>
+        <td class="right">0.00</td>
+        <td class="right">{{ config.net_tuition_fee|floatformat:2 }}</td>
+        <td>VAT zero-rated</td>
+      </tr>
+      <tr class="blue-row">
+        <td>Non-Saudi (Iqama / Passport)</td>
+        <td class="right">{{ config.net_tuition_fee|floatformat:2 }}</td>
+        <td class="right">{{ config.vat_amount_non_saudi|floatformat:2 }}</td>
+        <td class="right">{{ config.final_net_non_saudi|floatformat:2 }}</td>
+        <td>{{ config.vat_pct }}% VAT applies</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Section 4: Payment Schedule -->
+  <div class="section-title">4 · Payment Schedule</div>
+  {% if installments %}
+  <table>
+    <thead>
+      <tr>
+        <th>Installment</th>
+        <th class="right">Amount (SAR)</th>
+        <th>Due Date</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inst in installments %}
+      <tr {% if inst.installment_type == 'RESERVATION' %}class="amber-row"{% endif %}>
+        <td>{{ inst.get_installment_type_display }}</td>
+        <td class="right"><strong>{{ inst.amount|floatformat:2 }}</strong></td>
+        <td>{{ inst.due_date|default:"—" }}</td>
+        <td>{{ inst.notes|default:"" }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="total-row">
+        <td><strong>TOTAL INSTALLMENTS</strong></td>
+        <td class="right"><strong>{{ config.installments_total|floatformat:2 }}</strong></td>
+        <td colspan="2">
+          {% if not validation_errors %}
+          <span class="badge badge-green">✓ Matches Net Tuition</span>
+          {% else %}
+          <span class="badge" style="background:#fee2e2;color:#991b1b;">⚠ Mismatch</span>
+          {% endif %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#94a3b8; font-style:italic; margin-bottom:18px; padding:10px;">
+    No payment schedule defined.
+  </p>
+  {% endif %}
+
+  <!-- Summary Cards -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="label">Entrance Exam</div>
+      <div class="value" style="color:#475569;">SAR {{ config.entrance_exam_fee|floatformat:0 }}</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Registration</div>
+      <div class="value" style="color:#475569;">SAR {{ config.registration_fee|floatformat:0 }}</div>
+    </div>
+    <div class="summary-card" style="border-color:#86efac;">
+      <div class="label" style="color:#16a34a;">Saudi Tuition</div>
+      <div class="value" style="color:#166534;">SAR {{ config.net_tuition_fee|floatformat:0 }}</div>
+    </div>
+    <div class="summary-card" style="border-color:#93c5fd;">
+      <div class="label" style="color:#2563eb;">Non-Saudi Tuition</div>
+      <div class="value" style="color:#1d4ed8;">SAR {{ config.final_net_non_saudi|floatformat:0 }}</div>
+    </div>
+  </div>
+
+  {% if config.notes %}
+  <p style="font-size:9pt;color:#64748b;border-top:1px solid #e2e8f0;padding-top:8px;">
+    <strong>Notes:</strong> {{ config.notes }}
+  </p>
+  {% endif %}
+
+  <div class="footer">
+    <span>{{ config.division }} · {{ config.grade }} · {{ config.get_structure_type_display }} · {{ config.academic_year }}</span>
+    <span>Al-Kawthar School — Fees Department — Confidential</span>
+  </div>
+
+</div>
+</body>
+</html>

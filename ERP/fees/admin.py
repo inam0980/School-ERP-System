@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import FeeType, FeeStructure, StudentFee, Payment, TaxInvoice, Salary
+from .models import (
+    FeeType, FeeStructure, StudentFee, Payment, TaxInvoice, Salary,
+    TuitionFeeConfig, TuitionInstallment,
+)
 
 
 class PaymentInline(admin.TabularInline):
@@ -52,3 +55,69 @@ class SalaryAdmin(admin.ModelAdmin):
     list_filter   = ('is_paid', 'month')
     search_fields = ('staff__first_name', 'staff__last_name', 'staff__username')
     readonly_fields = ('net_salary',)
+
+
+# ════════════════════════════════════════════════════════════════
+#  TUITION FEE CONFIG
+# ════════════════════════════════════════════════════════════════
+
+class TuitionInstallmentInline(admin.TabularInline):
+    model  = TuitionInstallment
+    extra  = 0
+    fields = ('installment_type', 'amount', 'due_date', 'notes')
+
+
+@admin.register(TuitionFeeConfig)
+class TuitionFeeConfigAdmin(admin.ModelAdmin):
+    list_display   = (
+        'academic_year', 'division', 'grade', 'structure_type',
+        'gross_tuition_fee', '_net_tuition', '_vat_non_saudi', '_final_non_saudi',
+        'num_payments', 'includes_books',
+    )
+    list_filter    = ('academic_year', 'division', 'structure_type', 'includes_books')
+    search_fields  = ('grade__name', 'division__name')
+    readonly_fields = (
+        '_group_discount_amount', '_net_tuition', '_vat_non_saudi', '_final_non_saudi',
+    )
+    inlines        = [TuitionInstallmentInline]
+    fieldsets      = [
+        ('Identification', {
+            'fields': ('academic_year', 'division', 'grade',
+                       'structure_type', 'num_payments', 'includes_books',
+                       'from_academic_year', 'to_academic_year'),
+        }),
+        ('One-time Fees', {
+            'fields': ('entrance_exam_fee', 'registration_fee', 'reservation_fee'),
+        }),
+        ('Tuition & Discount', {
+            'fields': ('gross_tuition_fee', 'group_discount_enabled',
+                       'group_discount_pct', '_group_discount_amount'),
+        }),
+        ('Computed (read-only)', {
+            'fields': ('_net_tuition', 'vat_pct', '_vat_non_saudi', '_final_non_saudi'),
+        }),
+        ('Notes', {'fields': ('notes',)}),
+    ]
+
+    @admin.display(description='Group Discount (SAR)')
+    def _group_discount_amount(self, obj):
+        return f"SAR {obj.group_discount_amount:,.2f}"
+
+    @admin.display(description='Net Tuition – Saudi')
+    def _net_tuition(self, obj):
+        return f"SAR {obj.net_tuition_fee:,.2f}"
+
+    @admin.display(description='VAT – Non-Saudi')
+    def _vat_non_saudi(self, obj):
+        return f"SAR {obj.vat_amount_non_saudi:,.2f}"
+
+    @admin.display(description='Final – Non-Saudi')
+    def _final_non_saudi(self, obj):
+        return f"SAR {obj.final_net_non_saudi:,.2f}"
+
+
+@admin.register(TuitionInstallment)
+class TuitionInstallmentAdmin(admin.ModelAdmin):
+    list_display  = ('config', 'installment_type', 'amount', 'due_date')
+    list_filter   = ('installment_type', 'config__academic_year', 'config__division')
+    search_fields = ('config__grade__name',)

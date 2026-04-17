@@ -347,3 +347,263 @@ class Salary(models.Model):
         if self.net_salary < 0:
             self.net_salary = Decimal('0.00')
         super().save(*args, **kwargs)
+
+
+# ════════════════════════════════════════════════════════════════
+#  TUITION FEE CONFIG  (complete fee structure per division/grade/year)
+# ════════════════════════════════════════════════════════════════
+
+class TuitionFeeConfig(models.Model):
+    REGULAR = 'REGULAR'
+    SPECIAL = 'SPECIAL'
+    STRUCTURE_TYPE_CHOICES = [
+        (REGULAR, 'Regular'),
+        (SPECIAL, 'Special / New Students'),
+    ]
+
+    PAYMENTS_2 = 2
+    PAYMENTS_3 = 3
+    NUM_PAYMENTS_CHOICES = [
+        (PAYMENTS_2, '2 Installments'),
+        (PAYMENTS_3, '3 Installments'),
+    ]
+
+    academic_year          = models.ForeignKey(
+        AcademicYear, on_delete=models.PROTECT, related_name='tuition_configs')
+    division               = models.ForeignKey(
+        Division, on_delete=models.PROTECT, related_name='tuition_configs')
+    grade                  = models.ForeignKey(
+        Grade, on_delete=models.PROTECT, related_name='tuition_configs')
+    structure_type         = models.CharField(
+        max_length=10, choices=STRUCTURE_TYPE_CHOICES, default=REGULAR)
+    num_payments           = models.PositiveSmallIntegerField(
+        choices=NUM_PAYMENTS_CHOICES, default=PAYMENTS_2,
+        verbose_name='Number of Installments')
+    includes_books         = models.BooleanField(
+        default=False, help_text='Tuition fee includes books')
+
+    # ── One-time fees ─────────────────────────────────────────────
+    entrance_exam_fee      = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        verbose_name='Entrance Exam Fee (SAR)')
+    registration_fee       = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        verbose_name='Registration Fee (SAR)')
+    reservation_fee        = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        help_text='Down payment / حجز مقعد',
+        verbose_name='Reservation / Down Payment (SAR)')
+
+    # ── Tuition ───────────────────────────────────────────────────
+    gross_tuition_fee      = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        verbose_name='Gross Tuition Fee (SAR)')
+
+    # ── Group discount ────────────────────────────────────────────
+    group_discount_enabled = models.BooleanField(default=False)
+    group_discount_pct     = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('0.00'),
+        help_text='Discount percentage (e.g. 10 for 10%)',
+        verbose_name='Group Discount (%)')
+
+    # ── VAT ───────────────────────────────────────────────────────
+    vat_pct                = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('15.00'),
+        help_text='VAT rate (%) applied to non-Saudi students',
+        verbose_name='VAT Rate (%)')
+
+    # ── Year range (multi-year applicability) ─────────────────────
+    from_academic_year     = models.ForeignKey(
+        AcademicYear, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='tuition_configs_from', verbose_name='Applicable From Year')
+    to_academic_year       = models.ForeignKey(
+        AcademicYear, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='tuition_configs_to', verbose_name='Applicable To Year')
+
+    notes      = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['academic_year', 'division', 'grade', 'structure_type']
+        ordering = ['division__name', 'grade__order', 'grade__name', 'structure_type']
+        verbose_name = 'Tuition Fee Configuration'
+        verbose_name_plural = 'Tuition Fee Configurations'
+
+    def __str__(self):
+        return (f"{self.division} — {self.grade} — "
+                f"{self.get_structure_type_display()} ({self.academic_year})")
+
+    # ── Computed fee components ───────────────────────────────────
+
+    @property
+    def group_discount_amount(self) -> Decimal:
+        """Group discount in SAR."""
+        if not self.group_discount_enabled or self.group_discount_pct <= 0:
+            return Decimal('0.00')
+        return (self.gross_tuition_fee * self.group_discount_pct / 100).quantize(Decimal('0.01'))
+
+    @property
+    def net_tuition_fee(self) -> Decimal:
+        """Net tuition after group discount (Saudi students pay this amount)."""
+        return (self.gross_tuition_fee - self.group_discount_amount).quantize(Decimal('0.01'))
+
+    @property
+    def vat_amount_non_saudi(self) -> Decimal:
+        """VAT amount charged to non-Saudi students on net tuition."""
+        return (self.net_tuition_fee * self.vat_pct / 100).quantize(Decimal('0.01'))
+
+    @property
+    def final_net_non_saudi(self) -> Decimal:
+        """Total tuition for non-Saudi students (net tuition + VAT)."""
+        return (self.net_tuition_fee + self.vat_amount_non_saudi).quantize(Decimal('0.01'))
+
+    @property
+    def total_one_time_fees(self) -> Decimal:
+        """Sum of entrance exam + registration + reservation fees."""
+        return (
+            self.entrance_exam_fee + self.registration_fee + self.reservation_fee
+        ).quantize(Decimal('0.01'))
+
+    @property
+    def installments_total(self) -> Decimal:
+        """Sum of all non-reservation installments."""
+        total = Decimal('0.00')
+        for inst in self.installments.all():
+            if inst.installment_type != TuitionInstallment.RESERVATION:
+                total += inst.amount
+        return total.quantize(Decimal('0.01'))
+
+    def validate_installments(self) -> list:
+        """Return list of validation error strings. Empty list = valid."""
+        errors = []
+        insts = list(self.installments.all())
+        if not insts:
+            return errors
+
+        # Reservation installment must match reservation_fee
+        res_insts = [i for i in insts if i.installment_type == TuitionInstallment.RESERVATION]
+        if res_insts:
+            res_total = sum(i.amount for i in res_insts)
+            if abs(res_total - self.reservation_fee) > Decimal('0.01'):
+                errors.append(
+                    f"Reservation installment ({res_total:,.2f}) ≠ "
+                    f"reservation fee ({self.reservation_fee:,.2f})."
+                )
+
+        # Non-reservation installments must sum to net_tuition_fee
+        non_res = [i for i in insts if i.installment_type != TuitionInstallment.RESERVATION]
+        if non_res:
+            non_res_total = sum(i.amount for i in non_res)
+            if abs(non_res_total - self.net_tuition_fee) > Decimal('0.01'):
+                errors.append(
+                    f"Installments (excl. reservation) total SAR {non_res_total:,.2f} ≠ "
+                    f"net tuition SAR {self.net_tuition_fee:,.2f}."
+                )
+
+        # Installment count must match num_payments
+        if len(non_res) != self.num_payments:
+            errors.append(
+                f"Expected {self.num_payments} installment(s), found {len(non_res)}."
+            )
+        return errors
+
+
+# ════════════════════════════════════════════════════════════════
+#  PAYMENT PLAN  (per-student installment schedule for a StudentFee)
+# ════════════════════════════════════════════════════════════════
+
+class PaymentPlan(models.Model):
+    """Installment schedule attached to one StudentFee."""
+    student_fee = models.OneToOneField(
+        StudentFee, on_delete=models.CASCADE, related_name='payment_plan')
+    notes       = models.TextField(blank=True)
+    created_by  = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='payment_plans_created')
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return (f"Plan — {self.student_fee.student} — "
+                f"{self.student_fee.fee_structure.fee_type.name}")
+
+
+class PaymentPlanInstallment(models.Model):
+    UNPAID  = 'UNPAID'
+    PARTIAL = 'PARTIAL'
+    PAID    = 'PAID'
+    OVERDUE = 'OVERDUE'
+
+    STATUS_CHOICES = [
+        (UNPAID,  'Unpaid'),
+        (PARTIAL, 'Partial'),
+        (PAID,    'Paid'),
+        (OVERDUE, 'Overdue'),
+    ]
+
+    plan           = models.ForeignKey(
+        PaymentPlan, on_delete=models.CASCADE, related_name='installments')
+    installment_no = models.PositiveSmallIntegerField()
+    amount         = models.DecimalField(max_digits=10, decimal_places=2)
+    due_date       = models.DateField()
+    paid_amount    = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    status         = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, default=UNPAID)
+
+    class Meta:
+        ordering = ['installment_no']
+        unique_together = ['plan', 'installment_no']
+
+    def __str__(self):
+        return (f"Installment {self.installment_no} — "
+                f"{self.plan.student_fee.student} — SAR {self.amount:,.2f}")
+
+    @property
+    def balance(self):
+        return (self.amount - self.paid_amount).quantize(Decimal('0.01'))
+
+    def refresh_status(self):
+        if self.paid_amount <= 0:
+            self.status = (
+                self.OVERDUE if self.due_date < timezone.localdate() else self.UNPAID
+            )
+        elif self.paid_amount >= self.amount:
+            self.status = self.PAID
+        else:
+            self.status = self.PARTIAL
+        self.save(update_fields=['status'])
+
+
+class TuitionInstallment(models.Model):
+    RESERVATION = 'RESERVATION'
+    FIRST       = 'FIRST'
+    SECOND      = 'SECOND'
+    THIRD       = 'THIRD'
+
+    INSTALLMENT_TYPES = [
+        (RESERVATION, 'Reservation / Down Payment'),
+        (FIRST,       '1st Installment'),
+        (SECOND,      '2nd Installment'),
+        (THIRD,       '3rd Installment'),
+    ]
+
+    # For deterministic ordering without DB-level sort
+    INSTALLMENT_ORDER = {RESERVATION: 0, FIRST: 1, SECOND: 2, THIRD: 3}
+
+    config           = models.ForeignKey(
+        TuitionFeeConfig, on_delete=models.CASCADE, related_name='installments')
+    installment_type = models.CharField(max_length=15, choices=INSTALLMENT_TYPES)
+    amount           = models.DecimalField(max_digits=10, decimal_places=2)
+    due_date         = models.DateField(null=True, blank=True)
+    notes            = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        unique_together = ['config', 'installment_type']
+        ordering = ['config', 'installment_type']
+        verbose_name = 'Tuition Installment'
+        verbose_name_plural = 'Tuition Installments'
+
+    def __str__(self):
+        return (f"{self.config} — {self.get_installment_type_display()} "
+                f"— SAR {self.amount:,.2f}")
