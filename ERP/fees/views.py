@@ -15,12 +15,17 @@ from django.core.cache import cache
 from accounts.decorators import role_required
 from students.models import Student
 from core.models import AcademicYear, Division, Grade, Section
-from .models import FeeType, FeeStructure, StudentFee, Payment, TaxInvoice, Salary
+from .models import (
+    FeeType, FeeStructure, StudentFee, Payment, TaxInvoice, Salary,
+    TuitionFeeConfig, TuitionInstallment,
+    PaymentPlan, PaymentPlanInstallment,
+)
 from .forms import (
     FeeTypeForm, FeeStructureForm, BulkAssignFeeForm,
     StudentFeeEditForm, PaymentForm, FeeReportFilterForm,
     SalaryForm, SalaryMonthFilterForm,
     ManualInvoiceHeaderForm, ManualInvoiceLineForm, DefaultersFilterForm,
+    TuitionFeeConfigForm, TuitionInstallmentFormSet, TuitionConfigFilterForm,
 )
 
 _ADMIN       = ('SUPER_ADMIN', 'ADMIN')
@@ -195,22 +200,64 @@ def fee_collection(request):
     """
     Multi-fee payment: search student → see all outstanding fees with
     checkboxes and per-row amount/discount → one submit pays them all.
+
+    Also supports hierarchical browse: Division → Grade → Section → Students.
     """
+    import json as _json
+
     query    = request.GET.get('q', '').strip()
     students = []
     student  = None
     dues     = []
 
+    # ── Browse params ───────────────────────────────────────────
+    browse_div_id     = request.GET.get('div', '')
+    browse_grade_id   = request.GET.get('grade', '')
+    browse_section_id = request.GET.get('section', '')
+
+    # Build browse data for the template (all divisions + their grades/sections)
+    all_divisions = list(
+        Division.objects.filter(is_active=True)
+        .prefetch_related('grades__sections')
+        .order_by('name')
+    )
+    browse_data = []
+    for div in all_divisions:
+        grades_data = []
+        for gr in div.grades.order_by('order', 'name'):
+            sections_data = [
+                {'id': sec.pk, 'name': sec.name}
+                for sec in gr.sections.order_by('name')
+            ]
+            grades_data.append({'id': gr.pk, 'name': gr.name, 'sections': sections_data})
+        browse_data.append({'id': div.pk, 'name': str(div), 'grades': grades_data})
+
+    # ── Name / ID search ────────────────────────────────────────
     if query:
         students = Student.objects.filter(
             Q(full_name__icontains=query) |
             Q(student_id__icontains=query) |
             Q(arabic_name__icontains=query),
             is_active=True,
-        ).select_related('grade', 'section')[:20]
+        ).select_related('grade', 'section', 'division')[:40]
+
+    # ── Browse: Section selected → show all students in it ──────
+    elif browse_section_id:
+        students = Student.objects.filter(
+            section_id=browse_section_id,
+            is_active=True,
+        ).select_related('grade', 'section', 'division').order_by('full_name')
+
+    # ── Browse: Grade selected (no section) → show all students in grade ──
+    elif browse_grade_id:
+        students = Student.objects.filter(
+            grade_id=browse_grade_id,
+            is_active=True,
+        ).select_related('grade', 'section', 'division').order_by('section__name', 'full_name')
 
     student_pk = request.GET.get('student_id') or request.POST.get('student_id')
     if student_pk:
+        students = []   # hide the list once a student is selected
         student = get_object_or_404(
             Student.objects.select_related('grade', 'section', 'division', 'academic_year'),
             pk=student_pk,
@@ -219,14 +266,17 @@ def fee_collection(request):
             StudentFee.objects.filter(student=student)
             .exclude(status__in=['WAIVED', 'PAID'])
             .select_related('fee_structure', 'fee_structure__fee_type')
+            .prefetch_related('payment_plan__installments')
             .order_by('due_date')
         )
 
     # ── MULTI-FEE POST ──────────────────────────────────────────
     receipts = []
     if request.method == 'POST' and student:
-        selected_pks = request.POST.getlist('selected_fees')
-        if not selected_pks:
+        selected_pks       = request.POST.getlist('selected_fees')
+        selected_inst_pks  = request.POST.getlist('selected_installments')
+
+        if not selected_pks and not selected_inst_pks:
             messages.error(request, "Please select at least one fee to pay.")
         else:
             date_str = request.POST.get('payment_date', '')
@@ -240,6 +290,7 @@ def fee_collection(request):
             notes           = request.POST.get('notes', '').strip()
             errors          = []
 
+            # ── Normal (non-plan) fees ───────────────────────────
             for pk in selected_pks:
                 try:
                     fee = StudentFee.objects.select_related(
@@ -247,7 +298,6 @@ def fee_collection(request):
                 except StudentFee.DoesNotExist:
                     continue
 
-                # Apply inline discount
                 raw_disc = request.POST.get(f'discount_{pk}', '').strip()
                 try:
                     disc = Decimal(raw_disc) if raw_disc else Decimal('0')
@@ -256,7 +306,7 @@ def fee_collection(request):
                 if disc > 0:
                     fee.discount      = (fee.discount or Decimal('0')) + disc
                     fee.discount_note = request.POST.get(f'discount_note_{pk}', '').strip()
-                    fee.save()          # recalculates net_amount
+                    fee.save()
 
                 raw_amt = request.POST.get(f'amount_{pk}', '').strip()
                 try:
@@ -284,6 +334,55 @@ def fee_collection(request):
                     notes           = notes,
                     collected_by    = request.user,
                 )
+                fee.refresh_status()
+                receipts.append(payment)
+
+            # ── Installment plan payments ────────────────────────
+            for inst_pk in selected_inst_pks:
+                try:
+                    inst = PaymentPlanInstallment.objects.select_related(
+                        'plan__student_fee__fee_structure__fee_type',
+                        'plan__student_fee__student',
+                    ).get(pk=inst_pk, plan__student_fee__student=student)
+                except PaymentPlanInstallment.DoesNotExist:
+                    continue
+
+                if inst.balance <= 0:
+                    continue
+
+                raw_amt = request.POST.get(f'inst_amount_{inst_pk}', '').strip()
+                try:
+                    amount = Decimal(raw_amt)
+                except Exception:
+                    errors.append(
+                        f"Installment {inst.installment_no} of "
+                        f"{inst.plan.student_fee.fee_structure.fee_type.name}: "
+                        f"invalid amount."
+                    )
+                    continue
+
+                if amount <= 0 or amount > inst.balance:
+                    errors.append(
+                        f"Installment {inst.installment_no}: SAR {amount} "
+                        f"exceeds balance SAR {inst.balance:.2f}."
+                    )
+                    continue
+
+                # Record payment against the parent StudentFee
+                payment = Payment.objects.create(
+                    student_fee     = inst.plan.student_fee,
+                    paid_amount     = amount,
+                    payment_date    = payment_date,
+                    payment_method  = payment_method,
+                    transaction_ref = transaction_ref,
+                    notes           = f"Installment {inst.installment_no}" + (f" — {notes}" if notes else ""),
+                    collected_by    = request.user,
+                )
+                # Update installment paid amount & status
+                inst.paid_amount = (inst.paid_amount + amount).quantize(Decimal('0.01'))
+                inst.save(update_fields=['paid_amount'])
+                inst.refresh_status()
+                inst.plan.student_fee.refresh_status()
                 receipts.append(payment)
 
             for e in errors:
@@ -311,13 +410,18 @@ def fee_collection(request):
         )
 
     return render(request, 'fees/fee_collection.html', {
-        'query':           query,
-        'students':        students,
-        'student':         student,
-        'dues':            dues,
-        'receipts':        receipts,
-        'payment_methods': Payment.PAYMENT_METHODS,
-        'today':           timezone.localdate().isoformat(),
+        'query':              query,
+        'students':           students,
+        'student':            student,
+        'dues':               dues,
+        'receipts':           receipts,
+        'payment_methods':    Payment.PAYMENT_METHODS,
+        'today':              timezone.localdate().isoformat(),
+        'browse_data_json':   _json.dumps(browse_data),
+        'browse_div_id':      browse_div_id,
+        'browse_grade_id':    browse_grade_id,
+        'browse_section_id':  browse_section_id,
+        'all_divisions':      all_divisions,
     })
 
 
@@ -877,4 +981,307 @@ def bank_verify_payment(request, payment_pk):
     payment.save(update_fields=['bank_verified', 'bank_verified_at', 'transaction_ref'])
     messages.success(request, f"Receipt {payment.receipt_number} marked as bank-verified.")
     return redirect('fees:receipt_print', payment_pk=payment_pk)
+
+
+# ════════════════════════════════════════════════════════════════
+#  TUITION FEE CONFIG  (complete structured fee schedule)
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def tuition_config_list(request):
+    """List all tuition fee configurations with filter support."""
+    filter_form = TuitionConfigFilterForm(request.GET or None)
+    qs = TuitionFeeConfig.objects.select_related(
+        'academic_year', 'division', 'grade',
+    ).prefetch_related('installments')
+
+    if filter_form.is_valid():
+        year    = filter_form.cleaned_data.get('academic_year')
+        div     = filter_form.cleaned_data.get('division')
+        stype   = filter_form.cleaned_data.get('structure_type')
+        if year:
+            qs = qs.filter(academic_year=year)
+        if div:
+            qs = qs.filter(division=div)
+        if stype:
+            qs = qs.filter(structure_type=stype)
+
+    return render(request, 'fees/tuition_config_list.html', {
+        'configs':     qs,
+        'filter_form': filter_form,
+    })
+
+
+@login_required
+@role_required(*_ADMIN)
+def tuition_config_form(request, pk=None):
+    """Create or edit a tuition fee configuration with inline installments."""
+    instance = get_object_or_404(TuitionFeeConfig, pk=pk) if pk else None
+    form     = TuitionFeeConfigForm(request.POST or None, instance=instance)
+
+    if instance:
+        formset = TuitionInstallmentFormSet(
+            request.POST or None, instance=instance)
+    else:
+        formset = TuitionInstallmentFormSet(request.POST or None)
+
+    if request.method == 'POST' and form.is_valid():
+        config  = form.save(commit=False)
+        formset = TuitionInstallmentFormSet(request.POST, instance=config)
+        if formset.is_valid():
+            config.save()
+            formset.save()
+            # Post-save validation warning (non-blocking)
+            errors = config.validate_installments()
+            if errors:
+                for e in errors:
+                    messages.warning(request, f"Validation: {e}")
+            else:
+                messages.success(request, "Tuition fee configuration saved successfully.")
+            return redirect('fees:tuition_config_detail', pk=config.pk)
+
+    return render(request, 'fees/tuition_config_form.html', {
+        'form':     form,
+        'formset':  formset,
+        'title':    'Edit Tuition Fee Config' if instance else 'New Tuition Fee Config',
+        'instance': instance,
+    })
+
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def tuition_config_detail(request, pk):
+    """Full structured fee table for a single configuration."""
+    config = get_object_or_404(
+        TuitionFeeConfig.objects.select_related(
+            'academic_year', 'division', 'grade',
+            'from_academic_year', 'to_academic_year',
+        ).prefetch_related('installments'),
+        pk=pk,
+    )
+    installments = sorted(
+        config.installments.all(),
+        key=lambda i: TuitionInstallment.INSTALLMENT_ORDER.get(i.installment_type, 99),
+    )
+    validation_errors = config.validate_installments()
+    return render(request, 'fees/tuition_config_detail.html', {
+        'config':            config,
+        'installments':      installments,
+        'validation_errors': validation_errors,
+    })
+
+
+@login_required
+@role_required(*_ADMIN)
+@require_POST
+def tuition_config_delete(request, pk):
+    config = get_object_or_404(TuitionFeeConfig, pk=pk)
+    config.delete()
+    messages.success(request, "Tuition fee configuration deleted.")
+    return redirect('fees:tuition_config_list')
+
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def tuition_config_print(request, pk):
+    """Print-optimised view of a full tuition fee schedule."""
+    config = get_object_or_404(
+        TuitionFeeConfig.objects.select_related(
+            'academic_year', 'division', 'grade',
+            'from_academic_year', 'to_academic_year',
+        ).prefetch_related('installments'),
+        pk=pk,
+    )
+    installments = sorted(
+        config.installments.all(),
+        key=lambda i: TuitionInstallment.INSTALLMENT_ORDER.get(i.installment_type, 99),
+    )
+    return render(request, 'fees/tuition_config_print.html', {
+        'config':       config,
+        'installments': installments,
+    })
+
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def tuition_config_export_csv(request):
+    """Export all (filtered) tuition configurations to CSV."""
+    filter_form = TuitionConfigFilterForm(request.GET or None)
+    qs = TuitionFeeConfig.objects.select_related(
+        'academic_year', 'division', 'grade',
+    ).prefetch_related('installments')
+
+    if filter_form.is_valid():
+        year  = filter_form.cleaned_data.get('academic_year')
+        div   = filter_form.cleaned_data.get('division')
+        stype = filter_form.cleaned_data.get('structure_type')
+        if year:
+            qs = qs.filter(academic_year=year)
+        if div:
+            qs = qs.filter(division=div)
+        if stype:
+            qs = qs.filter(structure_type=stype)
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response['Content-Disposition'] = 'attachment; filename="tuition_fee_structure.csv"'
+    response.write('\ufeff')
+    writer = csv.writer(response)
+    writer.writerow([
+        'Academic Year', 'Division', 'Grade', 'Structure Type',
+        'No. of Payments', 'Includes Books',
+        'Entrance Exam Fee (SAR)', 'Registration Fee (SAR)',
+        'Reservation / Down Payment (SAR)',
+        'Gross Tuition (SAR)',
+        'Group Discount Enabled', 'Group Discount (%)',
+        'Group Discount Amount (SAR)',
+        'Net Tuition – Saudi (SAR)',
+        'VAT Rate (%)', 'VAT Amount – Non-Saudi (SAR)',
+        'Final Tuition – Non-Saudi (SAR)',
+        'Reservation Installment (SAR)',
+        '1st Installment (SAR)',
+        '2nd Installment (SAR)',
+        '3rd Installment (SAR)',
+        'Notes',
+    ])
+    for cfg in qs:
+        insts = {i.installment_type: i.amount for i in cfg.installments.all()}
+        writer.writerow([
+            str(cfg.academic_year),
+            str(cfg.division),
+            str(cfg.grade),
+            cfg.get_structure_type_display(),
+            cfg.num_payments,
+            'Yes' if cfg.includes_books else 'No',
+            cfg.entrance_exam_fee,
+            cfg.registration_fee,
+            cfg.reservation_fee,
+            cfg.gross_tuition_fee,
+            'Yes' if cfg.group_discount_enabled else 'No',
+            cfg.group_discount_pct if cfg.group_discount_enabled else 0,
+            cfg.group_discount_amount,
+            cfg.net_tuition_fee,
+            cfg.vat_pct,
+            cfg.vat_amount_non_saudi,
+            cfg.final_net_non_saudi,
+            insts.get(TuitionInstallment.RESERVATION, ''),
+            insts.get(TuitionInstallment.FIRST, ''),
+            insts.get(TuitionInstallment.SECOND, ''),
+            insts.get(TuitionInstallment.THIRD, ''),
+            cfg.notes,
+        ])
+    return response
+
+
+# ════════════════════════════════════════════════════════════════
+#  PAYMENT PLAN  (installment schedule per student fee)
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def setup_payment_plan(request, student_fee_pk):
+    """
+    Create or replace an installment plan for a StudentFee.
+    GET  → show form.
+    POST → validate & save plan installments.
+    """
+    sf = get_object_or_404(
+        StudentFee.objects.select_related(
+            'student', 'fee_structure', 'fee_structure__fee_type'),
+        pk=student_fee_pk,
+    )
+
+    if sf.balance <= 0:
+        messages.error(request, "This fee is already fully paid — no installment plan needed.")
+        from django.urls import reverse
+        return redirect(reverse('fees:collection') + f"?student_id={sf.student_id}")
+
+    existing_plan = getattr(sf, 'payment_plan', None)
+
+    if request.method == 'POST':
+        count_str = request.POST.get('installment_count', '2')
+        try:
+            count = max(2, min(12, int(count_str)))
+        except ValueError:
+            count = 2
+
+        amounts   = []
+        due_dates = []
+        errors    = []
+
+        for i in range(1, count + 1):
+            amt_raw = request.POST.get(f'inst_amount_{i}', '').strip()
+            due_raw = request.POST.get(f'inst_due_{i}', '').strip()
+            try:
+                amt = Decimal(amt_raw)
+                if amt <= 0:
+                    raise ValueError
+            except Exception:
+                errors.append(f"Installment {i}: enter a valid amount.")
+                amt = Decimal('0')
+            try:
+                due = date.fromisoformat(due_raw)
+            except Exception:
+                errors.append(f"Installment {i}: enter a valid due date.")
+                due = timezone.localdate()
+            amounts.append(amt)
+            due_dates.append(due)
+
+        total_inst = sum(amounts)
+        if abs(total_inst - sf.balance) > Decimal('0.01'):
+            errors.append(
+                f"Installments total SAR {total_inst:,.2f} does not match "
+                f"outstanding balance SAR {sf.balance:,.2f}."
+            )
+
+        if errors:
+            for e in errors:
+                messages.error(request, e)
+        else:
+            if existing_plan:
+                existing_plan.delete()
+
+            plan = PaymentPlan.objects.create(
+                student_fee=sf,
+                notes=request.POST.get('notes', '').strip(),
+                created_by=request.user,
+            )
+            for idx, (amt, due) in enumerate(zip(amounts, due_dates), start=1):
+                PaymentPlanInstallment.objects.create(
+                    plan=plan,
+                    installment_no=idx,
+                    amount=amt,
+                    due_date=due,
+                )
+            messages.success(
+                request,
+                f"Installment plan saved — {count} installments for "
+                f"{sf.fee_structure.fee_type.name}."
+            )
+            from django.urls import reverse
+            return redirect(reverse('fees:collection') + f"?student_id={sf.student_id}")
+
+    from django.urls import reverse
+    return render(request, 'fees/payment_plan_form.html', {
+        'sf':            sf,
+        'existing_plan': existing_plan,
+        'back_url':      reverse('fees:collection') + f"?student_id={sf.student_id}",
+    })
+
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def delete_payment_plan(request, plan_pk):
+    """Delete an installment plan (POST only)."""
+    plan = get_object_or_404(
+        PaymentPlan.objects.select_related('student_fee__student'),
+        pk=plan_pk,
+    )
+    student_id = plan.student_fee.student_id
+    if request.method == 'POST':
+        plan.delete()
+        messages.success(request, "Installment plan deleted.")
+    from django.urls import reverse
+    return redirect(reverse('fees:collection') + f"?student_id={student_id}")
+
 

@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Installment Plan — {{ sf.fee_structure.fee_type.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8">
+
+    <!-- Back link -->
+    <a href="{{ back_url }}" class="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-primary mb-6">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back to Fee Collection
+    </a>
+
+    <!-- Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-6 py-4 bg-primary/5 border-b border-slate-200">
+            <h1 class="text-lg font-bold text-slate-800">
+                {% if existing_plan %}Edit{% else %}Set Up{% endif %} Installment Plan
+            </h1>
+            <p class="text-sm text-slate-500 mt-0.5">
+                <span class="font-medium text-slate-700">{{ sf.student.full_name }}</span>
+                · {{ sf.fee_structure.fee_type.name }}
+                · Balance: <span class="font-semibold text-red-600">SAR {{ sf.balance|floatformat:2 }}</span>
+            </p>
+        </div>
+
+        <!-- Messages -->
+        {% if messages %}
+        <div class="px-6 pt-4">
+            {% for msg in messages %}
+            <div class="mb-2 px-4 py-2 rounded-lg text-sm
+                {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
+                {% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+                {{ msg }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Existing plan warning -->
+        {% if existing_plan %}
+        <div class="mx-6 mt-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+            <strong>Note:</strong> This fee already has an installment plan. Saving will replace it.
+            <form method="post" action="{% url 'fees:payment_plan_delete' existing_plan.pk %}"
+                  class="inline ml-2">{% csrf_token %}
+                <button type="submit" class="underline hover:text-red-600"
+                        onclick="return confirm('Delete the existing plan?')">Delete plan</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <!-- Form -->
+        <form method="post" id="planForm" class="px-6 py-6 space-y-6">
+            {% csrf_token %}
+
+            <!-- Number of installments -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">
+                    Number of Installments
+                </label>
+                <select id="instCount" name="installment_count"
+                        class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        onchange="buildRows()">
+                    {% for n in "234567"|make_list %}
+                    <option value="{{ n }}" {% if n == "2" %}selected{% endif %}>{{ n }} installments</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Auto-split helper -->
+            <div class="flex items-center gap-3">
+                <button type="button" onclick="autoSplit()"
+                        class="text-xs px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200">
+                    Auto-split equally
+                </button>
+                <span class="text-xs text-slate-400">Total balance: SAR {{ sf.balance|floatformat:2 }}</span>
+                <span id="remainingBadge" class="text-xs font-medium px-2 py-0.5 rounded-full"></span>
+            </div>
+
+            <!-- Installment rows -->
+            <div id="instRows" class="space-y-3"></div>
+
+            <!-- Notes -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Notes (optional)</label>
+                <textarea name="notes" rows="2"
+                          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                          placeholder="e.g. agreed with parent on 17 Apr 2026"></textarea>
+            </div>
+
+            <!-- Submit -->
+            <div class="flex justify-end gap-3 pt-2 border-t border-slate-100">
+                <a href="{{ back_url }}"
+                   class="px-4 py-2 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50">
+                    Cancel
+                </a>
+                <button type="submit"
+                        class="px-5 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90">
+                    Save Plan
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const BALANCE = {{ sf.balance }};
+const TODAY   = "{{ today|default:'' }}";
+
+function buildRows() {
+    const n   = parseInt(document.getElementById('instCount').value, 10);
+    const box = document.getElementById('instRows');
+    // Keep existing values if row count shrinks
+    const existing = [];
+    box.querySelectorAll('.inst-row').forEach(r => {
+        existing.push({
+            amt: r.querySelector('.inst-amt').value,
+            due: r.querySelector('.inst-due').value,
+        });
+    });
+    box.innerHTML = '';
+    for (let i = 1; i <= n; i++) {
+        const prev = existing[i - 1] || {};
+        const row  = document.createElement('div');
+        row.className = 'inst-row grid grid-cols-[auto_1fr_1fr] gap-3 items-end';
+        row.innerHTML = `
+            <div class="text-sm font-semibold text-slate-500 pb-2">#${i}</div>
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">Amount (SAR)</label>
+                <input type="number" name="inst_amount_${i}" step="0.01" min="0.01"
+                       class="inst-amt w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary/40"
+                       value="${prev.amt || ''}" placeholder="0.00" oninput="updateRemaining()">
+            </div>
+            <div>
+                <label class="block text-xs text-slate-500 mb-1">Due Date</label>
+                <input type="date" name="inst_due_${i}"
+                       class="inst-due w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                       value="${prev.due || ''}">
+            </div>`;
+        box.appendChild(row);
+    }
+    updateRemaining();
+}
+
+function autoSplit() {
+    const n      = parseInt(document.getElementById('instCount').value, 10);
+    const each   = (BALANCE / n).toFixed(2);
+    // Distribute remainder to first installment
+    let remainder = (BALANCE - parseFloat(each) * n).toFixed(2);
+    document.querySelectorAll('.inst-amt').forEach((inp, idx) => {
+        inp.value = idx === 0
+            ? (parseFloat(each) + parseFloat(remainder)).toFixed(2)
+            : each;
+    });
+    updateRemaining();
+}
+
+function updateRemaining() {
+    let total = 0;
+    document.querySelectorAll('.inst-amt').forEach(inp => {
+        total += parseFloat(inp.value) || 0;
+    });
+    const rem   = (BALANCE - total).toFixed(2);
+    const badge = document.getElementById('remainingBadge');
+    if (Math.abs(parseFloat(rem)) < 0.01) {
+        badge.textContent = '✓ Balanced';
+        badge.className   = 'text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700';
+    } else {
+        badge.textContent = `Remaining: SAR ${rem}`;
+        badge.className   = 'text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-600';
+    }
+}
+
+// Form validation before submit
+document.getElementById('planForm').addEventListener('submit', function(e) {
+    let total = 0;
+    document.querySelectorAll('.inst-amt').forEach(inp => {
+        total += parseFloat(inp.value) || 0;
+    });
+    if (Math.abs(BALANCE - total) > 0.01) {
+        e.preventDefault();
+        alert(`Installments total SAR ${total.toFixed(2)} must equal balance SAR ${BALANCE.toFixed(2)}.`);
+    }
+});
+
+// Init
+buildRows();
+</script>
+{% endblock %}

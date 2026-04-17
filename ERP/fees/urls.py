@@ -51,6 +51,19 @@ urlpatterns = [
     path('payroll/<int:pk>/delete/',      views.salary_delete,         name='salary_delete'),
     path('payroll/<int:pk>/mark-paid/',   views.mark_salary_paid,      name='salary_mark_paid'),
 
+    # Tuition Fee Config (complete structured fee schedule)
+    path('tuition/',                              views.tuition_config_list,       name='tuition_config_list'),
+    path('tuition/add/',                          views.tuition_config_form,       name='tuition_config_add'),
+    path('tuition/export/csv/',                   views.tuition_config_export_csv, name='tuition_config_export_csv'),
+    path('tuition/<int:pk>/',                     views.tuition_config_detail,     name='tuition_config_detail'),
+    path('tuition/<int:pk>/edit/',                views.tuition_config_form,       name='tuition_config_edit'),
+    path('tuition/<int:pk>/delete/',              views.tuition_config_delete,     name='tuition_config_delete'),
+    path('tuition/<int:pk>/print/',               views.tuition_config_print,      name='tuition_config_print'),
+
     # JSON API
     path('api/summary/',                  views.api_fees_summary,      name='api_summary'),
+
+    # Installment Payment Plans (per student fee)
+    path('payment-plan/<int:student_fee_pk>/setup/', views.setup_payment_plan, name='payment_plan_setup'),
+    path('payment-plan/<int:plan_pk>/delete/',       views.delete_payment_plan, name='payment_plan_delete'),
 ]
