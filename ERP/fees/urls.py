@@ -14,11 +14,20 @@ urlpatterns = [
     path('fee-types/<int:pk>/edit/',      views.fee_type_form,         name='fee_type_edit'),
     path('fee-types/<int:pk>/delete/',    views.fee_type_delete,       name='fee_type_delete'),
 
-    # Fee Structures
+    # Fee Structures (individual)
     path('structures/',                   views.fee_structure_list,    name='fee_structure_list'),
     path('structures/add/',               views.fee_structure_form,    name='fee_structure_add'),
     path('structures/<int:pk>/edit/',     views.fee_structure_form,    name='fee_structure_edit'),
     path('structures/<int:pk>/delete/',   views.fee_structure_delete,  name='fee_structure_delete'),
+    path('structures/<int:pk>/items/',    views.fee_structure_items_json, name='fee_structure_items'),
+
+    # Fee Structure Bundles (all-in-one: entrance + registration + tuition)
+    path('bundles/',                      views.bundle_list,           name='bundle_list'),
+    path('bundles/add/',                  views.bundle_form,           name='bundle_add'),
+    path('bundles/<int:pk>/',             views.bundle_detail,         name='bundle_detail'),
+    path('bundles/<int:pk>/edit/',        views.bundle_form,           name='bundle_edit'),
+    path('bundles/<int:pk>/delete/',      views.bundle_delete,         name='bundle_delete'),
+    path('bundles/<int:pk>/assign/',      views.bundle_assign,         name='bundle_assign'),
 
     # Bulk assign
     path('assign/',                       views.bulk_assign_fees,      name='bulk_assign'),
@@ -67,3 +76,4 @@ urlpatterns = [
     path('payment-plan/<int:student_fee_pk>/setup/', views.setup_payment_plan, name='payment_plan_setup'),
     path('payment-plan/<int:plan_pk>/delete/',       views.delete_payment_plan, name='payment_plan_delete'),
 ]
+

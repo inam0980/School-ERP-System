@@ -1,8 +1,10 @@
 from django import forms
 from django.utils import timezone
+from decimal import Decimal
 from core.models import AcademicYear, Division, Grade, Section
 from .models import (
-    FeeType, FeeStructure, StudentFee, Payment, TaxInvoice, Salary,
+    FeeType, FeeStructure, FeeStructureItem, FeeStructureBundle, BundleInstallment,
+    StudentFee, Payment, TaxInvoice, Salary,
     TuitionFeeConfig, TuitionInstallment,
 )
 
@@ -27,48 +29,158 @@ class FeeTypeForm(forms.ModelForm):
 class FeeStructureForm(forms.ModelForm):
     class Meta:
         model  = FeeStructure
-        fields = ['academic_year', 'grade', 'division', 'fee_type', 'amount', 'due_date', 'frequency']
+        fields = ['name', 'academic_year', 'grade', 'frequency']
         widgets = {
+            'name':          forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'Optional label, e.g. "Grade 1 American 2026–27"'}),
             'academic_year': forms.Select(attrs={'class': _SELECT}),
             'grade':         forms.Select(attrs={'class': _SELECT}),
-            'division':      forms.Select(attrs={'class': _SELECT}),
-            'fee_type':      forms.Select(attrs={'class': _SELECT}),
-            'amount':        forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0'}),
-            'due_date':      forms.DateInput(attrs={'class': _INPUT, 'type': 'date'}),
             'frequency':     forms.Select(attrs={'class': _SELECT}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['academic_year'].queryset = AcademicYear.objects.all()
+        self.fields['grade'].queryset = Grade.objects.select_related('division').order_by('division__name', 'order', 'name')
+
+
+class FeeStructureBulkCreateForm(forms.Form):
+    """Create a single fee structure for one grade in one academic year."""
+    _FREQ = [
+        ('ONCE',    'One-time'),
+        ('MONTHLY', 'Monthly'),
+        ('TERM',    'Per Term'),
+        ('ANNUAL',  'Annual'),
+    ]
+
+    name = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': _INPUT,
+            'placeholder': 'Optional label, e.g. "Grade 1 American 2026–27"',
+        }),
+        help_text='Optional label for this structure.',
+    )
+    academic_year = forms.ModelChoiceField(
+        queryset=AcademicYear.objects.all(),
+        widget=forms.Select(attrs={'class': _SELECT}),
+        label='Academic Year',
+    )
+    grade = forms.ModelChoiceField(
+        queryset=Grade.objects.select_related('division').order_by('division__name', 'order', 'name'),
+        widget=forms.Select(attrs={'class': _SELECT}),
+        label='Grade',
+        help_text='One structure will be created for this grade.',
+    )
+    frequency = forms.ChoiceField(
+        choices=_FREQ,
+        initial='ANNUAL',
+        widget=forms.Select(attrs={'class': _SELECT}),
+    )
+
+
+class FeeStructureBundleForm(forms.ModelForm):
+    """
+    Single form that captures all fee amounts for a Division+Grade bundle:
+    Entrance Exam, Registration, Gross Tuition, Group Discount, Instalment config.
+    """
+    class Meta:
+        model  = FeeStructureBundle
+        fields = [
+            'name', 'academic_year', 'division', 'grade', 'due_date',
+            'entrance_exam_fee', 'registration_fee',
+            'gross_tuition_fee', 'group_discount_pct',
+            'installments_count', 'min_down_payment',
+            'notes',
+        ]
+        widgets = {
+            'name':               forms.TextInput(attrs={'class': _INPUT,
+                                  'placeholder': 'e.g. Grade 5 English — 2026–27 Fee Schedule'}),
+            'academic_year':      forms.Select(attrs={'class': _SELECT}),
+            'division':           forms.Select(attrs={'class': _SELECT}),
+            'grade':              forms.Select(attrs={'class': _SELECT}),
+            'due_date':           forms.DateInput(attrs={'class': _INPUT, 'type': 'date'}),
+            'entrance_exam_fee':  forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0'}),
+            'registration_fee':   forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0'}),
+            'gross_tuition_fee':  forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0'}),
+            'group_discount_pct': forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01',
+                                  'min': '0', 'max': '100', 'placeholder': '0.00'}),
+            'installments_count': forms.Select(attrs={'class': _SELECT}),
+            'min_down_payment':   forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0.01'}),
+            'notes':              forms.Textarea(attrs={'class': _INPUT, 'rows': 2}),
+        }
+        labels = {
+            'entrance_exam_fee':  'Grade Level Entrance Exam Fee (SAR)',
+            'registration_fee':   'Registration Fee (SAR)',
+            'gross_tuition_fee':  'Gross Total Tuition Fee (SAR)',
+            'group_discount_pct': 'Group Discount (%)',
+            'min_down_payment':   'Minimum Down Payment (SAR)',
+        }
+
+    def clean_min_down_payment(self):
+        val = self.cleaned_data.get('min_down_payment')
+        if val is not None and val <= 0:
+            raise forms.ValidationError('Minimum down payment must be greater than 0.')
+        return val
+
+    def clean(self):
+        cleaned = super().clean()
+        gross = cleaned.get('gross_tuition_fee')
+        down  = cleaned.get('min_down_payment')
+        if gross is not None and down is not None and down > gross:
+            self.add_error('min_down_payment',
+                           f'Down payment (SAR {down:.2f}) cannot exceed gross tuition (SAR {gross:.2f}).')
+        return cleaned
+
+
+class BundleInstallmentForm(forms.ModelForm):
+    class Meta:
+        model  = BundleInstallment
+        fields = ['label', 'amount', 'due_date']
+        widgets = {
+            'label':    forms.TextInput(attrs={'class': _INPUT}),
+            'amount':   forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0.01'}),
+            'due_date': forms.DateInput(attrs={'class': _INPUT, 'type': 'date'}),
+        }
 
 
 class BulkAssignFeeForm(forms.Form):
-    """Assign a FeeStructure to all students in a grade (or specific section)."""
-    fee_structure  = forms.ModelChoiceField(
-        queryset=FeeStructure.objects.select_related('fee_type', 'grade', 'academic_year'),
-        widget=forms.Select(attrs={'class': _SELECT}),
+    """Assign all items of a FeeStructure to active students in the grade."""
+    fee_structure = forms.ModelChoiceField(
+        queryset=FeeStructure.objects.select_related(
+            'academic_year', 'grade__division'
+        ).prefetch_related('items__fee_type'),
+        widget=forms.Select(attrs={
+            'class': _SELECT,
+            'id': 'id_fee_structure',
+        }),
         label='Fee Structure',
+        help_text='Select a structure to preview its fee-type items below.',
     )
-    section        = forms.ModelChoiceField(
+    section = forms.ModelChoiceField(
         queryset=Section.objects.select_related('grade'),
         required=False,
         widget=forms.Select(attrs={'class': _SELECT}),
-        label='Section (leave blank = entire grade)',
+        label='Section',
         empty_label='All Sections',
     )
-    discount       = forms.DecimalField(
-        required=False, initial=0, min_value=0,
-        widget=forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01'}),
-        label='Blanket Discount (SAR)',
+    discount_pct = forms.DecimalField(
+        required=False, initial=Decimal('0'), min_value=Decimal('0'), max_value=Decimal('100'),
+        max_digits=5, decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            'class': _INPUT, 'step': '0.01', 'min': '0', 'max': '100',
+            'placeholder': '0.00', 'id': 'id_discount_pct',
+        }),
+        label='Bulk Discount %',
+        help_text='Applied to every fee-type in the structure (e.g. 10 = 10% off).',
     )
-    discount_note  = forms.CharField(
-        required=False, max_length=200,
-        widget=forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'e.g. Sibling discount'}),
+    due_date = forms.DateField(
+        widget=forms.DateInput(attrs={'class': _INPUT, 'type': 'date'}),
+        label='Due Date',
+        help_text='Same due date applied to all fee-type assignments.',
     )
 
-    def clean_discount(self):
-        return self.cleaned_data.get('discount') or 0
+    def clean_discount_pct(self):
+        return self.cleaned_data.get('discount_pct') or Decimal('0')
 
 
 class StudentFeeEditForm(forms.ModelForm):

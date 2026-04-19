@@ -50,11 +50,21 @@ def student_list(request):
         elif is_active == '0':
             qs = qs.filter(is_active=False)
 
-    total = qs.count()
+        citizenship = form.cleaned_data.get('citizenship')
+        if citizenship == 'saudi':
+            qs = qs.filter(nationality='Saudi')
+        elif citizenship == 'expat':
+            qs = qs.exclude(nationality='Saudi')
+
+    total       = qs.count()
+    saudi_count = qs.filter(nationality='Saudi').count()
+    expat_count = total - saudi_count
     return render(request, 'students/student_list.html', {
-        'students': qs,
-        'form': form,
-        'total': total,
+        'students':     qs,
+        'form':         form,
+        'total':        total,
+        'saudi_count':  saudi_count,
+        'expat_count':  expat_count,
     })
 
 

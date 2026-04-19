@@ -16,12 +16,15 @@ from accounts.decorators import role_required
 from students.models import Student
 from core.models import AcademicYear, Division, Grade, Section
 from .models import (
-    FeeType, FeeStructure, StudentFee, Payment, TaxInvoice, Salary,
+    FeeType, FeeStructure, FeeStructureItem, FeeStructureBundle, BundleInstallment,
+    StudentFee, Payment, TaxInvoice, Salary,
     TuitionFeeConfig, TuitionInstallment,
     PaymentPlan, PaymentPlanInstallment,
 )
 from .forms import (
-    FeeTypeForm, FeeStructureForm, BulkAssignFeeForm,
+    FeeTypeForm, FeeStructureForm, FeeStructureBulkCreateForm,
+    FeeStructureBundleForm, BundleInstallmentForm,
+    BulkAssignFeeForm,
     StudentFeeEditForm, PaymentForm, FeeReportFilterForm,
     SalaryForm, SalaryMonthFilterForm,
     ManualInvoiceHeaderForm, ManualInvoiceLineForm, DefaultersFilterForm,
@@ -31,6 +34,14 @@ from .forms import (
 _ADMIN       = ('SUPER_ADMIN', 'ADMIN')
 _ACCOUNTANT  = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT')
 _STAFF_VIEW  = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'STAFF')
+
+
+def _grades_by_division():
+    """Return list of (division, [grade, ...]) ordered for optgroup display."""
+    result = {}
+    for grade in Grade.objects.select_related('division').order_by('division__name', 'order', 'name'):
+        result.setdefault(grade.division, []).append(grade)
+    return list(result.items())
 
 
 # ════════════════════════════════════════════════════════════════
@@ -103,28 +114,129 @@ def fee_type_delete(request, pk):
 def fee_structure_list(request):
     year_id = request.GET.get('year')
     qs = FeeStructure.objects.select_related(
-        'academic_year', 'grade', 'division', 'fee_type'
-    )
+        'academic_year', 'grade__division'
+    ).prefetch_related('items__fee_type')
     if year_id:
         qs = qs.filter(academic_year_id=year_id)
+
+    # Group by division for display
+    divisions_map = {}
+    for s in qs:
+        div = s.grade.division
+        divisions_map.setdefault(div, []).append(s)
+
     return render(request, 'fees/fee_structure_list.html', {
-        'structures': qs,
-        'years': AcademicYear.objects.all(),
-        'active_year': year_id,
+        'divisions_map': divisions_map,
+        'years':         AcademicYear.objects.all(),
+        'active_year':   year_id,
     })
 
 
 @login_required
 @role_required(*_ADMIN)
 def fee_structure_form(request, pk=None):
-    instance = get_object_or_404(FeeStructure, pk=pk) if pk else None
-    form     = FeeStructureForm(request.POST or None, instance=instance)
-    if form.is_valid():
-        form.save()
-        messages.success(request, "Fee structure saved.")
-        return redirect('fees:fee_structure_list')
+    # ── EDIT: single existing structure ──────────────────────────
+    if pk:
+        instance = get_object_or_404(FeeStructure, pk=pk)
+        all_fee_types = FeeType.objects.all()
+        existing_items = {item.fee_type_id: item for item in instance.items.select_related('fee_type')}
+
+        form = FeeStructureForm(request.POST or None, instance=instance)
+        if request.method == 'POST' and form.is_valid():
+            form.save()
+            for ft in all_fee_types:
+                raw = request.POST.get(f'amount_{ft.pk}', '').strip()
+                if raw:
+                    try:
+                        amt = Decimal(raw)
+                    except Exception:
+                        amt = None
+                    if amt and amt > 0:
+                        if ft.pk in existing_items:
+                            item = existing_items[ft.pk]
+                            item.amount = amt
+                            item.save()
+                        else:
+                            FeeStructureItem.objects.create(structure=instance, fee_type=ft, amount=amt)
+                    else:
+                        if ft.pk in existing_items:
+                            existing_items[ft.pk].delete()
+                else:
+                    if ft.pk in existing_items:
+                        existing_items[ft.pk].delete()
+            messages.success(request, "Fee structure saved.")
+            return redirect('fees:fee_structure_list')
+
+        fee_types_with_amounts = [
+            {'ft': ft, 'amount': existing_items[ft.pk].amount if ft.pk in existing_items else ''}
+            for ft in all_fee_types
+        ]
+        grades_by_division = _grades_by_division()
+        return render(request, 'fees/fee_structure_form.html', {
+            'form': form, 'instance': instance, 'title': 'Edit Fee Structure',
+            'fee_types_with_amounts': fee_types_with_amounts,
+            'grades_by_division': grades_by_division,
+        })
+
+    # ── CREATE: one structure per grade ────────────────────────────────
+    form = FeeStructureBulkCreateForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        grade         = form.cleaned_data['grade']
+        academic_year = form.cleaned_data['academic_year']
+        frequency     = form.cleaned_data['frequency']
+        name          = form.cleaned_data.get('name', '')
+
+        # Collect per-fee-type amounts from raw POST (amount_<ft_pk>)
+        all_fee_types = FeeType.objects.all()
+        items_to_create = []  # list of (FeeType, Decimal amount)
+        for ft in all_fee_types:
+            raw = request.POST.get(f'amount_{ft.pk}', '').strip()
+            if raw:
+                try:
+                    amt = Decimal(raw)
+                except Exception:
+                    amt = None
+                if amt and amt > 0:
+                    items_to_create.append((ft, amt))
+
+        if not items_to_create:
+            messages.error(request, 'Enter an amount for at least one fee type.')
+        else:
+            container, new_s = FeeStructure.objects.get_or_create(
+                academic_year=academic_year,
+                grade=grade,
+                defaults={'name': name, 'frequency': frequency},
+            )
+            items_created = items_skipped = 0
+            for ft, amt in items_to_create:
+                _, new_i = FeeStructureItem.objects.get_or_create(
+                    structure=container,
+                    fee_type=ft,
+                    defaults={'amount': amt},
+                )
+                if new_i:
+                    items_created += 1
+                else:
+                    items_skipped += 1
+
+            verb = 'created' if new_s else 'already existed'
+            messages.success(
+                request,
+                f"Structure '{container}' {verb}. "
+                f"{items_created} fee-type item(s) added"
+                + (f", {items_skipped} skipped (already existed)." if items_skipped else '.')
+            )
+            return redirect('fees:fee_structure_list')
+
+    all_fee_types = FeeType.objects.all()
+    grades_by_division = _grades_by_division()
+
     return render(request, 'fees/fee_structure_form.html', {
-        'form': form, 'title': 'Edit Structure' if instance else 'Add Fee Structure',
+        'form':            form,
+        'instance':        None,
+        'title':           'Add Fee Structure',
+        'all_fee_types':   all_fee_types,
+        'grades_by_division': grades_by_division,
     })
 
 
@@ -138,8 +250,282 @@ def fee_structure_delete(request, pk):
 
 
 # ════════════════════════════════════════════════════════════════
-#  BULK FEE ASSIGNMENT
+#  FEE STRUCTURE BUNDLE  (all-in-one: entrance + registration + tuition)
 # ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def bundle_list(request):
+    year_id = request.GET.get('year', '')
+    qs = (FeeStructureBundle.objects
+          .select_related('academic_year', 'division', 'grade', 'created_by')
+          .prefetch_related('installments'))
+    if year_id:
+        qs = qs.filter(academic_year_id=year_id)
+    return render(request, 'fees/bundle_list.html', {
+        'bundles':     qs,
+        'years':       AcademicYear.objects.all(),
+        'active_year': year_id,
+    })
+
+
+@login_required
+@role_required(*_ADMIN)
+def bundle_form(request, pk=None):
+    instance = get_object_or_404(FeeStructureBundle, pk=pk) if pk else None
+    form     = FeeStructureBundleForm(request.POST or None, instance=instance)
+
+    if form.is_valid():
+        bundle = form.save(commit=False)
+        if not instance:
+            bundle.created_by = request.user
+        bundle.save()
+        bundle.generate_installments()
+        messages.success(request, f"Bundle '{bundle.name}' saved — instalments auto-generated.")
+        return redirect('fees:bundle_detail', pk=bundle.pk)
+
+    return render(request, 'fees/bundle_form.html', {
+        'form':     form,
+        'instance': instance,
+        'title':    'Edit Fee Structure Bundle' if instance else 'Create Fee Structure Bundle',
+    })
+
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def bundle_detail(request, pk):
+    bundle = get_object_or_404(
+        FeeStructureBundle.objects
+        .select_related('academic_year', 'division', 'grade', 'created_by')
+        .prefetch_related('installments'),
+        pk=pk,
+    )
+
+    # ── Save edited instalments ──────────────────────────────────
+    if request.method == 'POST' and 'save_installments' in request.POST:
+        errors = []
+        for inst in bundle.installments.all():
+            raw_amt   = request.POST.get(f'inst_amount_{inst.pk}', '').strip()
+            raw_due   = request.POST.get(f'inst_due_{inst.pk}', '').strip()
+            raw_label = request.POST.get(f'inst_label_{inst.pk}', inst.label).strip()
+            try:
+                amt = Decimal(raw_amt)
+                if amt <= 0:
+                    raise ValueError
+            except Exception:
+                errors.append(f'Instalment #{inst.installment_no}: invalid amount.')
+                continue
+            if inst.installment_no == 1 and amt < bundle.min_down_payment:
+                errors.append(
+                    f'Down payment must be at least SAR {bundle.min_down_payment:.2f}.'
+                )
+                continue
+            try:
+                due = date.fromisoformat(raw_due) if raw_due else inst.due_date
+            except Exception:
+                due = inst.due_date
+            inst.amount   = amt
+            inst.due_date = due
+            inst.label    = raw_label or inst.label
+            inst.save()
+
+        if errors:
+            for e in errors:
+                messages.error(request, e)
+        else:
+            messages.success(request, 'Instalments updated successfully.')
+        return redirect('fees:bundle_detail', pk=bundle.pk)
+
+    # ── Regenerate instalments (reset to equal splits) ───────────
+    if request.method == 'POST' and 'regenerate' in request.POST:
+        bundle.generate_installments()
+        messages.success(request, 'Instalments regenerated with equal splits.')
+        return redirect('fees:bundle_detail', pk=bundle.pk)
+
+    sections = Section.objects.filter(grade=bundle.grade).order_by('name')
+    return render(request, 'fees/bundle_detail.html', {
+        'bundle':   bundle,
+        'sections': sections,
+    })
+
+
+@login_required
+@role_required(*_ACCOUNTANT)
+@require_POST
+def bundle_assign(request, pk):
+    """
+    Assign a FeeStructureBundle to all active students in its Division+Grade
+    (optionally filtered to one Section).
+    Creates FeeStructure records per fee type and StudentFee records per student.
+    For tuition, creates a PaymentPlan with the bundle's instalments.
+    """
+    bundle     = get_object_or_404(FeeStructureBundle, pk=pk)
+    section_id = request.POST.get('section_id', '').strip()
+
+    students = Student.objects.filter(
+        grade=bundle.grade,
+        division=bundle.division,
+        is_active=True,
+    )
+    if section_id:
+        students = students.filter(section_id=section_id)
+
+    if not students.exists():
+        messages.warning(request, 'No active students found for this bundle\'s Division / Grade.')
+        return redirect('fees:bundle_detail', pk=bundle.pk)
+
+    # ── Get or create the three FeeType objects ──────────────────
+    ft_entrance, _ = FeeType.objects.get_or_create(
+        category=FeeType.ENTRANCE_EXAM,
+        defaults={'name': 'Grade Level Entrance Exam Fee', 'is_taxable': False},
+    )
+    ft_reg, _ = FeeType.objects.get_or_create(
+        category=FeeType.REGISTRATION,
+        defaults={'name': 'Registration Fee', 'is_taxable': False},
+    )
+    ft_tuition, _ = FeeType.objects.get_or_create(
+        category=FeeType.TUITION,
+        defaults={'name': 'Tuition Fee', 'is_taxable': True},
+    )
+
+    # ── Get or create one FeeStructure container + items ─────────
+    container, _ = FeeStructure.objects.get_or_create(
+        academic_year=bundle.academic_year,
+        grade=bundle.grade,
+        defaults={'name': bundle.name, 'frequency': 'ANNUAL'},
+    )
+
+    fsi_entrance = fsi_reg = None
+    if bundle.entrance_exam_fee > 0:
+        fsi_entrance, _ = FeeStructureItem.objects.get_or_create(
+            structure=container, fee_type=ft_entrance,
+            defaults={'amount': bundle.entrance_exam_fee},
+        )
+    if bundle.registration_fee > 0:
+        fsi_reg, _ = FeeStructureItem.objects.get_or_create(
+            structure=container, fee_type=ft_reg,
+            defaults={'amount': bundle.registration_fee},
+        )
+    fsi_tuition, _ = FeeStructureItem.objects.get_or_create(
+        structure=container, fee_type=ft_tuition,
+        defaults={'amount': bundle.gross_tuition_fee},
+    )
+
+    created = skipped = 0
+    installments = list(bundle.installments.order_by('installment_no'))
+
+    for student in students:
+        # 1 — Entrance exam fee (skip if zero)
+        if fsi_entrance:
+            sf, new = StudentFee.objects.get_or_create(
+                student=student, fee_structure=fsi_entrance,
+                defaults={
+                    'amount':      bundle.entrance_exam_fee,
+                    'discount':    Decimal('0'),
+                    'due_date':    bundle.due_date,
+                    'assigned_by': request.user,
+                },
+            )
+            if new:
+                sf.save()
+                created += 1
+            else:
+                skipped += 1
+
+        # 2 — Registration fee (skip if zero)
+        if fsi_reg:
+            sf, new = StudentFee.objects.get_or_create(
+                student=student, fee_structure=fsi_reg,
+                defaults={
+                    'amount':      bundle.registration_fee,
+                    'discount':    Decimal('0'),
+                    'due_date':    bundle.due_date,
+                    'assigned_by': request.user,
+                },
+            )
+            if new:
+                sf.save()
+                created += 1
+            else:
+                skipped += 1
+
+        # 3 — Tuition fee (with group discount + optional payment plan)
+        sf_tuition, new = StudentFee.objects.get_or_create(
+            student=student, fee_structure=fsi_tuition,
+            defaults={
+                'amount':        bundle.gross_tuition_fee,
+                'discount':      bundle.group_discount_amount,
+                'discount_note': f'Group discount {bundle.group_discount_pct}%',
+                'due_date':      bundle.due_date,
+                'assigned_by':   request.user,
+            },
+        )
+        if new:
+            sf_tuition.save()  # triggers net_amount calc
+            created += 1
+            # Create PaymentPlan with bundle instalments (if > 1 instalment)
+            if len(installments) > 1:
+                plan = PaymentPlan.objects.create(
+                    student_fee=sf_tuition,
+                    notes=f'Bundle: {bundle.name}',
+                    created_by=request.user,
+                )
+                for binst in installments:
+                    PaymentPlanInstallment.objects.create(
+                        plan=plan,
+                        installment_no=binst.installment_no,
+                        amount=binst.amount,
+                        due_date=binst.due_date,
+                    )
+        else:
+            skipped += 1
+
+    messages.success(
+        request,
+        f'Assignment done — {created} fee record(s) created, {skipped} already existed.'
+    )
+    return redirect('fees:bundle_detail', pk=bundle.pk)
+
+
+@login_required
+@role_required(*_ADMIN)
+@require_POST
+def bundle_delete(request, pk):
+    bundle = get_object_or_404(FeeStructureBundle, pk=pk)
+    name   = bundle.name
+    bundle.delete()
+    messages.success(request, f"Bundle '{name}' deleted.")
+    return redirect('fees:bundle_list')
+
+
+
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def fee_structure_items_json(request, pk):
+    """AJAX: return fee items for a given FeeStructure pk."""
+    structure = get_object_or_404(
+        FeeStructure.objects.select_related('academic_year', 'grade__division'), pk=pk
+    )
+    items = list(
+        structure.items.select_related('fee_type').values(
+            'id', 'fee_type__name', 'fee_type__is_taxable', 'amount'
+        )
+    )
+    return JsonResponse({
+        'structure': str(structure),
+        'grade':     str(structure.grade),
+        'division':  str(structure.grade.division),
+        'items': [
+            {
+                'id':         i['id'],
+                'fee_type':   i['fee_type__name'],
+                'is_taxable': i['fee_type__is_taxable'],
+                'amount':     str(i['amount']),
+            } for i in items
+        ],
+    })
+
 
 @login_required
 @role_required(*_ACCOUNTANT)
@@ -148,45 +534,68 @@ def bulk_assign_fees(request):
     results = None
 
     if form.is_valid():
-        structure     = form.cleaned_data['fee_structure']
-        section       = form.cleaned_data.get('section')
-        discount      = form.cleaned_data['discount']
-        discount_note = form.cleaned_data.get('discount_note', '')
+        structure    = form.cleaned_data['fee_structure']   # FeeStructure container
+        section      = form.cleaned_data.get('section')
+        discount_pct = form.cleaned_data['discount_pct']   # Decimal 0-100
+        due_date     = form.cleaned_data['due_date']
 
+        items = list(structure.items.select_related('fee_type').all())
+        if not items:
+            messages.warning(request, 'This fee structure has no fee-type items yet.')
+            return redirect('fees:fee_structure_list')
+
+        # Filter students by the structure's grade (division is implicit via grade)
         students = Student.objects.filter(
-            grade=structure.grade,
-            is_active=True,
+            grade=structure.grade, is_active=True
         )
         if section:
             students = students.filter(section=section)
 
-        created = updated = skipped = 0
-        for student in students:
-            obj, created_flag = StudentFee.objects.get_or_create(
-                student=student,
-                fee_structure=structure,
-                defaults={
-                    'amount':        structure.amount,
-                    'discount':      discount,
-                    'discount_note': discount_note,
-                    'due_date':      structure.due_date,
-                    'assigned_by':   request.user,
-                },
-            )
-            if created_flag:
-                obj.save()          # triggers net_amount calc
-                created += 1
-            else:
-                skipped += 1
+        created = skipped = 0
+        for item in items:
+            discount_amt = (item.amount * discount_pct / 100).quantize(Decimal('0.01'))
+            disc_note    = f'{discount_pct}% bulk discount' if discount_pct > 0 else ''
+            for student in students:
+                obj, created_flag = StudentFee.objects.get_or_create(
+                    student=student,
+                    fee_structure=item,
+                    defaults={
+                        'amount':        item.amount,
+                        'discount':      discount_amt,
+                        'discount_note': disc_note,
+                        'due_date':      due_date,
+                        'assigned_by':   request.user,
+                    },
+                )
+                if created_flag:
+                    obj.save()   # triggers net_amount + VAT calc
+                    created += 1
+                else:
+                    skipped += 1
 
         results = {'created': created, 'skipped': skipped}
         messages.success(
             request,
-            f"Done — {created} fees created, {skipped} already existed."
+            f"Done — {created} fee records created, {skipped} already existed."
         )
+
+    # Load items for the currently selected structure (for JS preview)
+    selected_structure = None
+    structure_items    = []
+    if request.method == 'POST' and form.is_valid():
+        pass  # already handled above
+    elif request.method == 'POST':
+        pk_val = request.POST.get('fee_structure')
+        if pk_val:
+            try:
+                selected_structure = FeeStructure.objects.get(pk=pk_val)
+                structure_items = list(selected_structure.items.select_related('fee_type'))
+            except FeeStructure.DoesNotExist:
+                pass
 
     return render(request, 'fees/bulk_assign.html', {
         'form': form, 'results': results,
+        'structure_items': structure_items,
     })
 
 
@@ -436,11 +845,34 @@ def receipt_print(request, payment_pk):
         Payment.objects.select_related(
             'student_fee__student', 'student_fee__fee_structure__fee_type',
             'student_fee__student__grade', 'student_fee__student__section',
+            'student_fee__student__division',
             'collected_by',
         ),
         pk=payment_pk,
     )
-    return render(request, 'fees/receipt_print.html', {'payment': payment})
+
+    # ── VAT breakdown for the paid amount ──────────────────────
+    fee      = payment.student_fee
+    student  = fee.student
+    fee_type = fee.fee_structure.fee_type
+    vat_rate = fee_type.vat_rate_for(student.is_saudi)  # 0 or Decimal('0.15')
+
+    paid = payment.paid_amount
+    if vat_rate > 0:
+        paid_before_vat = (paid / (1 + vat_rate)).quantize(Decimal('0.01'))
+        paid_vat        = (paid - paid_before_vat).quantize(Decimal('0.01'))
+    else:
+        paid_before_vat = paid
+        paid_vat        = Decimal('0.00')
+
+    vat_pct = int(vat_rate * 100)  # 0 or 15
+
+    return render(request, 'fees/receipt_print.html', {
+        'payment':        payment,
+        'paid_before_vat': paid_before_vat,
+        'paid_vat':        paid_vat,
+        'vat_pct':         vat_pct,
+    })
 
 
 # ════════════════════════════════════════════════════════════════

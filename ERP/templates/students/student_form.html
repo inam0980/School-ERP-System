@@ -22,27 +22,84 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                 <span class="text-sm font-semibold">Personal Information / المعلومات الشخصية</span>
             </div>
-            <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-                {% include 'students/_field.html' with field=form.full_name %}
-                {% include 'students/_field.html' with field=form.arabic_name rtl=True %}
-                {% include 'students/_field.html' with field=form.dob %}
-                {% include 'students/_field.html' with field=form.gender %}
-                {% include 'students/_field.html' with field=form.nationality %}
-                {% include 'students/_field.html' with field=form.id_type %}
-                {% include 'students/_field.html' with field=form.national_id %}
-                <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-slate-600 mb-1.5">
-                        Photo / الصورة الشخصية
-                    </label>
-                    {% if student and student.photo %}
-                    <div class="mb-2 flex items-center gap-3">
-                        <img src="{{ student.photo.url }}" class="w-16 h-16 rounded-xl object-cover border border-slate-200" alt="Current photo">
-                        <span class="text-xs text-slate-400">Current photo — upload new to replace</span>
+            <div class="px-6 py-5 space-y-5">
+
+                <!-- ── Citizenship Picker ─────────────────────────── -->
+                <div>
+                    <p class="text-sm font-semibold text-slate-600 mb-2">Citizenship / الجنسية
+                        <span class="text-red-400">*</span>
+                    </p>
+                    <div class="grid grid-cols-2 gap-3" id="citizenshipPicker">
+
+                        <!-- Saudi card -->
+                        <label id="card-saudi"
+                               class="relative flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all select-none
+                                      border-slate-200 hover:border-green-400 bg-white"
+                               onclick="setCitizenship('saudi')">
+                            <input type="radio" name="_citizenship" value="saudi" class="sr-only">
+                            <span class="text-2xl">🇸🇦</span>
+                            <div>
+                                <p class="text-sm font-semibold text-slate-800">Saudi Citizen</p>
+                                <p class="text-xs text-slate-500">مواطن سعودي · National ID (هوية)</p>
+                            </div>
+                            <span id="check-saudi" class="absolute top-2 right-2 hidden w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            </span>
+                        </label>
+
+                        <!-- Non-Saudi card -->
+                        <label id="card-expat"
+                               class="relative flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all select-none
+                                      border-slate-200 hover:border-blue-400 bg-white"
+                               onclick="setCitizenship('expat')">
+                            <input type="radio" name="_citizenship" value="expat" class="sr-only">
+                            <span class="text-2xl">🌍</span>
+                            <div>
+                                <p class="text-sm font-semibold text-slate-800">Non-Saudi (Expat)</p>
+                                <p class="text-xs text-slate-500">مقيم / أجنبي · Iqama or Passport</p>
+                            </div>
+                            <span id="check-expat" class="absolute top-2 right-2 hidden w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            </span>
+                        </label>
+
                     </div>
-                    {% endif %}
-                    {{ form.photo }}
+                    <!-- Validation hint shown if user submits without picking -->
+                    <p id="citizenshipError" class="hidden text-xs text-red-500 mt-1">Please select Saudi or Non-Saudi.</p>
                 </div>
-            </div>
+
+                <!-- ── Main fields grid ──────────────────────────── -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {% include 'students/_field.html' with field=form.full_name %}
+                    {% include 'students/_field.html' with field=form.arabic_name rtl=True %}
+                    {% include 'students/_field.html' with field=form.dob %}
+                    {% include 'students/_field.html' with field=form.gender %}
+
+                    <!-- Nationality (locked to "Saudi" when Saudi card picked) -->
+                    <div id="nationalityWrap">
+                        {% include 'students/_field.html' with field=form.nationality %}
+                    </div>
+
+                    <!-- ID Type (filtered by citizenship) -->
+                    <div>
+                        {% include 'students/_field.html' with field=form.id_type %}
+                    </div>
+
+                    {% include 'students/_field.html' with field=form.national_id %}
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-slate-600 mb-1.5">
+                            Photo / الصورة الشخصية
+                        </label>
+                        {% if student and student.photo %}
+                        <div class="mb-2 flex items-center gap-3">
+                            <img src="{{ student.photo.url }}" class="w-16 h-16 rounded-xl object-cover border border-slate-200" alt="Current photo">
+                            <span class="text-xs text-slate-400">Current photo — upload new to replace</span>
+                        </div>
+                        {% endif %}
+                        {{ form.photo }}
+                    </div>
+                </div><!-- /grid -->
+            </div><!-- /space-y-5 -->
         </div>
 
         <!-- ── SECTION 2: Academic ───────────────────────────────── -->
@@ -252,7 +309,93 @@
 
 {% block extra_scripts %}
 <script>
-// Document type quick-select
+// ── Citizenship picker ──────────────────────────────────────────────
+const nationalityInput = document.getElementById('{{ form.nationality.id_for_label }}');
+const idTypeSelect     = document.getElementById('{{ form.id_type.id_for_label }}');
+
+// Store all original id_type options once
+const allIdTypeOptions = Array.from(idTypeSelect.options).map(o => ({ value: o.value, text: o.text }));
+
+function setCitizenship(type) {
+    const cardSaudi = document.getElementById('card-saudi');
+    const cardExpat = document.getElementById('card-expat');
+    const chkSaudi  = document.getElementById('check-saudi');
+    const chkExpat  = document.getElementById('check-expat');
+
+    if (type === 'saudi') {
+        // Style cards
+        cardSaudi.classList.add('border-green-500', 'bg-green-50');
+        cardSaudi.classList.remove('border-slate-200', 'border-blue-500', 'bg-blue-50');
+        cardExpat.classList.remove('border-blue-500', 'bg-blue-50');
+        cardExpat.classList.add('border-slate-200');
+        chkSaudi.classList.remove('hidden');
+        chkExpat.classList.add('hidden');
+
+        // Lock nationality to Saudi
+        nationalityInput.value    = 'Saudi';
+        nationalityInput.readOnly = true;
+        nationalityInput.classList.add('bg-green-50', 'text-green-800', 'font-medium');
+
+        // Filter id_type to National ID only
+        idTypeSelect.innerHTML = '';
+        allIdTypeOptions.filter(o => o.value === 'NATIONAL_ID').forEach(o => {
+            idTypeSelect.innerHTML += `<option value="${o.value}">${o.text}</option>`;
+        });
+        idTypeSelect.value = 'NATIONAL_ID';
+
+    } else {
+        // Style cards
+        cardExpat.classList.add('border-blue-500', 'bg-blue-50');
+        cardExpat.classList.remove('border-slate-200', 'border-green-500', 'bg-green-50');
+        cardSaudi.classList.remove('border-green-500', 'bg-green-50');
+        cardSaudi.classList.add('border-slate-200');
+        chkExpat.classList.remove('hidden');
+        chkSaudi.classList.add('hidden');
+
+        // Unlock nationality field
+        if (nationalityInput.value === 'Saudi') nationalityInput.value = '';
+        nationalityInput.readOnly = false;
+        nationalityInput.classList.remove('bg-green-50', 'text-green-800', 'font-medium');
+
+        // Filter id_type to Iqama + Passport only
+        idTypeSelect.innerHTML = '';
+        allIdTypeOptions.filter(o => o.value !== 'NATIONAL_ID').forEach(o => {
+            idTypeSelect.innerHTML += `<option value="${o.value}">${o.text}</option>`;
+        });
+        // Default to IQAMA for expats
+        if (idTypeSelect.value === '' || idTypeSelect.value === 'NATIONAL_ID') {
+            idTypeSelect.value = 'IQAMA';
+        }
+    }
+
+    document.getElementById('citizenshipError').classList.add('hidden');
+}
+
+// Validate citizenship is picked on submit
+document.getElementById('studentForm').addEventListener('submit', function(e) {
+    const saudi = document.getElementById('check-saudi');
+    const expat = document.getElementById('check-expat');
+    if (saudi.classList.contains('hidden') && expat.classList.contains('hidden')) {
+        e.preventDefault();
+        const err = document.getElementById('citizenshipError');
+        err.classList.remove('hidden');
+        err.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+});
+
+// On edit: pre-select the correct card based on existing id_type value
+(function initCitizenshipPicker() {
+    const currentIdType    = "{{ student.id_type|default:'' }}";
+    const currentNationality = "{{ student.nationality|default:'' }}";
+    if (currentIdType === 'NATIONAL_ID' || currentNationality === 'Saudi') {
+        setCitizenship('saudi');
+    } else if (currentIdType === 'IQAMA' || currentIdType === 'PASSPORT') {
+        setCitizenship('expat');
+    }
+    // On new form, leave both unselected so user must pick
+})();
+
+// ── Document type quick-select ──────────────────────────────────────
 function docSetType(value) {
     const sel = document.getElementById('docTypeSelect');
     if (sel) { sel.value = value; sel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }

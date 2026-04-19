@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    FeeType, FeeStructure, StudentFee, Payment, TaxInvoice, Salary,
+    FeeType, FeeStructure, FeeStructureItem, StudentFee, Payment, TaxInvoice, Salary,
     TuitionFeeConfig, TuitionInstallment,
 )
 
@@ -12,6 +12,12 @@ class PaymentInline(admin.TabularInline):
     readonly_fields = ('receipt_number',)
 
 
+class FeeStructureItemInline(admin.TabularInline):
+    model  = FeeStructureItem
+    extra  = 1
+    fields = ('fee_type', 'amount')
+
+
 @admin.register(FeeType)
 class FeeTypeAdmin(admin.ModelAdmin):
     list_display = ('name', 'category', 'is_taxable')
@@ -20,15 +26,23 @@ class FeeTypeAdmin(admin.ModelAdmin):
 
 @admin.register(FeeStructure)
 class FeeStructureAdmin(admin.ModelAdmin):
-    list_display  = ('fee_type', 'grade', 'division', 'academic_year', 'amount', 'due_date')
-    list_filter   = ('academic_year', 'grade', 'division')
+    list_display  = ('__str__', 'grade', 'academic_year', 'frequency')
+    list_filter   = ('academic_year', 'grade__division')
+    search_fields = ('name', 'grade__name', 'grade__division__name')
+    inlines       = [FeeStructureItemInline]
+
+
+@admin.register(FeeStructureItem)
+class FeeStructureItemAdmin(admin.ModelAdmin):
+    list_display  = ('fee_type', 'structure', 'amount')
+    list_filter   = ('structure__academic_year', 'structure__grade__division', 'fee_type__category')
     search_fields = ('fee_type__name',)
 
 
 @admin.register(StudentFee)
 class StudentFeeAdmin(admin.ModelAdmin):
     list_display  = ('student', 'fee_structure', 'net_amount', 'status', 'due_date')
-    list_filter   = ('status', 'fee_structure__academic_year')
+    list_filter   = ('status', 'fee_structure__structure__academic_year')
     search_fields = ('student__full_name', 'student__student_id')
     inlines       = [PaymentInline]
 
