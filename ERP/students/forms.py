@@ -132,3 +132,8 @@ class StudentFilterForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={'class': _INPUT}),
     )
+    citizenship = forms.ChoiceField(
+        choices=[('', 'All'), ('saudi', 'Saudi 🇸🇦'), ('expat', 'Non-Saudi 🌍')],
+        required=False,
+        widget=forms.Select(attrs={'class': _INPUT}),
+    )

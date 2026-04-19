@@ -2,32 +2,356 @@
 {% block title %}{{ title }} — Al-Kawthar{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto">
-    <div class="flex items-center gap-3 mb-6">
-        <a href="{% url 'fees:fee_structure_list' %}"
-           class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition">
-            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-            </svg>
-        </a>
-        <h1 class="text-2xl font-bold text-primary">{{ title }}</h1>
-    </div>
-    <form method="post" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
-        {% csrf_token %}
-        {% for field in form %}
-        <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1.5">
-                {{ field.label }}{% if field.field.required %} <span class="text-red-500">*</span>{% endif %}
-            </label>
-            {{ field }}
-            {% if field.errors %}<p class="mt-1 text-xs text-red-600">{{ field.errors.0 }}</p>{% endif %}
-            {% if field.help_text %}<p class="mt-1 text-xs text-slate-500">{{ field.help_text }}</p>{% endif %}
-        </div>
-        {% endfor %}
-        <div class="flex gap-3 pt-2">
-            <button type="submit" class="flex-1 bg-primary text-white font-semibold py-2.5 rounded-lg hover:bg-primary-light transition">Save</button>
-            <a href="{% url 'fees:fee_structure_list' %}" class="flex-1 text-center border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-lg hover:bg-slate-50 transition">Cancel</a>
-        </div>
-    </form>
+<div class="flex items-center gap-3 mb-6">
+    <a href="{% url 'fees:fee_structure_list' %}"
+       class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition">
+        <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+        </svg>
+    </a>
+    <h1 class="text-2xl font-bold text-primary">{{ title }}</h1>
 </div>
+
+{% if messages %}
+{% for msg in messages %}
+<div class="mb-4 px-4 py-3 rounded-lg text-sm
+    {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200
+    {% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">{{ msg }}</div>
+{% endfor %}
+{% endif %}
+
+{% if instance %}
+{# ══════════════════════════════════════════════════════════════ #}
+{#  EDIT MODE — same layout as create                            #}
+{# ══════════════════════════════════════════════════════════════ #}
+<form method="post" id="edit-form">
+{% csrf_token %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+    <!-- ── Left column: structure details ─────────────────────── -->
+    <div class="space-y-4">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <h2 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-4">Structure Details</h2>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Label / Name <span class="text-slate-400">(optional)</span></label>
+                <input type="text" name="name" value="{{ form.name.value|default:'' }}"
+                       placeholder="e.g. Regular American 2026–27"
+                       class="border {% if form.name.errors %}border-red-400{% else %}border-slate-300{% endif %}
+                              rounded-lg px-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                {% if form.name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.name.errors.0 }}</p>{% endif %}
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Academic Year <span class="text-red-500">*</span></label>
+                <select name="academic_year"
+                        class="border {% if form.academic_year.errors %}border-red-400{% else %}border-slate-300{% endif %}
+                               rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    <option value="">— Select —</option>
+                    {% for val, label in form.fields.academic_year.choices %}
+                    {% if val %}
+                    <option value="{{ val }}" {% if form.academic_year.value|stringformat:'s' == val|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                {% if form.academic_year.errors %}<p class="text-red-500 text-xs mt-1">{{ form.academic_year.errors.0 }}</p>{% endif %}
+            </div>
+
+            <!-- Division (filter only — not submitted) -->
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Division <span class="text-red-500">*</span></label>
+                <select id="edit-division-select"
+                        class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    <option value="">— Select division —</option>
+                    {% for division, grades in grades_by_division %}
+                    <option value="{{ division.pk }}">{{ division }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Grade <span class="text-red-500">*</span></label>
+                <select name="grade" id="edit-grade-select"
+                        class="border {% if form.grade.errors %}border-red-400{% else %}border-slate-300{% endif %}
+                               rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    <option value="">— Select division first —</option>
+                    {% for division, grades in grades_by_division %}
+                    {% for grade in grades %}
+                    <option value="{{ grade.pk }}" data-division="{{ division.pk }}"
+                            style="display:none"
+                            {% if form.grade.value|stringformat:'s' == grade.pk|stringformat:'s' %}selected{% endif %}>{{ grade.name }}</option>
+                    {% endfor %}
+                    {% endfor %}
+                </select>
+                {% if form.grade.errors %}<p class="text-red-500 text-xs mt-1">{{ form.grade.errors.0 }}</p>{% endif %}
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Frequency <span class="text-red-500">*</span></label>
+                <select name="frequency"
+                        class="border {% if form.frequency.errors %}border-red-400{% else %}border-slate-300{% endif %}
+                               rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    {% for val, label in form.fields.frequency.choices %}
+                    <option value="{{ val }}" {% if form.frequency.value == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                {% if form.frequency.errors %}<p class="text-red-500 text-xs mt-1">{{ form.frequency.errors.0 }}</p>{% endif %}
+            </div>
+        </div>
+
+        <button type="submit"
+                class="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-light transition shadow">
+            Save Changes
+        </button>
+        <a href="{% url 'fees:fee_structure_list' %}"
+           class="block w-full py-3 text-center border border-slate-300 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition">
+            Cancel
+        </a>
+    </div>
+
+    <!-- ── Right column: fee type amounts ─────────────────────── -->
+    <div class="space-y-4">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <h2 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">
+                Fee Type Amounts
+                <span class="ml-1 text-slate-400 font-normal normal-case">(leave blank to remove)</span>
+            </h2>
+            <p class="text-xs text-slate-400 mb-4">Update amounts. Leave a field blank to remove that fee type from this structure.</p>
+            <div class="divide-y divide-slate-100">
+            {% for row in fee_types_with_amounts %}
+            <div class="flex items-center gap-4 py-2.5">
+                <div class="flex-1 min-w-0">
+                    <span class="text-sm font-medium text-slate-700">{{ row.ft.name }}</span>
+                    {% if row.ft.is_taxable %}
+                    <span class="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">+15% expat VAT</span>
+                    {% else %}
+                    <span class="ml-2 text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">No VAT</span>
+                    {% endif %}
+                    <span class="block text-xs text-slate-400">{{ row.ft.get_category_display }}</span>
+                </div>
+                <div class="relative w-36 shrink-0">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
+                    <input type="number" name="amount_{{ row.ft.pk }}" step="0.01" min="0"
+                           value="{{ row.amount }}"
+                           placeholder="—"
+                           class="ft-amount border border-slate-200 rounded-lg pl-10 pr-3 py-1.5 text-sm w-full
+                                  focus:ring-2 focus:ring-primary/40 focus:outline-none focus:border-primary
+                                  [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                </div>
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+        <div id="summary-box" class="hidden bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm">
+            <strong>Ready:</strong>
+            <strong class="text-primary"><span id="summary-fts">0</span> fee-type item(s)</strong> will be saved.
+        </div>
+    </div>
+</div><!-- /grid -->
+</form>
+
+{% else %}
+{# ══════════════════════════════════════════════════════════════ #}
+{#  CREATE MODE — bulk: multiple grades × multiple fee types      #}
+{# ══════════════════════════════════════════════════════════════ #}
+
+{% if form.non_field_errors %}
+<div class="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+    {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+</div>
+{% endif %}
+
+<div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 flex gap-3 items-start text-sm text-blue-700">
+    <span class="text-xl mt-0.5">ℹ️</span>
+    <div>
+        Select a <strong>Division</strong>, then the <strong>Grade</strong> within that division. Set an <strong>amount per fee type</strong> (leave blank to skip).
+    </div>
+</div>
+
+<form method="post" id="bulk-form">
+{% csrf_token %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+    <!-- ── Left column: structure details ─────────────────────── -->
+    <div class="space-y-4">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <h2 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-4">Structure Details</h2>
+
+            <!-- Optional Name -->
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Label / Name <span class="text-slate-400">(optional)</span></label>
+                <input type="text" name="name" value="{{ form.name.value|default:'' }}"
+                       placeholder="e.g. Regular American 2026–27"
+                       class="border {% if form.name.errors %}border-red-400{% else %}border-slate-300{% endif %}
+                              rounded-lg px-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                {% if form.name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.name.errors.0 }}</p>{% endif %}
+            </div>
+
+            <!-- Academic Year -->
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Academic Year <span class="text-red-500">*</span></label>
+                <select name="academic_year"
+                        class="border {% if form.academic_year.errors %}border-red-400{% else %}border-slate-300{% endif %}
+                               rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    <option value="">— Select —</option>
+                    {% for val, label in form.fields.academic_year.choices %}
+                    {% if val %}
+                    <option value="{{ val }}" {% if form.academic_year.value|stringformat:'s' == val|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                {% if form.academic_year.errors %}<p class="text-red-500 text-xs mt-1">{{ form.academic_year.errors.0 }}</p>{% endif %}
+            </div>
+
+            <!-- Division (filter only — not submitted) -->
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Division <span class="text-red-500">*</span></label>
+                <select id="edit-division-select"
+                        class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    <option value="">— Select division —</option>
+                    {% for division, grades in grades_by_division %}
+                    <option value="{{ division.pk }}">{{ division }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Grade -->
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Grade <span class="text-red-500">*</span></label>
+                <select name="grade" id="edit-grade-select"
+                        class="border {% if form.grade.errors %}border-red-400{% else %}border-slate-300{% endif %}
+                               rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    <option value="">— Select division first —</option>
+                    {% for division, grades in grades_by_division %}
+                    {% for grade in grades %}
+                    <option value="{{ grade.pk }}" data-division="{{ division.pk }}"
+                            style="display:none"
+                            {% if form.grade.value|stringformat:'s' == grade.pk|stringformat:'s' %}selected{% endif %}>{{ grade.name }}</option>
+                    {% endfor %}
+                    {% endfor %}
+                </select>
+                {% if form.grade.errors %}<p class="text-red-500 text-xs mt-1">{{ form.grade.errors.0 }}</p>{% endif %}
+            </div>
+
+            <!-- Frequency -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Frequency <span class="text-red-500">*</span></label>
+                <select name="frequency"
+                        class="border {% if form.frequency.errors %}border-red-400{% else %}border-slate-300{% endif %}
+                               rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    {% for val, label in form.fields.frequency.choices %}
+                    <option value="{{ val }}" {% if form.frequency.value == val %}selected{% elif not form.frequency.value and val == 'ANNUAL' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                {% if form.frequency.errors %}<p class="text-red-500 text-xs mt-1">{{ form.frequency.errors.0 }}</p>{% endif %}
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit"
+                class="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-light transition shadow">
+            Create Fee Structure
+        </button>
+        <a href="{% url 'fees:fee_structure_list' %}"
+           class="block w-full py-3 text-center border border-slate-300 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition">
+            Cancel
+        </a>
+    </div>
+
+    <!-- ── Right column: fee type amounts ─────────────────────── -->
+    <div class="space-y-4">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <h2 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">
+                Fee Type Amounts
+                <span class="ml-1 text-slate-400 font-normal normal-case">(leave blank to skip)</span>
+            </h2>
+            <p class="text-xs text-slate-400 mb-4">
+                Enter the SAR amount for each fee type to include in this structure.
+            </p>
+            <div class="divide-y divide-slate-100">
+            {% for ft in all_fee_types %}
+            <div class="flex items-center gap-4 py-2.5">
+                <div class="flex-1 min-w-0">
+                    <span class="text-sm font-medium text-slate-700">{{ ft.name }}</span>
+                    {% if ft.is_taxable %}
+                    <span class="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">+15% expat VAT</span>
+                    {% else %}
+                    <span class="ml-2 text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">No VAT</span>
+                    {% endif %}
+                    <span class="block text-xs text-slate-400">{{ ft.get_category_display }}</span>
+                </div>
+                <div class="relative w-36 shrink-0">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
+                    <input type="number" name="amount_{{ ft.pk }}" step="0.01" min="0"
+                           placeholder="—"
+                           class="ft-amount border border-slate-200 rounded-lg pl-10 pr-3 py-1.5 text-sm w-full
+                                  focus:ring-2 focus:ring-primary/40 focus:outline-none focus:border-primary
+                                  [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                </div>
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+
+        <!-- Live summary -->
+        <div id="summary-box" class="hidden bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm">
+            <strong>Ready:</strong>
+            <strong class="text-primary"><span id="summary-fts">0</span> fee-type item(s)</strong> will be added to this structure.
+        </div>
+    </div>
+
+</div><!-- /grid -->
+</form>
+
+<script>
+(function () {
+    // ── Division → Grade cascade ─────────────────────────────
+    function setupCascade(divSelId, gradeSelId) {
+        const divSel   = document.getElementById(divSelId);
+        const gradeSel = document.getElementById(gradeSelId);
+        if (!divSel || !gradeSel) return;
+
+        function filterGrades() {
+            const chosen = divSel.value;
+            const opts   = gradeSel.querySelectorAll('option[data-division]');
+            let hasVisible = false;
+            opts.forEach(opt => {
+                const show = !chosen || opt.dataset.division === chosen;
+                opt.style.display = show ? '' : 'none';
+                if (show) hasVisible = true;
+                if (!show && opt.selected) {
+                    opt.selected = false;
+                    gradeSel.value = '';
+                }
+            });
+            // Update placeholder
+            gradeSel.options[0].text = hasVisible ? '— Select grade —' : '— Select division first —';
+        }
+
+        // On load: if a grade is already selected, reveal its division
+        const preselected = gradeSel.querySelector('option[data-division][selected]');
+        if (preselected) {
+            divSel.value = preselected.dataset.division;
+        }
+        filterGrades();
+        divSel.addEventListener('change', filterGrades);
+    }
+
+    setupCascade('edit-division-select',   'edit-grade-select');
+    setupCascade('create-division-select', 'create-grade-select');
+
+    // ── Fee-type amount live counter ─────────────────────────
+    function updateCounts() {
+        const fc = Array.from(document.querySelectorAll('.ft-amount')).filter(i => i.value && parseFloat(i.value) > 0).length;
+        const box = document.getElementById('summary-box');
+        if (!box) return;
+        document.getElementById('summary-fts').textContent = fc;
+        box.classList.toggle('hidden', fc === 0);
+    }
+    document.querySelectorAll('.ft-amount').forEach(inp => inp.addEventListener('input', updateCounts));
+    updateCounts();
+})();
+</script>
+{% endif %}
 {% endblock %}
+

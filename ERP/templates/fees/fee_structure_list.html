@@ -5,14 +5,12 @@
 <div class="flex items-center justify-between mb-6">
     <div>
         <h1 class="text-2xl font-bold text-primary">Fee Structures</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Amount per fee type, grade, and academic year</p>
+        <p class="text-sm text-slate-500 mt-0.5">One structure per grade per academic year — grouped by division</p>
     </div>
-    {% if user.role in 'SUPER_ADMIN ADMIN' %}
     <a href="{% url 'fees:fee_structure_add' %}"
        class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-light transition">
         + Add Structure
     </a>
-    {% endif %}
 </div>
 
 <!-- Year filter -->
@@ -27,6 +25,7 @@
         </select>
     </div>
     <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg text-sm">Filter</button>
+    {% if active_year %}<a href="{% url 'fees:fee_structure_list' %}" class="text-sm text-slate-500 hover:text-slate-700 self-center">Clear</a>{% endif %}
 </form>
 
 {% if messages %}
@@ -35,64 +34,94 @@
 {% endfor %}
 {% endif %}
 
-<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-    {% if structures %}
-    <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="bg-slate-50">
-            <tr>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Fee Type</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Grade</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Division</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Year</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Frequency</th>
-                <th class="px-4 py-3 text-right font-semibold text-slate-600">Amount</th>
-                <th class="px-4 py-3 text-right font-semibold text-slate-600">+VAT</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Due</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600">Actions</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-        {% for s in structures %}
-        <tr class="hover:bg-slate-50 transition">
-            <td class="px-4 py-3">
-                <p class="font-medium text-slate-800">{{ s.fee_type.name }}</p>
-                {% if s.fee_type.is_taxable %}
-                <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">VAT 15%</span>
-                {% endif %}
-            </td>
-            <td class="px-4 py-3 text-slate-600">{{ s.grade }}</td>
-            <td class="px-4 py-3 text-slate-600">{{ s.division }}</td>
-            <td class="px-4 py-3 text-slate-600">{{ s.academic_year }}</td>
-            <td class="px-4 py-3 text-slate-500 text-xs">{{ s.get_frequency_display }}</td>
-            <td class="px-4 py-3 text-right font-semibold text-slate-800">SAR {{ s.amount }}</td>
-            <td class="px-4 py-3 text-right text-slate-600">SAR {{ s.gross_amount }}</td>
-            <td class="px-4 py-3 text-slate-500">{{ s.due_date|date:"d M Y" }}</td>
-            <td class="px-4 py-3">
-                <div class="flex gap-2">
-                    {% if user.role in 'SUPER_ADMIN ADMIN' %}
-                    <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}"
-                       class="px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs hover:bg-amber-200">Edit</a>
-                    <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}"
-                          onsubmit="return confirm('Delete this structure?');" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" class="px-2 py-1 rounded bg-red-100 text-red-700 text-xs hover:bg-red-200">Del</button>
-                    </form>
-                    {% endif %}
-                </div>
-            </td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div class="py-14 text-center text-slate-400">
-        <p class="text-4xl mb-3">🗂️</p>
-        <p>No fee structures. <a href="{% url 'fees:fee_structure_add' %}" class="text-primary underline">Add one</a>.</p>
+{% if divisions_map %}
+{% for division, structures in divisions_map.items %}
+{# ── Division Section ──────────────────────────────────────── #}
+<div class="mb-8">
+    <div class="flex items-center gap-3 mb-3">
+        <div class="h-7 w-1.5 bg-primary rounded-full"></div>
+        <h2 class="text-lg font-bold text-slate-800">{{ division }} Division</h2>
+        <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{{ structures|length }} grade structure{{ structures|length|pluralize }}</span>
     </div>
-    {% endif %}
-</div>
 
-<!-- Bulk assign shortcut -->
+    <div class="space-y-3 pl-5">
+    {% for s in structures %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {# Header #}
+        <div class="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-200">
+            <div class="flex items-center gap-4">
+                <div>
+                    <p class="font-semibold text-slate-800">
+                        {{ s.grade.name }}
+                        {% if s.name %}<span class="text-slate-400 font-normal text-sm ml-2">— {{ s.name }}</span>{% endif %}
+                    </p>
+                    <p class="text-xs text-slate-500 mt-0.5">{{ s.academic_year }} &nbsp;·&nbsp; {{ s.get_frequency_display }}</p>
+                </div>
+                <span class="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                    {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
+                </span>
+            </div>
+            <div class="flex gap-2 items-center">
+                <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}"
+                   class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 text-xs hover:bg-amber-200 font-medium">Edit</a>
+                <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}"
+                      onsubmit="return confirm('Delete this structure and ALL its items?');" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 text-xs hover:bg-red-200 font-medium">Delete</button>
+                </form>
+                <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}"
+                   class="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 text-xs hover:bg-green-200 font-medium">Assign →</a>
+            </div>
+        </div>
+
+        {# Fee items table #}
+        {% if s.items.all %}
+        <table class="min-w-full divide-y divide-slate-100 text-sm">
+            <thead>
+                <tr class="bg-white">
+                    <th class="px-5 py-2 text-left text-xs font-semibold text-slate-500">Fee Type</th>
+                    <th class="px-5 py-2 text-right text-xs font-semibold text-slate-500">Base (SAR)</th>
+                    <th class="px-5 py-2 text-right text-xs font-semibold text-green-700">🇸🇦 Saudi</th>
+                    <th class="px-5 py-2 text-right text-xs font-semibold text-blue-700">🌍 Non-Saudi</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+            {% for item in s.items.all %}
+            <tr class="hover:bg-slate-50/50">
+                <td class="px-5 py-2.5">
+                    <span class="font-medium text-slate-700">{{ item.fee_type.name }}</span>
+                    {% if item.fee_type.is_taxable %}
+                    <span class="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">+15% expat VAT</span>
+                    {% endif %}
+                </td>
+                <td class="px-5 py-2.5 text-right font-medium text-slate-700">{{ item.amount }}</td>
+                <td class="px-5 py-2.5 text-right text-green-700 font-medium">{{ item.amount }}</td>
+                <td class="px-5 py-2.5 text-right">
+                    <span class="text-blue-700 font-medium">{{ item.expat_total }}</span>
+                    {% if item.fee_type.is_taxable %}
+                    <span class="block text-xs text-blue-400">+{{ item.expat_vat }} VAT</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="px-5 py-3 text-xs text-slate-400 italic">No fee types added yet — edit to add amounts.</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+{% else %}
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 py-14 text-center text-slate-400">
+    <p class="text-4xl mb-3">🗂️</p>
+    <p>No fee structures. <a href="{% url 'fees:fee_structure_add' %}" class="text-primary underline">Add one</a>.</p>
+</div>
+{% endif %}
+
 <div class="mt-5 flex justify-end">
     <a href="{% url 'fees:bulk_assign' %}"
        class="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:opacity-90 transition">
