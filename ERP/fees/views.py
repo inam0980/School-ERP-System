@@ -535,7 +535,6 @@ def bulk_assign_fees(request):
 
     if form.is_valid():
         structure    = form.cleaned_data['fee_structure']   # FeeStructure container
-        section      = form.cleaned_data.get('section')
         discount_pct = form.cleaned_data['discount_pct']   # Decimal 0-100
         due_date     = form.cleaned_data['due_date']
 
@@ -548,14 +547,14 @@ def bulk_assign_fees(request):
         students = Student.objects.filter(
             grade=structure.grade, is_active=True
         )
-        if section:
-            students = students.filter(section=section)
 
         created = skipped = 0
-        for item in items:
-            discount_amt = (item.amount * discount_pct / 100).quantize(Decimal('0.01'))
-            disc_note    = f'{discount_pct}% bulk discount' if discount_pct > 0 else ''
-            for student in students:
+        assigned_students = []
+        for student in students:
+            student_created = False
+            for item in items:
+                discount_amt = (item.amount * discount_pct / 100).quantize(Decimal('0.01'))
+                disc_note    = f'{discount_pct}% bulk discount' if discount_pct > 0 else ''
                 obj, created_flag = StudentFee.objects.get_or_create(
                     student=student,
                     fee_structure=item,
@@ -570,10 +569,13 @@ def bulk_assign_fees(request):
                 if created_flag:
                     obj.save()   # triggers net_amount + VAT calc
                     created += 1
+                    student_created = True
                 else:
                     skipped += 1
+            if student_created and student not in assigned_students:
+                assigned_students.append(student)
 
-        results = {'created': created, 'skipped': skipped}
+        results = {'created': created, 'skipped': skipped, 'students': assigned_students, 'structure': structure}
         messages.success(
             request,
             f"Done — {created} fee records created, {skipped} already existed."
@@ -593,9 +595,52 @@ def bulk_assign_fees(request):
             except FeeStructure.DoesNotExist:
                 pass
 
+    # Build JSON map: structure_pk → {grade_name, division_pk, year_pk, sections:[{pk,name}]}
+    import json as _json
+    structures_qs = FeeStructure.objects.select_related(
+        'grade__division', 'academic_year'
+    ).prefetch_related('grade__sections')
+    structure_meta_map = {}
+    for fs in structures_qs:
+        structure_meta_map[str(fs.pk)] = {
+            'grade':       str(fs.grade),
+            'division_pk': str(fs.grade.division_id),
+            'year_pk':     str(fs.academic_year_id),
+            'sections': [
+                {'pk': str(sec.pk), 'name': sec.name}
+                for sec in fs.grade.sections.order_by('name')
+            ],
+        }
+
+    from core.models import AcademicYear
+    years     = AcademicYear.objects.order_by('-start_date')
+    divisions = Division.objects.order_by('name')
+
+    # ── Past assignment summary: group StudentFee by fee structure ──
+    from django.db.models import Count, Max
+    past_assignments = (
+        StudentFee.objects
+        .values(
+            'fee_structure__structure__pk',
+            'fee_structure__structure__academic_year__name',
+            'fee_structure__structure__grade__name',
+            'fee_structure__structure__grade__division__name',
+        )
+        .annotate(
+            student_count=Count('student', distinct=True),
+            last_assigned=Max('created_at'),
+        )
+        .exclude(fee_structure__structure__grade__division__name='ADHOC')
+        .order_by('-last_assigned')
+    )
+
     return render(request, 'fees/bulk_assign.html', {
         'form': form, 'results': results,
         'structure_items': structure_items,
+        'structure_meta_map_json': _json.dumps(structure_meta_map),
+        'years':          years,
+        'divisions':      divisions,
+        'past_assignments': past_assignments,
     })
 
 
@@ -678,6 +723,11 @@ def fee_collection(request):
             .prefetch_related('payment_plan__installments')
             .order_by('due_date')
         )
+        for sf in dues:
+            sf.discount_pct = (
+                (sf.discount / sf.amount * 100).quantize(Decimal('0.01'))
+                if sf.amount else Decimal('0.00')
+            )
 
     # ── MULTI-FEE POST ──────────────────────────────────────────
     receipts = []
@@ -707,13 +757,14 @@ def fee_collection(request):
                 except StudentFee.DoesNotExist:
                     continue
 
-                raw_disc = request.POST.get(f'discount_{pk}', '').strip()
+                raw_pct = request.POST.get(f'discount_pct_{pk}', '').strip()
                 try:
-                    disc = Decimal(raw_disc) if raw_disc else Decimal('0')
+                    pct = Decimal(raw_pct) if raw_pct else Decimal('0')
                 except Exception:
-                    disc = Decimal('0')
-                if disc > 0:
-                    fee.discount      = (fee.discount or Decimal('0')) + disc
+                    pct = Decimal('0')
+                disc = (pct / 100 * fee.amount).quantize(Decimal('0.01'))
+                if disc != (fee.discount or Decimal('0')):
+                    fee.discount      = disc
                     fee.discount_note = request.POST.get(f'discount_note_{pk}', '').strip()
                     fee.save()
 
@@ -831,7 +882,116 @@ def fee_collection(request):
         'browse_grade_id':    browse_grade_id,
         'browse_section_id':  browse_section_id,
         'all_divisions':      all_divisions,
+        'all_fee_types':      FeeType.objects.order_by('category', 'name'),
     })
+
+
+# ════════════════════════════════════════════════════════════════
+#  ADHOC / INDIVIDUAL FEE CHARGE
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+@require_POST
+def charge_adhoc_fee(request):
+    """
+    Charge a one-off fee to a single student that is NOT part of their
+    grade's fee structure (e.g. Library card, replacement ID, etc.).
+
+    Strategy: get-or-create a sentinel Division/Grade/FeeStructure so that
+    StudentFee always has a valid fee_structure FK — no model changes needed.
+    """
+    student_pk = request.POST.get('student_id')
+    student = get_object_or_404(
+        Student.objects.select_related('grade', 'section', 'division', 'academic_year'),
+        pk=student_pk,
+    )
+
+    fee_type_pk = request.POST.get('adhoc_fee_type')
+    try:
+        fee_type = FeeType.objects.get(pk=fee_type_pk)
+    except FeeType.DoesNotExist:
+        messages.error(request, "Invalid fee type selected.")
+        return redirect(f"{request.build_absolute_uri('/fees/collection/')}?student_id={student_pk}")
+
+    raw_amount = request.POST.get('adhoc_amount', '').strip()
+    try:
+        amount = Decimal(raw_amount)
+        if amount <= 0:
+            raise ValueError
+    except Exception:
+        messages.error(request, "Enter a valid amount greater than 0.")
+        return redirect(f"/fees/collection/?student_id={student_pk}")
+
+    raw_pct = request.POST.get('adhoc_discount_pct', '').strip()
+    try:
+        discount_pct = Decimal(raw_pct) if raw_pct else Decimal('0')
+    except Exception:
+        discount_pct = Decimal('0')
+    discount = (discount_pct / 100 * amount).quantize(Decimal('0.01'))
+    discount_note = request.POST.get('adhoc_discount_note', '').strip()
+
+    raw_due = request.POST.get('adhoc_due_date', '').strip()
+    try:
+        from datetime import date as _date
+        due_date = _date.fromisoformat(raw_due) if raw_due else timezone.localdate()
+    except ValueError:
+        due_date = timezone.localdate()
+
+    academic_year = student.academic_year
+    if not academic_year:
+        messages.error(request, "Student has no academic year assigned — cannot charge ad-hoc fee.")
+        return redirect(f"/fees/collection/?student_id={student_pk}")
+
+    # ── Sentinel objects (get-or-create) ────────────────────────
+    # Use name='ADHOC' — Django doesn't enforce choices at the DB level
+    # is_active=False keeps it hidden from all regular Division dropdowns
+    sentinel_div, _ = Division.objects.get_or_create(
+        name='ADHOC',
+        defaults={'curriculum_type': 'ADHOC', 'is_active': False},
+    )
+    sentinel_grade, _ = Grade.objects.get_or_create(
+        name='Ad-hoc Charges',
+        division=sentinel_div,
+        defaults={'order': 9999},
+    )
+    adhoc_structure, _ = FeeStructure.objects.get_or_create(
+        academic_year=academic_year,
+        grade=sentinel_grade,
+        defaults={'name': 'Ad-hoc / Individual Charges'},
+    )
+    adhoc_item, _ = FeeStructureItem.objects.get_or_create(
+        structure=adhoc_structure,
+        fee_type=fee_type,
+        defaults={'amount': amount},
+    )
+
+    # ── Create StudentFee (prevent duplicates) ───────────────────
+    sf, created = StudentFee.objects.get_or_create(
+        student=student,
+        fee_structure=adhoc_item,
+        defaults={
+            'amount':        amount,
+            'discount':      discount,
+            'discount_note': discount_note,
+            'due_date':      due_date,
+            'assigned_by':   request.user,
+        },
+    )
+    if not created:
+        messages.warning(
+            request,
+            f"{fee_type.name} is already in this student's fee list. "
+            "Select and pay it from the fees table below."
+        )
+    else:
+        messages.success(
+            request,
+            f"'{fee_type.name}' (SAR {sf.net_amount:,.2f}) added to fee list — "
+            f"select it below and submit payment."
+        )
+
+    return redirect(f"/fees/collection/?student_id={student_pk}#fees-section")
 
 
 # ════════════════════════════════════════════════════════════════
@@ -904,7 +1064,7 @@ def outstanding_report(request):
     form = FeeReportFilterForm(request.GET or None)
     qs   = StudentFee.objects.select_related(
         'student', 'student__grade', 'student__section',
-        'fee_structure__fee_type', 'fee_structure__academic_year',
+        'fee_structure__fee_type', 'fee_structure__structure__academic_year',
     )
 
     if form.is_valid() or request.GET:
@@ -919,7 +1079,7 @@ def outstanding_report(request):
         ftype   = data.get('fee_type')
 
         if year:
-            qs = qs.filter(fee_structure__academic_year=year)
+            qs = qs.filter(fee_structure__structure__academic_year=year)
         if div:
             qs = qs.filter(student__division=div)
         if grade:
@@ -990,8 +1150,8 @@ def student_ledger(request, student_pk):
         pk=student_pk,
     )
     fees = StudentFee.objects.filter(student=student).select_related(
-        'fee_structure__fee_type', 'fee_structure__academic_year',
-    ).prefetch_related('payments').order_by('fee_structure__academic_year', 'due_date')
+        'fee_structure__fee_type', 'fee_structure__structure__academic_year',
+    ).prefetch_related('payments').order_by('fee_structure__structure__academic_year', 'due_date')
 
     total_net    = fees.aggregate(s=Sum('net_amount'))['s'] or Decimal('0')
     total_paid   = sum(f.amount_paid for f in fees)
@@ -1083,13 +1243,20 @@ def defaulters_list(request):
 @login_required
 @role_required(*_ACCOUNTANT)
 def invoice_list(request):
-    student_pk = request.GET.get('student')
+    student_q = request.GET.get('student', '').strip()
     qs = TaxInvoice.objects.select_related('student', 'created_by')
-    if student_pk:
-        qs = qs.filter(student_id=student_pk)
+    if student_q:
+        if student_q.isdigit():
+            qs = qs.filter(student_id=student_q)
+        else:
+            qs = qs.filter(
+                Q(student__full_name__icontains=student_q) |
+                Q(student__arabic_name__icontains=student_q) |
+                Q(student__student_id__icontains=student_q)
+            )
     return render(request, 'fees/invoice_list.html', {
-        'invoices':   qs[:200],
-        'student_pk': student_pk,
+        'invoices':   qs.distinct()[:200],
+        'student_pk': student_q,
     })
 
 

@@ -37,6 +37,7 @@ urlpatterns = [
 
     # Collection
     path('collection/',                   views.fee_collection,        name='collection'),
+    path('collection/adhoc-charge/',      views.charge_adhoc_fee,      name='adhoc_charge'),
     path('receipt/<int:payment_pk>/',     views.receipt_print,         name='receipt_print'),
 
     # Reports
