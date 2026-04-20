@@ -3,11 +3,18 @@
 
 {% block content %}
 <div class="flex items-center justify-between mb-6">
-    <div>
-        <h1 class="text-2xl font-bold text-primary">Defaulters List</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Students with outstanding fees as of
-            <span class="font-semibold text-slate-700">{{ as_of|date:"d M Y" }}</span>
-        </p>
+    <div class="flex items-center gap-3">
+        <a href="{% url 'fees:dashboard' %}" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition" title="Back to Finance">
+            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-primary">Defaulters List</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Students with outstanding fees as of
+                <span class="font-semibold text-slate-700">{{ as_of|date:"d M Y" }}</span>
+            </p>
+        </div>
     </div>
     <a href="?{% if request.GET %}{{ request.GET.urlencode }}&{% endif %}export=csv"
        class="inline-flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition font-medium">

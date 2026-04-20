@@ -4,9 +4,16 @@
 {% block content %}
 <div class="max-w-5xl mx-auto space-y-6 pb-12">
 
-    <div>
-        <h1 class="text-2xl font-bold text-primary">Fee Collection / تحصيل الرسوم</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Follow the 3 steps below to collect fees from a student</p>
+    <div class="flex items-center gap-3">
+        <a href="{% url 'fees:dashboard' %}" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition" title="Back to Finance">
+            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-primary">Fee Collection / تحصيل الرسوم</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Follow the 3 steps below to collect fees from a student</p>
+        </div>
     </div>
 
     <!-- ═══ STEP PROGRESS INDICATOR ═══════════════════════════════ -->
@@ -205,7 +212,7 @@
         <input type="hidden" name="student_id" value="{{ student.pk }}">
 
         <!-- STEP 2: FEE SELECTION -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+        <div id="fees-section" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
 
             <div class="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
@@ -245,10 +252,9 @@
                         <div class="flex items-center gap-3 text-xs">
                             <span class="text-slate-500">Paid: SAR {{ sf.amount_paid|floatformat:2 }} / SAR {{ sf.net_amount|floatformat:2 }}</span>
                             <a href="{% url 'fees:payment_plan_setup' sf.pk %}" class="text-indigo-600 hover:underline">Edit plan</a>
-                            <form method="post" action="{% url 'fees:payment_plan_delete' sf.payment_plan.pk %}" class="inline">
-                                {% csrf_token %}
-                                <button type="submit" onclick="return confirm('Delete this installment plan?')" class="text-red-500 hover:underline">Delete plan</button>
-                            </form>
+                            <button type="button"
+                                    onclick="if(confirm('Delete this installment plan?')) document.getElementById('delPlan_{{ sf.payment_plan.pk }}').submit()"
+                                    class="text-red-500 hover:underline">Delete plan</button>
                         </div>
                     </div>
                 </div>
@@ -355,18 +361,27 @@
                         <div class="flex items-center gap-3 mt-0.5">
                             <p class="text-xs text-slate-400">Due: {{ sf.due_date|date:"d M Y" }}</p>
                             {% if sf.amount_paid > 0 %}<p class="text-xs text-slate-400">Paid: SAR {{ sf.amount_paid|floatformat:2 }}</p>{% endif %}
+                            {% if sf.fee_structure.fee_type.category == 'TUITION' %}
                             <a href="{% url 'fees:payment_plan_setup' sf.pk %}" class="text-xs text-indigo-500 hover:underline">+ Installment plan</a>
+                            {% endif %}
                         </div>
                     </div>
                     <!-- Discount -->
-                    <div class="w-32 flex-shrink-0">
-                        <label class="block text-xs text-slate-500 mb-1">Discount (SAR)</label>
-                        <input type="number" name="discount_{{ sf.pk }}"
-                               min="0" max="{{ sf.balance }}" step="0.01" placeholder="0.00"
+                    <div class="w-36 flex-shrink-0">
+                        <label class="block text-xs text-slate-500 mb-1">Discount (%)</label>
+                        <input type="number" name="discount_pct_{{ sf.pk }}"
+                               min="0" max="100" step="0.01" placeholder="0.00"
+                               {% if sf.discount %}value="{{ sf.discount_pct }}"{% endif %}
                                class="w-full border border-amber-300 bg-amber-50 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
-                               oninput="onDiscountChange(this, '{{ sf.pk }}', {{ sf.balance }})">
-                        <input type="text" name="discount_note_{{ sf.pk }}" placeholder="Reason…"
+                               oninput="onDiscountChange(this, '{{ sf.pk }}', {{ sf.balance }}, {{ sf.discount }}, {{ sf.amount }})"
+                               data-prev-discount="{{ sf.discount }}">
+                        <input type="text" name="discount_note_{{ sf.pk }}"
+                               value="{{ sf.discount_note }}"
+                               placeholder="Reason…"
                                class="w-full mt-1 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300">
+                        {% if sf.discount and sf.discount > 0 and 'bulk' in sf.discount_note|lower %}
+                        <p class="text-xs text-green-600 mt-1">✓ Bulk discount applied</p>
+                        {% endif %}
                     </div>
                     <!-- Balance -->
                     <div class="text-right w-28 flex-shrink-0">
@@ -504,7 +519,7 @@
                         </div>
                         <div class="space-y-2">
                             {% for sf in dues %}
-                            {% if not sf.payment_plan %}
+                            {% if not sf.payment_plan and sf.fee_structure.fee_type.category == 'TUITION' %}
                             <a href="{% url 'fees:payment_plan_setup' sf.pk %}"
                                class="flex items-center gap-3 px-4 py-3 bg-white rounded-lg border border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50 transition group">
                                 <span class="text-lg">
@@ -535,7 +550,89 @@
         {% endif %}
 
     </form>
+
+    <!-- Delete-plan forms (outside payForm to avoid nested-form HTML violation) -->
+    {% if student %}
+    {% for sf in dues %}
+    {% if sf.payment_plan %}
+    <form id="delPlan_{{ sf.payment_plan.pk }}" method="post"
+          action="{% url 'fees:payment_plan_delete' sf.payment_plan.pk %}"
+          style="display:none;">{% csrf_token %}</form>
     {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    <!-- ADHOC / ADDITIONAL FEE PANEL (outside payForm to avoid nested form issue) -->
+    {% if student %}
+    <form method="post" action="{% url 'fees:adhoc_charge' %}" id="adhocForm" class="mt-4">
+        {% csrf_token %}
+        <input type="hidden" name="student_id" value="{{ student.pk }}">
+        <div class="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+            <button type="button" onclick="toggleAdhocPanel()"
+                    class="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-amber-50 transition">
+                <div class="flex items-center gap-3">
+                    <span class="text-xl">➕</span>
+                    <div>
+                        <p class="font-semibold text-slate-800 text-sm">Charge Additional Fee</p>
+                        <p class="text-xs text-slate-500">Library card, ID card, replacement items, or any one-off charge — added to fee list for collection</p>
+                    </div>
+                </div>
+                <svg id="adhocChevron" class="w-5 h-5 text-slate-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <div id="adhocPanel" class="border-t border-amber-100 hidden p-5 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Fee Type -->
+                    <div class="lg:col-span-2">
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Fee Type <span class="text-red-500">*</span></label>
+                        <select name="adhoc_fee_type" required
+                                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                            <option value="">— Select fee type —</option>
+                            {% regroup all_fee_types by get_category_display as grouped_types %}
+                            {% for group in grouped_types %}
+                            <optgroup label="{{ group.grouper }}">
+                                {% for ft in group.list %}
+                                <option value="{{ ft.pk }}">{{ ft.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <!-- Amount -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Amount (SAR) <span class="text-red-500">*</span></label>
+                        <input type="number" name="adhoc_amount" min="0.01" step="0.01" required placeholder="0.00"
+                               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400">
+                    </div>
+                    <!-- Due Date -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Due Date</label>
+                        <input type="date" name="adhoc_due_date" value="{{ today }}"
+                               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                    </div>
+                    <!-- Discount % -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Discount (%)</label>
+                        <input type="number" name="adhoc_discount_pct" min="0" max="100" step="0.01" placeholder="0.00"
+                               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400">
+                    </div>
+                    <!-- Reason -->
+                    <div class="sm:col-span-2 lg:col-span-3">
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Reason / Note</label>
+                        <input type="text" name="adhoc_discount_note" placeholder="e.g. Library card replacement, ID card fee…"
+                               class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                    </div>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit"
+                            class="bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm px-6 py-2 rounded-lg transition">
+                        ➕ Add to Fee List
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+    {% endif %}
+{% endif %}{# outer if student #}
 
 </div>
 
@@ -688,11 +785,19 @@ function toggleRow(cb) {
     row.classList.toggle('opacity-40', !cb.checked);
     if (amtEl) amtEl.disabled = !cb.checked;
 }
-function onDiscountChange(discEl, pk, grossBalance) {
-    const disc   = parseFloat(discEl.value) || 0;
-    const newBal = Math.max(0, grossBalance - disc);
-    const amtEl  = document.getElementById('amt_' + pk);
-    const balEl  = document.getElementById('bal_' + pk);
+function onDiscountChange(discEl, pk, currentBalance, prevDiscount, baseAmount) {
+    // Derive the VAT rate from stored values:
+    //   currentBalance = (baseAmount - prevDiscount) * (1 + vatRate)
+    //   => vatRate = currentBalance / (baseAmount - prevDiscount) - 1
+    const base         = parseFloat(baseAmount)   || 0;
+    const prevDisc     = parseFloat(prevDiscount) || 0;
+    const netAfterDisc = base - prevDisc;
+    const vatRate      = netAfterDisc > 0 ? ((parseFloat(currentBalance) || 0) / netAfterDisc) - 1 : 0;
+    const pct          = parseFloat(discEl.value) || 0;
+    const newDiscSAR   = pct / 100 * base;
+    const newBal       = Math.max(0, (base - newDiscSAR) * (1 + vatRate));
+    const amtEl        = document.getElementById('amt_' + pk);
+    const balEl        = document.getElementById('bal_' + pk);
     if (amtEl) { amtEl.max = newBal.toFixed(2); amtEl.value = newBal.toFixed(2); }
     if (balEl) balEl.textContent = 'SAR ' + newBal.toFixed(2);
     recalcTotal();
@@ -709,6 +814,13 @@ function recalcTotal() {
     const st  = document.getElementById('submitTotal');
     if (gt) gt.textContent = fmt;
     if (st) st.textContent = fmt;
+}
+function toggleAdhocPanel() {
+    const panel   = document.getElementById('adhocPanel');
+    const chevron = document.getElementById('adhocChevron');
+    if (!panel) return;
+    const hidden = panel.classList.toggle('hidden');
+    if (chevron) chevron.style.transform = hidden ? '' : 'rotate(180deg)';
 }
 
 // ════════════════════════════════════════

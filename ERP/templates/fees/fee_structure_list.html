@@ -2,130 +2,213 @@
 {% block title %}Fee Structures — Al-Kawthar{% endblock %}
 
 {% block content %}
+
+{# ── Page header ── #}
 <div class="flex items-center justify-between mb-6">
-    <div>
-        <h1 class="text-2xl font-bold text-primary">Fee Structures</h1>
-        <p class="text-sm text-slate-500 mt-0.5">One structure per grade per academic year — grouped by division</p>
+    <div class="flex items-center gap-3">
+        <a href="{% url 'fees:dashboard' %}" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition" title="Back to Finance">
+            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-primary">Fee Structures</h1>
+            <p class="text-sm text-slate-500 mt-0.5">One structure per grade per academic year, grouped by division</p>
+        </div>
     </div>
     <a href="{% url 'fees:fee_structure_add' %}"
-       class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-light transition">
+       class="px-5 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary-light transition shadow-sm">
         + Add Structure
     </a>
 </div>
 
-<!-- Year filter -->
-<form method="get" class="mb-5 flex gap-3 items-end">
+{# ── Year filter ── #}
+<form method="get" class="mb-6 inline-flex items-end gap-3">
     <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">Academic Year</label>
-        <select name="year" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+        <label class="block text-xs font-medium text-slate-500 mb-1">Academic Year</label>
+        <select name="year"
+                class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-primary/30 focus:outline-none min-w-[160px]">
             <option value="">All Years</option>
             {% for yr in years %}
             <option value="{{ yr.pk }}" {% if active_year == yr.pk|stringformat:'s' %}selected{% endif %}>{{ yr }}</option>
             {% endfor %}
         </select>
     </div>
-    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg text-sm">Filter</button>
-    {% if active_year %}<a href="{% url 'fees:fee_structure_list' %}" class="text-sm text-slate-500 hover:text-slate-700 self-center">Clear</a>{% endif %}
+    <button type="submit"
+            class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-light transition">
+        Filter
+    </button>
+    {% if active_year %}
+    <a href="{% url 'fees:fee_structure_list' %}"
+       class="text-sm text-slate-400 hover:text-slate-600 self-center">✕ Clear</a>
+    {% endif %}
 </form>
 
+{# ── Flash messages ── #}
 {% if messages %}
 {% for msg in messages %}
-<div class="mb-4 px-4 py-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200">{{ msg }}</div>
+<div class="mb-4 px-4 py-3 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200 flex items-center gap-2">
+    <span>✓</span> {{ msg }}
+</div>
 {% endfor %}
 {% endif %}
 
+{# ── Division sections ── #}
 {% if divisions_map %}
 {% for division, structures in divisions_map.items %}
-{# ── Division Section ──────────────────────────────────────── #}
 <div class="mb-8">
-    <div class="flex items-center gap-3 mb-3">
-        <div class="h-7 w-1.5 bg-primary rounded-full"></div>
-        <h2 class="text-lg font-bold text-slate-800">{{ division }} Division</h2>
-        <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{{ structures|length }} grade structure{{ structures|length|pluralize }}</span>
+
+    {# Division header #}
+    <div class="flex items-center gap-4 px-5 py-4 bg-primary rounded-xl shadow-sm mb-0">
+        <div class="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white text-lg font-bold shrink-0">
+            {{ division.name|slice:":1" }}
+        </div>
+        <div class="flex-1 min-w-0">
+            <h2 class="text-white font-bold text-base leading-snug">{{ division }} Division</h2>
+            <p class="text-white/65 text-xs mt-0.5">
+                {{ structures|length }} grade structure{{ structures|length|pluralize }}
+            </p>
+        </div>
+        <span class="shrink-0 bg-white/15 text-white text-xs font-semibold px-3 py-1 rounded-full">
+            {{ structures|length }} grade{{ structures|length|pluralize }}
+        </span>
     </div>
 
-    <div class="space-y-3 pl-5">
+    {# Grade rows #}
+    <div class="border border-slate-200 rounded-b-xl overflow-hidden bg-white shadow-sm divide-y divide-slate-100">
     {% for s in structures %}
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        {# Header #}
-        <div class="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-200">
-            <div class="flex items-center gap-4">
-                <div>
-                    <p class="font-semibold text-slate-800">
-                        {{ s.grade.name }}
-                        {% if s.name %}<span class="text-slate-400 font-normal text-sm ml-2">— {{ s.name }}</span>{% endif %}
-                    </p>
-                    <p class="text-xs text-slate-500 mt-0.5">{{ s.academic_year }} &nbsp;·&nbsp; {{ s.get_frequency_display }}</p>
-                </div>
-                <span class="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                    {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
-                </span>
+    <div class="structure-row">
+
+        {# Always-visible info row #}
+        <div class="flex items-center gap-4 px-5 py-4">
+
+            {# Toggle chevron #}
+            <button type="button"
+                    onclick="toggleFees(this.closest('.structure-row'))"
+                    class="shrink-0 w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition"
+                    title="Show / hide fee types">
+                <svg class="w-3.5 h-3.5 text-slate-500 chevron transition-transform duration-200"
+                     fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+
+            {# Grade info #}
+            <div class="flex-1 min-w-0">
+                <p class="font-semibold text-slate-800 text-sm leading-snug">
+                    {{ s.grade.name }}
+                    {% if s.name %}
+                    <span class="text-slate-400 font-normal"> — {{ s.name }}</span>
+                    {% endif %}
+                </p>
+                <p class="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    <span>{{ s.academic_year }}</span>
+                    <span class="text-slate-300">·</span>
+                    <span>{{ s.get_frequency_display }}</span>
+                    <span class="text-slate-300">·</span>
+                    <span class="text-primary font-semibold">
+                        {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
+                    </span>
+                </p>
             </div>
-            <div class="flex gap-2 items-center">
+
+            {# Action buttons #}
+            <div class="shrink-0 flex items-center gap-2">
                 <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}"
-                   class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 text-xs hover:bg-amber-200 font-medium">Edit</a>
-                <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}"
-                      onsubmit="return confirm('Delete this structure and ALL its items?');" class="inline">
-                    {% csrf_token %}
-                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-100 text-red-700 text-xs hover:bg-red-200 font-medium">Delete</button>
-                </form>
+                   class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">
+                    ✏️ Edit
+                </a>
                 <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}"
-                   class="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 text-xs hover:bg-green-200 font-medium">Assign →</a>
+                   class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">
+                    Assign →
+                </a>
+                <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}"
+                      onsubmit="return confirm('Delete this structure and ALL its fee items? This cannot be undone.');" class="inline">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">
+                        🗑 Delete
+                    </button>
+                </form>
             </div>
         </div>
 
-        {# Fee items table #}
-        {% if s.items.all %}
-        <table class="min-w-full divide-y divide-slate-100 text-sm">
-            <thead>
-                <tr class="bg-white">
-                    <th class="px-5 py-2 text-left text-xs font-semibold text-slate-500">Fee Type</th>
-                    <th class="px-5 py-2 text-right text-xs font-semibold text-slate-500">Base (SAR)</th>
-                    <th class="px-5 py-2 text-right text-xs font-semibold text-green-700">🇸🇦 Saudi</th>
-                    <th class="px-5 py-2 text-right text-xs font-semibold text-blue-700">🌍 Non-Saudi</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-50">
-            {% for item in s.items.all %}
-            <tr class="hover:bg-slate-50/50">
-                <td class="px-5 py-2.5">
-                    <span class="font-medium text-slate-700">{{ item.fee_type.name }}</span>
-                    {% if item.fee_type.is_taxable %}
-                    <span class="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">+15% expat VAT</span>
-                    {% endif %}
-                </td>
-                <td class="px-5 py-2.5 text-right font-medium text-slate-700">{{ item.amount }}</td>
-                <td class="px-5 py-2.5 text-right text-green-700 font-medium">{{ item.amount }}</td>
-                <td class="px-5 py-2.5 text-right">
-                    <span class="text-blue-700 font-medium">{{ item.expat_total }}</span>
-                    {% if item.fee_type.is_taxable %}
-                    <span class="block text-xs text-blue-400">+{{ item.expat_vat }} VAT</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p class="px-5 py-3 text-xs text-slate-400 italic">No fee types added yet — edit to add amounts.</p>
-        {% endif %}
+        {# Expandable fee table #}
+        <div class="fees-panel hidden">
+            {% if s.items.all %}
+            <div class="border-t border-slate-100 bg-slate-50/60">
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-200">
+                            <th class="pl-16 pr-5 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Fee Type</th>
+                            <th class="px-5 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Base (SAR)</th>
+                            <th class="px-5 py-2.5 text-right text-xs font-semibold text-emerald-700 uppercase tracking-wide">🇸🇦 Saudi</th>
+                            <th class="px-5 py-2.5 text-right text-xs font-semibold text-blue-700 uppercase tracking-wide">🌍 Non-Saudi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in s.items.all %}
+                    <tr class="border-b border-slate-100 last:border-0 hover:bg-white/80 transition">
+                        <td class="pl-16 pr-5 py-3">
+                            <span class="font-medium text-slate-700">{{ item.fee_type.name }}</span>
+                            {% if item.fee_type.is_taxable %}
+                            <span class="ml-2 text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-md">+15% VAT</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-3 text-right font-medium text-slate-700">{{ item.amount }}</td>
+                        <td class="px-5 py-3 text-right font-semibold text-emerald-700">{{ item.amount }}</td>
+                        <td class="px-5 py-3 text-right">
+                            <span class="font-semibold text-blue-700">{{ item.expat_total }}</span>
+                            {% if item.fee_type.is_taxable %}
+                            <span class="block text-xs text-blue-400 font-normal">+{{ item.expat_vat }} VAT</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="border-t border-slate-100 px-16 py-4 text-xs text-slate-400 italic bg-slate-50/50">
+                No fee types added yet — click Edit to add amounts.
+            </div>
+            {% endif %}
+        </div>
+
     </div>
     {% endfor %}
     </div>
+
 </div>
 {% endfor %}
 
 {% else %}
-<div class="bg-white rounded-xl shadow-sm border border-slate-200 py-14 text-center text-slate-400">
-    <p class="text-4xl mb-3">🗂️</p>
-    <p>No fee structures. <a href="{% url 'fees:fee_structure_add' %}" class="text-primary underline">Add one</a>.</p>
+<div class="bg-white rounded-xl border border-slate-200 shadow-sm py-16 text-center text-slate-400">
+    <p class="text-5xl mb-4">🗂️</p>
+    <p class="text-base font-medium text-slate-500 mb-1">No fee structures yet</p>
+    <p class="text-sm mb-5">Create the first one to get started.</p>
+    <a href="{% url 'fees:fee_structure_add' %}"
+       class="inline-block px-5 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary-light transition">
+        + Add Structure
+    </a>
 </div>
 {% endif %}
 
-<div class="mt-5 flex justify-end">
+{# Bulk assign CTA #}
+<div class="mt-4 flex justify-end">
     <a href="{% url 'fees:bulk_assign' %}"
-       class="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-medium hover:opacity-90 transition">
+       class="inline-flex items-center gap-2 px-5 py-2.5 bg-accent text-white rounded-lg text-sm font-semibold hover:opacity-90 transition shadow-sm">
         📌 Bulk Assign to Students →
     </a>
 </div>
+
+<script>
+function toggleFees(row) {
+    const panel   = row.querySelector('.fees-panel');
+    const chevron = row.querySelector('.chevron');
+    const isOpen  = !panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', isOpen);
+    chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+</script>
 {% endblock %}

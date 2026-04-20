@@ -110,7 +110,7 @@ class FeeStructure(models.Model):
         ordering = ['academic_year', 'grade__division__name', 'grade__order', 'grade__name']
 
     def __str__(self):
-        label = self.name or str(self.grade)
+        label = f"{self.grade} — {self.name}" if self.name else str(self.grade)
         return f"{label} ({self.academic_year})"
 
 

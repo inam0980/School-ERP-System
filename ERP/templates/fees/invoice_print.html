@@ -144,9 +144,9 @@
                     {{ item.description }}
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-center">{{ item.qty|default:1 }}</td>
-                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.gross_amount|default:item.net_before_vat|default:item.amount|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.gross_amount|default:item.net_before_vat|floatformat:2 }}</td>
                 <td class="border border-slate-300 px-2 py-2 text-right">{{ item.discount|default:"0.00"|floatformat:2 }}</td>
-                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.net_before_vat|default:item.amount|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.net_before_vat|floatformat:2 }}</td>
                 <td class="border border-slate-300 px-2 py-2 text-center font-semibold
                     {% if item.vat_rate == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
                     {{ item.vat_rate|default:0 }}
