@@ -6,6 +6,7 @@ app_name = 'students'
 urlpatterns = [
     # List & Import
     path('',                                 views.student_list,           name='list'),
+    path('export/csv/',                      views.student_export_csv,     name='export_csv'),
     path('import/',                          views.student_import,         name='import'),
     path('import/template/',                 views.download_import_template, name='import_template'),
     # CRUD

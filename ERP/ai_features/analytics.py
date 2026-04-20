@@ -235,7 +235,7 @@ def compute_fee_default_risk(academic_year=None):
     ).filter(status__in=['OVERDUE', 'UNPAID', 'PARTIAL'])
 
     if academic_year:
-        qs = qs.filter(fee_structure__academic_year=academic_year)
+        qs = qs.filter(fee_structure__structure__academic_year=academic_year)
 
     # Group by student
     student_map: dict = {}

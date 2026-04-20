@@ -1,3 +1,4 @@
+import csv
 import io
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -66,6 +67,75 @@ def student_list(request):
         'saudi_count':  saudi_count,
         'expat_count':  expat_count,
     })
+
+
+# ────────────────────────── EXPORT CSV ──────────────────────────
+
+@login_required
+@role_required(*_STAFF)
+def student_export_csv(request):
+    """Export the currently filtered student list as a CSV file."""
+    form = StudentFilterForm(request.GET or None)
+    qs   = Student.objects.select_related('division', 'grade', 'section', 'academic_year').all()
+
+    if form.is_valid():
+        q         = form.cleaned_data.get('q', '')
+        division  = form.cleaned_data.get('division')
+        grade     = form.cleaned_data.get('grade')
+        section   = form.cleaned_data.get('section')
+        gender    = form.cleaned_data.get('gender')
+        is_active = form.cleaned_data.get('is_active')
+
+        if q:
+            qs = qs.filter(
+                Q(full_name__icontains=q) |
+                Q(arabic_name__icontains=q) |
+                Q(student_id__icontains=q) |
+                Q(guardian_phone__icontains=q)
+            )
+        if division:
+            qs = qs.filter(division=division)
+        if grade:
+            qs = qs.filter(grade=grade)
+        if section:
+            qs = qs.filter(section=section)
+        if gender:
+            qs = qs.filter(gender=gender)
+        if is_active == '1':
+            qs = qs.filter(is_active=True)
+        elif is_active == '0':
+            qs = qs.filter(is_active=False)
+
+        citizenship = form.cleaned_data.get('citizenship')
+        if citizenship == 'saudi':
+            qs = qs.filter(nationality='Saudi')
+        elif citizenship == 'expat':
+            qs = qs.exclude(nationality='Saudi')
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="students.csv"'
+    response.write('\ufeff')  # BOM for Excel UTF-8 compatibility
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'Student ID', 'Full Name', 'Arabic Name', 'Gender', 'Date of Birth',
+        'Nationality', 'ID Type', 'National ID', 'Division', 'Grade', 'Section',
+        'Academic Year', 'Roll No.', 'Enrollment Type', 'Admission Date', 'Active',
+        'Father Name', 'Mother Name', 'Guardian Phone', 'Guardian Email',
+        'Address',
+    ])
+    for s in qs:
+        writer.writerow([
+            s.student_id, s.full_name, s.arabic_name,
+            s.get_gender_display(), s.dob,
+            s.nationality, s.get_id_type_display(), s.national_id,
+            s.division, s.grade, s.section, s.academic_year,
+            s.roll_number, s.get_enrollment_type_display(), s.admission_date,
+            'Yes' if s.is_active else 'No',
+            s.father_name, s.mother_name, s.guardian_phone, s.guardian_email,
+            s.address,
+        ])
+    return response
 
 
 # ────────────────────────── ADD ──────────────────────────
