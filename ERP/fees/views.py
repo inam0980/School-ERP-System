@@ -1036,6 +1036,109 @@ def receipt_print(request, payment_pk):
 
 
 # ════════════════════════════════════════════════════════════════
+#  COMBINED RECEIPT  (all payments in one transaction session)
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def combined_receipt(request):
+    """
+    A single-page receipt covering multiple payments made in one session.
+    URL: /fees/combined-receipt/?pks=1,2,3
+    Shows: what was paid now + all remaining outstanding fees for the student.
+    """
+    pks_str = request.GET.get('pks', '')
+    pks = [int(x) for x in pks_str.split(',') if x.strip().isdigit()]
+    if not pks:
+        return redirect('fees:collection')
+
+    payments = list(
+        Payment.objects.filter(pk__in=pks)
+        .select_related(
+            'student_fee__student',
+            'student_fee__student__grade',
+            'student_fee__student__section',
+            'student_fee__student__division',
+            'student_fee__fee_structure__fee_type',
+            'collected_by',
+        )
+        .order_by('pk')
+    )
+    if not payments:
+        return redirect('fees:collection')
+
+    student = payments[0].student_fee.student
+
+    # Build paid line items with VAT breakdown
+    paid_lines = []
+    total_paid = Decimal('0.00')
+    total_vat  = Decimal('0.00')
+    for p in payments:
+        fee      = p.student_fee
+        fee_type = fee.fee_structure.fee_type
+        vat_rate = fee_type.vat_rate_for(student.is_saudi)
+        paid     = p.paid_amount
+        if vat_rate > 0:
+            net = (paid / (1 + vat_rate)).quantize(Decimal('0.01'))
+            vat = (paid - net).quantize(Decimal('0.01'))
+        else:
+            net = paid
+            vat = Decimal('0.00')
+        total_paid += paid
+        total_vat  += vat
+        paid_lines.append({
+            'description': fee_type.name,
+            'gross':       fee.amount,
+            'discount':    fee.discount,
+            'net':         net,
+            'vat_pct':     int(vat_rate * 100),
+            'vat':         vat,
+            'paid':        paid,
+            'note':        p.notes or '',
+        })
+
+    total_net_before_vat = (total_paid - total_vat).quantize(Decimal('0.01'))
+
+    # Outstanding fees (exclude ADHOC, exclude fully paid, exclude fees just paid)
+    paid_fee_pks = {p.student_fee_id for p in payments}
+    outstanding = (
+        StudentFee.objects
+        .filter(student=student)
+        .exclude(status='PAID')
+        .exclude(status='WAIVED')
+        .exclude(pk__in=paid_fee_pks)
+        .select_related('fee_structure__fee_type',
+                        'fee_structure__structure__grade__division')
+        .order_by('due_date')
+    )
+    # Exclude ADHOC division items
+    outstanding = [
+        f for f in outstanding
+        if f.fee_structure.structure.grade.division.name != 'ADHOC'
+    ]
+    total_outstanding = sum(f.balance for f in outstanding)
+
+    # Use first payment's metadata for header info
+    first = payments[0]
+
+    return render(request, 'fees/combined_receipt.html', {
+        'student':              student,
+        'payments':             payments,
+        'paid_lines':           paid_lines,
+        'total_paid':           total_paid,
+        'total_vat':            total_vat,
+        'total_net_before_vat': total_net_before_vat,
+        'outstanding':          outstanding,
+        'total_outstanding':    total_outstanding,
+        'payment_date':         first.payment_date,
+        'payment_method':       first.get_payment_method_display(),
+        'transaction_ref':      first.transaction_ref,
+        'collected_by':         first.collected_by,
+        'receipt_numbers':      ', '.join(p.receipt_number for p in payments),
+    })
+
+
+# ════════════════════════════════════════════════════════════════
 #  STUDENT FEE EDIT (discount / status)
 # ════════════════════════════════════════════════════════════════
 

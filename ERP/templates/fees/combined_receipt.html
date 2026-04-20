@@ -1,0 +1,370 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combined Receipt — {{ student.full_name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { font-size: 9pt; background: white; padding: 0; }
+            @page { size: A4; margin: 1cm 1.2cm; }
+        }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f1f5f9; }
+        th, td { border: 1px solid #cbd5e1; }
+    </style>
+</head>
+<body class="p-4">
+
+<!-- ══ Actions bar (no-print) ══════════════════════════════════ -->
+<div class="no-print flex flex-wrap gap-3 mb-4 max-w-4xl mx-auto">
+    <button onclick="window.print()"
+            class="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700 transition">
+        🖨️ Print Receipt
+    </button>
+    <a href="{% url 'fees:collection' %}?student_id={{ student.pk }}"
+       class="flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition">
+        ← Back to Collection
+    </a>
+    <a href="{% url 'fees:student_ledger' student.pk %}"
+       class="flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition">
+        📋 Student Ledger
+    </a>
+</div>
+
+<!-- ══ Receipt Document ═════════════════════════════════════════ -->
+<div class="max-w-4xl mx-auto bg-white border border-slate-300 shadow-lg">
+
+    <!-- ══ SCHOOL HEADER ══════════════════════════════════════════ -->
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;">
+        <tr>
+            <td class="px-4 py-3 align-top border border-slate-300"
+                style="width:35%;direction:rtl;text-align:right;font-size:11px;line-height:1.7;">
+                <div style="font-size:14px;font-weight:bold;">مدارس الكوثر العالمية</div>
+                <div>جدة - طريق الملك عبد العزيز - حي المحمدية</div>
+                <div>الرقم الضريبي : 310706514800003</div>
+                <div>رقم السجل التجاري : 4030218023</div>
+                <div>جوال : 966506561717+ · 966506359280+</div>
+                <div>Info@alkawthar.edu.sa</div>
+                <div>www.alkawthar.edu.sa</div>
+            </td>
+            <td class="px-4 py-3 align-middle text-center border border-slate-300" style="width:30%;">
+                <img src="{% static 'images/logo.png' %}" alt="School Logo"
+                     style="max-width:120px;max-height:100px;object-fit:contain;display:block;margin:0 auto;">
+            </td>
+            <td class="px-4 py-3 align-top border border-slate-300"
+                style="width:35%;font-size:11px;line-height:1.7;">
+                <div style="font-size:14px;font-weight:bold;">AL-KAWTHAR INTERNATIONAL SCHOOL</div>
+                <div>Jeddah, King Abdulaziz Road, Al Mohamamdiya</div>
+                <div>VAT Reg. 310706514800003</div>
+                <div>CR Number : 4030218023</div>
+                <div>Mobile : +966506359280 +966506561717</div>
+                <div>Info@alkawthar.edu.sa</div>
+                <div>www.alkawthar.edu.sa</div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ══ RECEIPT TITLE ══════════════════════════════════════════ -->
+    <div class="text-center py-3 border border-t-0 border-slate-300">
+        <div style="font-size:16px;font-weight:bold;">إيصال دفع شامل</div>
+        <div style="font-size:15px;font-weight:bold;">Combined Payment Receipt</div>
+    </div>
+
+    <!-- ══ STUDENT / TRANSACTION INFO ════════════════════════════ -->
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;border-top:none;font-size:11px;">
+        <tr>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50"
+                style="width:13%;direction:rtl;text-align:right;">
+                أرقام الإيصالات<br>
+                <span class="text-slate-500" style="direction:ltr;">Receipt Nos.</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono font-bold text-xs" style="width:20%;">
+                {{ receipt_numbers }}
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50"
+                style="width:10%;direction:rtl;text-align:right;">
+                اسم الأب<br>
+                <span class="text-slate-500" style="direction:ltr;">Father Name</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold uppercase" style="width:22%;">
+                {{ student.father_name|default:"—" }}
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50"
+                style="width:11%;direction:rtl;text-align:right;">
+                رقم هوية الأب<br>
+                <span class="text-slate-500" style="direction:ltr;">Father's ID</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono" style="width:24%;">
+                {{ student.father_national_id|default:"—" }}
+            </td>
+        </tr>
+        <tr>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50"
+                style="direction:rtl;text-align:right;">
+                التاريخ<br>
+                <span class="text-slate-500" style="direction:ltr;">Date</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold">
+                {{ payment_date|date:"d/m/Y" }}
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50"
+                style="direction:rtl;text-align:right;">
+                اسم الطالب<br>
+                <span class="text-slate-500" style="direction:ltr;">Student Name</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold uppercase">
+                {{ student.full_name }}
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50"
+                style="direction:rtl;text-align:right;">
+                رقم هوية الطالب<br>
+                <span class="text-slate-500" style="direction:ltr;">Student ID</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono">
+                {{ student.student_id }}
+            </td>
+        </tr>
+        <tr>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50"
+                style="direction:rtl;text-align:right;">
+                طريقة الدفع<br>
+                <span class="text-slate-500" style="direction:ltr;">Payment Method</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold">
+                {{ payment_method }}
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50"
+                style="direction:rtl;text-align:right;">
+                المرحلة الدراسية<br>
+                <span class="text-slate-500" style="direction:ltr;">Grade</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold uppercase">
+                {{ student.grade.name|default:"—" }}
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50"
+                style="direction:rtl;text-align:right;">
+                محصّل بواسطة<br>
+                <span class="text-slate-500" style="direction:ltr;">Collected By</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5">
+                {{ collected_by.full_name|default:"—" }}
+            </td>
+        </tr>
+        {% if transaction_ref %}
+        <tr>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50"
+                style="direction:rtl;text-align:right;">
+                المرجع البنكي<br>
+                <span class="text-slate-500" style="direction:ltr;">Transaction Ref</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono" colspan="5">
+                {{ transaction_ref }}
+            </td>
+        </tr>
+        {% endif %}
+    </table>
+
+    <!-- ══ SECTION 1: PAYMENTS MADE NOW ══════════════════════════ -->
+    <div class="px-4 py-2 border border-t-0 border-slate-300"
+         style="background:#1e3a5f;color:white;font-size:11px;font-weight:bold;">
+        ✅ &nbsp; المبالغ المدفوعة الآن &nbsp;/&nbsp; Payments Collected in This Transaction
+    </div>
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;border-top:none;font-size:10.5px;">
+        <thead>
+            <tr style="background:#e8f0fe;">
+                <th class="border border-slate-300 px-2 py-2 text-center" style="width:4%;">م<br>#</th>
+                <th class="border border-slate-300 px-2 py-2 text-left" style="width:28%;">البيان<br>Description</th>
+                <th class="border border-slate-300 px-2 py-2 text-right" style="width:12%;">القيمة الإجمالية<br>Gross</th>
+                <th class="border border-slate-300 px-2 py-2 text-right" style="width:10%;">الخصم<br>Discount</th>
+                <th class="border border-slate-300 px-2 py-2 text-right" style="width:13%;">قبل الضريبة<br>Net ex-VAT</th>
+                <th class="border border-slate-300 px-2 py-2 text-center" style="width:8%;">الضريبة%<br>VAT%</th>
+                <th class="border border-slate-300 px-2 py-2 text-right" style="width:11%;">مبلغ الضريبة<br>VAT</th>
+                <th class="border border-slate-300 px-2 py-2 text-right" style="width:14%;">المدفوع<br>Paid SAR</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line in paid_lines %}
+            <tr style="background:{% cycle '#ffffff' '#f8fafc' %};">
+                <td class="border border-slate-300 px-2 py-2 text-center">{{ forloop.counter }}</td>
+                <td class="border border-slate-300 px-2 py-2">
+                    {{ line.description }}
+                    {% if line.note %}<div class="text-xs text-slate-400 mt-0.5">{{ line.note }}</div>{% endif %}
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ line.gross|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right {% if line.discount %}text-green-700{% endif %}">
+                    {{ line.discount|floatformat:2 }}
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ line.net|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-center
+                    {% if line.vat_pct == 0 %}text-green-700 font-semibold{% else %}text-orange-700 font-semibold{% endif %}">
+                    {{ line.vat_pct }}%
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right
+                    {% if line.vat_pct == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
+                    {{ line.vat|floatformat:2 }}
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right font-bold">
+                    {{ line.paid|floatformat:2 }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="background:#f0f9ff;">
+                <td class="border border-slate-300 px-2 py-2 font-bold text-right text-xs" colspan="4"
+                    style="direction:rtl;">
+                    إجمالي هذه الدفعة / Total This Transaction
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right font-semibold">
+                    {{ total_net_before_vat|floatformat:2 }}
+                </td>
+                <td class="border border-slate-300 px-2 py-2"></td>
+                <td class="border border-slate-300 px-2 py-2 text-right font-semibold text-orange-700">
+                    {{ total_vat|floatformat:2 }}
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right font-bold text-base"
+                    style="color:#1e3a5f;">
+                    SAR {{ total_paid|floatformat:2 }}
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- ══ SECTION 2: REMAINING OUTSTANDING FEES ═════════════════ -->
+    <div class="px-4 py-2 border border-t-0 border-slate-300"
+         style="background:#7f1d1d;color:white;font-size:11px;font-weight:bold;">
+        ⚠️ &nbsp; الرسوم المتبقية غير المدفوعة &nbsp;/&nbsp; Outstanding Fees Remaining
+    </div>
+    {% if outstanding %}
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;border-top:none;font-size:10.5px;">
+        <thead>
+            <tr style="background:#fef2f2;">
+                <th class="border border-slate-300 px-2 py-2 text-center" style="width:4%;">#</th>
+                <th class="border border-slate-300 px-2 py-2 text-left" style="width:32%;">البيان / Description</th>
+                <th class="border border-slate-300 px-2 py-2 text-right" style="width:14%;">إجمالي الرسوم<br>Total Fee</th>
+                <th class="border border-slate-300 px-2 py-2 text-right" style="width:14%;">المدفوع<br>Paid So Far</th>
+                <th class="border border-slate-300 px-2 py-2 text-right" style="width:14%;">الرصيد المتبقي<br>Balance Due</th>
+                <th class="border border-slate-300 px-2 py-2 text-center" style="width:12%;">تاريخ الاستحقاق<br>Due Date</th>
+                <th class="border border-slate-300 px-2 py-2 text-center" style="width:10%;">الحالة<br>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for f in outstanding %}
+            <tr style="background:{% cycle '#ffffff' '#fff5f5' %};">
+                <td class="border border-slate-300 px-2 py-2 text-center">{{ forloop.counter }}</td>
+                <td class="border border-slate-300 px-2 py-2">{{ f.fee_structure.fee_type.name }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ f.net_amount|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right text-green-700">{{ f.amount_paid|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right font-bold text-red-600">{{ f.balance|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-center">{{ f.due_date|date:"d/m/Y" }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-center text-xs font-semibold
+                    {% if f.status == 'OVERDUE' %}text-red-700{% elif f.status == 'PARTIAL' %}text-orange-600{% else %}text-slate-500{% endif %}">
+                    {{ f.get_status_display }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="background:#fef2f2;">
+                <td class="border border-slate-300 px-2 py-2 font-bold text-right text-xs" colspan="4"
+                    style="direction:rtl;">
+                    إجمالي المتبقي / Total Outstanding
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right font-bold text-red-700 text-base" colspan="3">
+                    SAR {{ total_outstanding|floatformat:2 }}
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+    {% else %}
+    <div class="border border-t-0 border-slate-300 px-4 py-3 text-center text-green-700 text-sm font-semibold bg-green-50">
+        ✅ No outstanding fees — all fees are fully paid!
+    </div>
+    {% endif %}
+
+    <!-- ══ SUMMARY TOTALS ═════════════════════════════════════════ -->
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;border-top:none;font-size:10.5px;">
+        <tr>
+            <!-- Notes -->
+            <td class="border border-slate-300 p-3 align-top" style="width:60%;">
+                <div class="text-slate-500 text-xs mb-1 font-semibold">Remarks / ملاحظات</div>
+                {% if collected_by %}
+                <div class="text-xs text-slate-400 mt-1">Collected by: {{ collected_by.full_name }}</div>
+                {% endif %}
+                <div class="text-xs text-slate-400 mt-1">Issued: {% now "d M Y H:i" %}</div>
+            </td>
+            <!-- Summary box -->
+            <td class="border border-slate-300 p-0 align-top" style="width:40%;">
+                <table class="w-full border-collapse">
+                    <tr>
+                        <td class="border border-slate-300 px-3 py-2"
+                            style="direction:rtl;text-align:right;font-size:10px;line-height:1.4;">
+                            المبلغ قبل الضريبة<br>
+                            <span style="direction:ltr;display:block;text-align:left;color:#64748b;">Net Before VAT</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-right font-semibold">
+                            SAR {{ total_net_before_vat|floatformat:2 }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="border border-slate-300 px-3 py-2"
+                            style="direction:rtl;text-align:right;font-size:10px;line-height:1.4;">
+                            مبلغ الضريبة<br>
+                            <span style="direction:ltr;display:block;text-align:left;color:#64748b;">VAT Amount</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-right font-semibold text-orange-700">
+                            SAR {{ total_vat|floatformat:2 }}
+                        </td>
+                    </tr>
+                    <tr style="background:#e8f0fe;">
+                        <td class="border border-slate-300 px-3 py-2 font-bold"
+                            style="direction:rtl;text-align:right;font-size:11px;line-height:1.4;">
+                            إجمالي المدفوع اليوم<br>
+                            <span style="direction:ltr;display:block;text-align:left;">Total Paid Today</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-right font-bold text-lg"
+                            style="color:#1e3a5f;">
+                            SAR {{ total_paid|floatformat:2 }}
+                        </td>
+                    </tr>
+                    <tr style="background:#fef2f2;">
+                        <td class="border border-slate-300 px-3 py-2"
+                            style="direction:rtl;text-align:right;font-size:10px;line-height:1.4;color:#991b1b;">
+                            إجمالي الرصيد المتبقي<br>
+                            <span style="direction:ltr;display:block;text-align:left;">Total Still Outstanding</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-right font-bold text-red-700 text-lg">
+                            SAR {{ total_outstanding|floatformat:2 }}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ══ ZERO-RATING FOOTER ════════════════════════════════════ -->
+    <div class="border border-slate-300 border-t-0 px-4 py-2 text-center"
+         style="font-size:9.5px;direction:rtl;line-height:1.6;color:#374151;">
+        الخدمات الخاضعة لنسبة الضريبة الصفرية: تحمل الدولة الضريبة المستحقة على الخدمات التعليمية الأهلية المقدمة إلى المواطنين.
+    </div>
+
+    <!-- ══ SIGNATURE FOOTER ══════════════════════════════════════ -->
+    <div class="border border-slate-300 border-t-0 px-6 py-5 flex justify-between items-end"
+         style="font-size:10px;color:#64748b;">
+        <div>
+            <p>هذا الإيصال مُصدَر بالكمبيوتر ولا يحتاج إلى توقيع.</p>
+            <p>This is a computer-generated receipt and requires no signature.</p>
+        </div>
+        <div class="text-center">
+            <div class="border-t border-slate-400 mt-8 pt-2" style="width:120px;">
+                <span>Authorized Signature / التوقيع المعتمد</span>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /receipt document -->
+</body>
+</html>
