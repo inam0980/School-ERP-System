@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -48,9 +49,8 @@
                 <div>www.alkawthar.edu.sa</div>
             </td>
             <td class="px-4 py-3 align-middle text-center border border-slate-300" style="width:30%;">
-                <div class="mx-auto flex items-center justify-center rounded-full bg-slate-100 border-2 border-slate-300" style="width:80px;height:80px;">
-                    <span class="text-slate-400 text-xs font-bold">LOGO</span>
-                </div>
+                <img src="{% static 'images/logo.png' %}" alt="School Logo"
+                     style="max-width:120px;max-height:100px;object-fit:contain;display:block;margin:0 auto;">
             </td>
             <td class="px-4 py-3 align-top border border-slate-300" style="width:35%;font-size:11px;line-height:1.7;">
                 <div style="font-size:14px;font-weight:bold;">AL - KAWTHAR INTERNATIONAL SCHOOL</div>

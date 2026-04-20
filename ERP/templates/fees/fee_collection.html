@@ -57,9 +57,15 @@
         {% for r in receipts %}
         <a href="{% url 'fees:receipt_print' r.pk %}" target="_blank"
            class="inline-flex items-center gap-1 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg transition">
-            Print Receipt — {{ r.student_fee.fee_structure.fee_type.name }}
+            🖨️ {{ r.student_fee.fee_structure.fee_type.name }}
         </a>
         {% endfor %}
+        {% if receipts|length > 1 %}
+        <a href="{% url 'fees:combined_receipt' %}?pks={% for r in receipts %}{{ r.pk }}{% if not forloop.last %},{% endif %}{% endfor %}" target="_blank"
+           class="inline-flex items-center gap-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition">
+            🖨️ Combined Receipt
+        </a>
+        {% endif %}
         {% endif %}
     </div>
     {% endfor %}
