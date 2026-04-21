@@ -20,8 +20,9 @@ from .analytics import (
 
 _ADMIN = ('SUPER_ADMIN', 'ADMIN')
 _STAFF = ('SUPER_ADMIN', 'ADMIN', 'TEACHER', 'ACCOUNTANT', 'STAFF')
+_MANAGEMENT = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT')
 
-_CACHE_TTL = 300   # 5 minutes
+_CACHE_TTL = 1800  # 30 minutes
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -29,7 +30,7 @@ _CACHE_TTL = 300   # 5 minutes
 # ──────────────────────────────────────────────────────────────────────────────
 
 @login_required
-@role_required(*_ADMIN)
+@role_required(*_MANAGEMENT)
 def ai_dashboard(request):
     current_year = AcademicYear.objects.filter(is_current=True).first()
     year_pk      = current_year.pk if current_year else 'none'

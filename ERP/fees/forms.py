@@ -18,11 +18,16 @@ _SMALL  = ('border border-slate-300 rounded-lg px-3 py-2 w-full text-sm '
 class FeeTypeForm(forms.ModelForm):
     class Meta:
         model  = FeeType
-        fields = ['name', 'category', 'is_taxable', 'description']
+        fields = ['name', 'category', 'is_taxable', 'description', 'default_amount']
         widgets = {
-            'name':        forms.TextInput(attrs={'class': _INPUT}),
-            'category':    forms.Select(attrs={'class': _SELECT}),
-            'description': forms.Textarea(attrs={'class': _INPUT, 'rows': 2}),
+            'name':           forms.TextInput(attrs={'class': _INPUT}),
+            'category':       forms.Select(attrs={'class': _SELECT, 'id': 'id_category'}),
+            'description':    forms.Textarea(attrs={'class': _INPUT, 'rows': 2}),
+            'default_amount': forms.NumberInput(attrs={
+                'class': _INPUT, 'step': '0.01', 'min': '0',
+                'placeholder': 'e.g. 1500.00',
+                'id': 'id_default_amount',
+            }),
         }
 
 
@@ -320,42 +325,6 @@ class SalaryMonthFilterForm(forms.Form):
         required=False,
         widget=forms.DateInput(attrs={'class': _INPUT, 'type': 'month'}),
         label='Month',
-    )
-
-
-class ManualInvoiceLineForm(forms.Form):
-    """One line item on a manually-entered tax invoice."""
-    description = forms.CharField(
-        max_length=200,
-        widget=forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'e.g. Reservation Seat Fee'}),
-    )
-    amount = forms.DecimalField(
-        min_value=0, decimal_places=2,
-        widget=forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0'}),
-    )
-    is_taxable = forms.BooleanField(required=False, label='Subject to 15% VAT')
-    is_credit  = forms.BooleanField(required=False, label='Credit / Deduction (negative line)')
-
-
-class ManualInvoiceHeaderForm(forms.Form):
-    """Header fields for a manually-entered tax invoice."""
-    INVOICE_TYPES = [
-        ('STANDARD',    'Tax Invoice (Standard)'),
-        ('CREDIT_NOTE', 'Tax Credit Note (Discount / Refund)'),
-    ]
-    invoice_type = forms.ChoiceField(
-        choices=INVOICE_TYPES,
-        widget=forms.Select(attrs={'class': _SELECT}),
-        label='Invoice Type',
-    )
-    date = forms.DateField(
-        widget=forms.DateInput(attrs={'class': _INPUT, 'type': 'date'}),
-        initial=__import__('datetime').date.today,
-    )
-    notes = forms.CharField(
-        required=False,
-        widget=forms.Textarea(attrs={'class': _INPUT, 'rows': 2,
-                                     'placeholder': 'Optional notes…'}),
     )
 
 

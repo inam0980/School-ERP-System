@@ -115,7 +115,7 @@
                     data-year="{{ s.academic_year_id }}"
                     style="display:none"
                     {% if form.fee_structure.value|stringformat:'s' == s.pk|stringformat:'s' %}selected{% endif %}>
-                {{ s.grade.name }}
+                {% if s.name %}{{ s.grade.name }} — {{ s.name }}{% else %}{{ s.grade.name }} — Fee Structure{% endif %}
             </option>
             {% endfor %}
         </select>
@@ -352,7 +352,7 @@
             if (show) any = true;
         });
         structureSel.options[0].text = divPk
-            ? (any ? '— Select a grade —' : '— No structures found —')
+            ? (any ? '— Select a fee structure —' : '— No structures found —')
             : '— Select division first —';
     }
 

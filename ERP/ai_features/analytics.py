@@ -40,10 +40,19 @@ def compute_attendance_risk(academic_year=None, section=None, grade=None):
     """
     Returns a list of dicts, one per active student, ordered by risk (worst first).
     Each dict: {student, total, present, late, pct, risk}
-    Uses pure threshold logic (no sklearn needed for this).
+    Uses a single annotated query instead of per-student queries (no N+1).
     """
-    from attendance.models import Attendance
+    from django.db.models import Count, Q
     from students.models import Student
+
+    attn_filter = Q()
+    if academic_year:
+        today = timezone.localdate()
+        end   = min(academic_year.end_date, today)
+        attn_filter = Q(
+            attendances__date__gte=academic_year.start_date,
+            attendances__date__lte=end,
+        )
 
     qs = Student.objects.filter(is_active=True).select_related(
         'section', 'grade', 'division', 'academic_year'
@@ -55,16 +64,18 @@ def compute_attendance_risk(academic_year=None, section=None, grade=None):
     if grade:
         qs = qs.filter(grade=grade)
 
+    qs = qs.annotate(
+        total=Count('attendances', filter=attn_filter),
+        present=Count(
+            'attendances',
+            filter=attn_filter & Q(attendances__status__in=['P', 'L']),
+        ),
+    )
+
     results = []
     for student in qs:
-        attn = Attendance.objects.filter(student=student)
-        if academic_year:
-            attn = attn.filter(
-                date__gte=academic_year.start_date,
-                date__lte=min(academic_year.end_date, timezone.localdate()),
-            )
-        total   = attn.count()
-        present = attn.filter(status__in=['P', 'L']).count()  # late counts as present
+        total   = student.total
+        present = student.present
         pct     = _pct(present, total)
         results.append({
             'student': student,

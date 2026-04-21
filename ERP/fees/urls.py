@@ -49,7 +49,6 @@ urlpatterns = [
     # Invoices
     path('invoices/',                     views.invoice_list,          name='invoice_list'),
     path('invoices/generate/<int:student_pk>/', views.generate_invoice, name='generate_invoice'),
-    path('invoices/manual/<int:student_pk>/',   views.manual_invoice,   name='manual_invoice'),
     path('invoices/<int:pk>/print/',      views.invoice_print,         name='invoice_print'),
 
     # Bank verification
