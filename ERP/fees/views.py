@@ -27,7 +27,7 @@ from .forms import (
     BulkAssignFeeForm,
     StudentFeeEditForm, PaymentForm, FeeReportFilterForm,
     SalaryForm, SalaryMonthFilterForm,
-    ManualInvoiceHeaderForm, ManualInvoiceLineForm, DefaultersFilterForm,
+    DefaultersFilterForm,
     TuitionFeeConfigForm, TuitionInstallmentFormSet, TuitionConfigFilterForm,
 )
 
@@ -76,14 +76,14 @@ def api_fees_summary(request):
 # ════════════════════════════════════════════════════════════════
 
 @login_required
-@role_required(*_ADMIN)
+@role_required(*_ACCOUNTANT)
 def fee_type_list(request):
     types = FeeType.objects.all()
     return render(request, 'fees/fee_type_list.html', {'fee_types': types})
 
 
 @login_required
-@role_required(*_ADMIN)
+@role_required(*_ACCOUNTANT)
 def fee_type_form(request, pk=None):
     instance = get_object_or_404(FeeType, pk=pk) if pk else None
     form     = FeeTypeForm(request.POST or None, instance=instance)
@@ -133,7 +133,7 @@ def fee_structure_list(request):
 
 
 @login_required
-@role_required(*_ADMIN)
+@role_required(*_ACCOUNTANT)
 def fee_structure_form(request, pk=None):
     # ── EDIT: single existing structure ──────────────────────────
     if pk:
@@ -168,7 +168,7 @@ def fee_structure_form(request, pk=None):
             return redirect('fees:fee_structure_list')
 
         fee_types_with_amounts = [
-            {'ft': ft, 'amount': existing_items[ft.pk].amount if ft.pk in existing_items else ''}
+            {'ft': ft, 'amount': existing_items[ft.pk].amount if ft.pk in existing_items else (ft.default_amount or '')}
             for ft in all_fee_types
         ]
         grades_by_division = _grades_by_division()
@@ -744,7 +744,7 @@ def fee_collection(request):
             except ValueError:
                 payment_date = timezone.localdate()
 
-            payment_method  = request.POST.get('payment_method', Payment.CASH)
+            payment_method  = request.POST.get('payment_method', Payment.CREDIT_CARD)
             transaction_ref = request.POST.get('transaction_ref', '').strip()
             notes           = request.POST.get('notes', '').strip()
             errors          = []
@@ -1579,89 +1579,6 @@ def fees_dashboard(request):
             ('Payroll',              '/fees/payroll/',                      '💼', 'slate'),
             ('Fee Types',            '/fees/fee-types/',                    '🏷️',  'slate'),
         ],
-    })
-
-
-# ════════════════════════════════════════════════════════════════
-#  MANUAL TAX INVOICE ENTRY
-#  Handles: Cash Collection, Reservation Seat, Entrance Exam,
-#           Tax Credit Note, Custom items
-# ════════════════════════════════════════════════════════════════
-
-@login_required
-@role_required(*_ACCOUNTANT)
-def manual_invoice(request, student_pk):
-    """
-    Create a manual tax invoice (or credit note) for a student
-    with arbitrary line items — used for cash collection, reservation
-    seat, entrance exam, discounts, etc.
-    """
-    student     = get_object_or_404(Student, pk=student_pk)
-    header_form = ManualInvoiceHeaderForm(request.POST or None)
-
-    # Build dynamic line-item formset from POST
-    line_count = int(request.POST.get('line_count', 1))
-    line_forms = [ManualInvoiceLineForm(request.POST or None, prefix=f'line_{i}')
-                  for i in range(line_count)]
-
-    if request.method == 'POST' and header_form.is_valid() and all(f.is_valid() for f in line_forms):
-        subtotal  = Decimal('0')
-        tax_total = Decimal('0')
-        items     = []
-
-        for lf in line_forms:
-            d   = lf.cleaned_data
-            amt = d['amount']
-            if d.get('is_credit'):
-                amt = -amt
-            # Apply Saudi zero-rating: tuition/books are 0% for Saudi students
-            effective_taxable = d.get('is_taxable', False)
-            if effective_taxable and student.is_saudi:
-                desc_lower = d['description'].lower()
-                if any(kw in desc_lower for kw in ('tuition', 'رسوم دراسية', 'book', 'كتاب')):
-                    effective_taxable = False
-            tax = (amt * Decimal('0.15')).quantize(Decimal('0.01')) if effective_taxable else Decimal('0')
-            subtotal  += amt
-            tax_total += tax
-            items.append({
-                'description':    d['description'],
-                'qty':            1,
-                'gross_amount':   float(abs(amt)),
-                'discount':       0,
-                'net_before_vat': float(amt),
-                'vat_rate':       15 if effective_taxable else 0,
-                'vat':            float(tax),
-                'total':          float(amt + tax),
-                'is_credit':      d.get('is_credit', False),
-            })
-
-        hd           = header_form.cleaned_data
-        inv_type     = hd['invoice_type']
-        inv_status   = TaxInvoice.ISSUED
-        if inv_type == TaxInvoice.INVOICE_TYPE_CREDIT_NOTE:
-            inv_status = TaxInvoice.CREDIT_NOTE
-
-        invoice = TaxInvoice.objects.create(
-            student         = student,
-            date            = hd['date'],
-            subtotal        = subtotal,
-            tax_amount      = tax_total,
-            total           = subtotal + tax_total,
-            status          = inv_status,
-            invoice_type    = inv_type,
-            notes           = hd.get('notes', ''),
-            created_by      = request.user,
-            line_items_json = items,
-        )
-        messages.success(request, f"Invoice {invoice.invoice_number} created.")
-        return redirect('fees:invoice_print', pk=invoice.pk)
-
-    return render(request, 'fees/manual_invoice_form.html', {
-        'student':     student,
-        'header_form': header_form,
-        'line_forms':  line_forms,
-        'line_count':  line_count,
-        'is_saudi':    student.is_saudi,
     })
 
 

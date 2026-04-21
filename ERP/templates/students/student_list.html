@@ -105,66 +105,59 @@
     <!-- Table -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         {% if students %}
-        <div class="overflow-x-auto">
+        <div class="overflow-x-hidden">
             <table class="w-full text-sm">
                 <thead class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                     <tr>
-                        <th class="px-4 py-3 text-left">Photo</th>
-                        <th class="px-4 py-3 text-left">Student ID</th>
-                        <th class="px-4 py-3 text-left">Name (EN)</th>
-                        <th class="px-4 py-3 text-right" dir="rtl">الاسم (عربي)</th>
-                        <th class="px-4 py-3 text-left">Division</th>
-                        <th class="px-4 py-3 text-left">Grade / Section</th>
-                        <th class="px-4 py-3 text-left">Citizenship</th>
-                        <th class="px-4 py-3 text-left">Gender</th>
-                        <th class="px-4 py-3 text-left">Guardian Phone</th>
-                        <th class="px-4 py-3 text-left">Status</th>
-                        <th class="px-4 py-3 text-right">Actions</th>
+                        <th class="px-3 py-3 text-left">Photo</th>
+                        <th class="px-3 py-3 text-left">Student ID</th>
+                        <th class="px-3 py-3 text-left">Name</th>
+                        <th class="px-3 py-3 text-left">Division</th>
+                        <th class="px-3 py-3 text-left">Grade / Section</th>
+                        <th class="px-3 py-3 text-center">🌍</th>
+                        <th class="px-3 py-3 text-center">Gen</th>
+                        <th class="px-3 py-3 text-left">Status</th>
+                        <th class="px-3 py-3 text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
                     {% for s in students %}
                     <tr class="hover:bg-slate-50 transition">
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-2">
                             {% if s.photo %}
-                            <img src="{{ s.photo.url }}" alt="" class="w-9 h-9 rounded-full object-cover border border-slate-200">
+                            <img src="{{ s.photo.url }}" alt="" class="w-8 h-8 rounded-full object-cover border border-slate-200">
                             {% else %}
-                            <div class="w-9 h-9 rounded-full bg-[#1e3a5f]/10 flex items-center justify-center text-[#1e3a5f] font-bold text-sm">
+                            <div class="w-8 h-8 rounded-full bg-[#1e3a5f]/10 flex items-center justify-center text-[#1e3a5f] font-bold text-xs">
                                 {{ s.full_name|first|upper }}
                             </div>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ s.student_id }}</td>
-                        <td class="px-4 py-3 font-medium text-slate-800">
-                            <a href="{% url 'students:detail' s.pk %}" class="hover:text-[#1e3a5f] hover:underline">{{ s.full_name }}</a>
+                        <td class="px-3 py-2 font-mono text-xs text-slate-500">{{ s.student_id }}</td>
+                        <td class="px-3 py-2">
+                            <a href="{% url 'students:detail' s.pk %}" class="font-medium text-slate-800 hover:text-[#1e3a5f] hover:underline leading-tight block">{{ s.full_name }}</a>
+                            {% if s.arabic_name %}<span class="text-xs text-slate-400 leading-tight" dir="rtl">{{ s.arabic_name }}</span>{% endif %}
                         </td>
-                        <td class="px-4 py-3 text-slate-600 text-right font-medium" dir="rtl">{{ s.arabic_name }}</td>
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-2">
                             <span class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">{{ s.division }}</span>
                         </td>
-                        <td class="px-4 py-3 text-slate-600">{{ s.grade.name }} / {{ s.section.name }}</td>
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-2 text-slate-600 text-xs">{{ s.grade.name }} / {{ s.section.name }}</td>
+                        <td class="px-3 py-2 text-center">
                             {% if s.nationality == 'Saudi' %}
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-100">
-                                🇸🇦 Saudi
-                            </span>
+                            <span title="Saudi">🇸🇦</span>
                             {% else %}
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-semibold rounded-full border border-blue-100" title="{{ s.nationality }}">
-                                🌍 {{ s.nationality }}
-                            </span>
+                            <span title="{{ s.nationality }}">🌍</span>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 text-slate-500 text-xs">{{ s.get_gender_display }}</td>
-                        <td class="px-4 py-3 text-slate-600 text-xs">{{ s.guardian_phone|default:"—" }}</td>
-                        <td class="px-4 py-3">
+                        <td class="px-3 py-2 text-center text-slate-500 text-xs">{{ s.get_gender_display|slice:":1" }}</td>
+                        <td class="px-3 py-2">
                             {% if s.is_active %}
                             <span class="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-100">Active</span>
                             {% else %}
                             <span class="px-2 py-0.5 bg-red-50 text-red-600 text-xs font-semibold rounded-full border border-red-100">Inactive</span>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-3 text-right">
-                            <div class="flex items-center justify-end gap-1.5">
+                        <td class="px-3 py-2 text-right">
+                            <div class="flex items-center justify-end gap-1">
                                 <a href="{% url 'students:detail' s.pk %}" title="View"
                                    class="p-1.5 text-slate-500 hover:text-[#1e3a5f] hover:bg-slate-100 rounded-lg transition">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>

@@ -30,7 +30,7 @@ _MANAGEMENT = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT')
 # ──────────────────────────────────────────────────────────────────────────────
 
 @login_required
-@role_required(*_ADMIN)
+@role_required(*_MANAGEMENT)
 def staff_dashboard(request):
     today              = timezone.localdate()
     expiry_threshold   = today + timedelta(days=90)

@@ -283,6 +283,7 @@
                 <div class="relative w-36 shrink-0">
                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
                     <input type="number" name="amount_{{ ft.pk }}" step="0.01" min="0"
+                           value="{{ ft.default_amount|default:'' }}"
                            placeholder="—"
                            class="ft-amount border border-slate-200 rounded-lg pl-10 pr-3 py-1.5 text-sm w-full
                                   focus:ring-2 focus:ring-primary/40 focus:outline-none focus:border-primary

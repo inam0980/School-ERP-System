@@ -60,10 +60,14 @@ class FeeType(models.Model):
         (OTHER,            'Other / أخرى'),
     ]
 
-    name        = models.CharField(max_length=100)
-    category    = models.CharField(max_length=20, choices=FEE_CATEGORIES, default=OTHER)
-    is_taxable  = models.BooleanField(default=False, help_text="Subject to VAT (ZATCA)")
-    description = models.TextField(blank=True)
+    name           = models.CharField(max_length=100)
+    category       = models.CharField(max_length=20, choices=FEE_CATEGORIES, default=OTHER)
+    is_taxable     = models.BooleanField(default=False, help_text="Subject to VAT (ZATCA)")
+    description    = models.TextField(blank=True)
+    default_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Default price pre-filled when adding this fee to a structure (not used for Tuition)."
+    )
 
     VAT_RATE = Decimal('0.15')  # Saudi ZATCA standard rate for non-Saudi students
 
@@ -110,7 +114,7 @@ class FeeStructure(models.Model):
         ordering = ['academic_year', 'grade__division__name', 'grade__order', 'grade__name']
 
     def __str__(self):
-        label = f"{self.grade} — {self.name}" if self.name else str(self.grade)
+        label = f"{self.grade} — {self.name}" if self.name else f"{self.grade} — Fee Structure"
         return f"{label} ({self.academic_year})"
 
 
@@ -371,25 +375,21 @@ def _receipt_number():
 
 
 class Payment(models.Model):
-    CASH    = 'CASH'
-    BANK    = 'BANK'
-    MADA    = 'MADA'
-    ONLINE  = 'ONLINE'
-    CHEQUE  = 'CHEQUE'
+    CREDIT_CARD   = 'CREDIT_CARD'
+    BANK          = 'BANK'
+    INSTALLMENT   = 'INSTALLMENT'
 
     PAYMENT_METHODS = [
-        (CASH,   'Cash / نقدًا'),
-        (BANK,   'Bank Transfer / تحويل بنكي'),
-        (MADA,   'Mada / مدى'),
-        (ONLINE, 'Online / إلكتروني'),
-        (CHEQUE, 'Cheque / شيك'),
+        (CREDIT_CARD,  'Credit Card / بطاقة ائتمانية'),
+        (BANK,         'Bank Transfer / تحويل بنكي'),
+        (INSTALLMENT,  'Installment / تقسيط'),
     ]
 
     student_fee    = models.ForeignKey(StudentFee, on_delete=models.CASCADE,
                                        related_name='payments')
     paid_amount    = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date   = models.DateField(default=timezone.localdate)
-    payment_method = models.CharField(max_length=10, choices=PAYMENT_METHODS, default=CASH)
+    payment_method = models.CharField(max_length=15, choices=PAYMENT_METHODS, default=CREDIT_CARD)
     receipt_number = models.CharField(max_length=30, unique=True,
                                       default=_receipt_number, editable=False)
     transaction_ref = models.CharField(max_length=100, blank=True,
