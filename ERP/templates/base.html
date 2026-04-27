@@ -113,7 +113,7 @@
             <p class="px-4 pt-4 pb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Finance</p>
             <a href="/fees/" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300
                                      hover:bg-white/10 hover:text-white transition-all text-sm font-medium
-                                     {% if request.resolver_match.namespace == 'fees' %}bg-white/15 text-white{% endif %}">
+                                     {% if request.resolver_match.namespace == 'fees' and request.resolver_match.url_name == 'dashboard' %}bg-white/15 text-white{% endif %}">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round"
                           d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2
@@ -121,6 +121,16 @@
                              m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
                 Fees &amp; Payments
+            </a>
+            <a href="{% url 'fees:tax_invoice_menu' %}"
+               class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-slate-300
+                      hover:bg-white/10 hover:text-white transition-all text-sm font-medium ml-2
+                      {% if request.resolver_match.url_name in 'tax_invoice_menu,reservation_invoice,tax_credit_note,invoice_credit_note' %}bg-white/15 text-white{% endif %}">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Tax Invoice Entry
             </a>
 
             <!-- School Setup (Admin only) -->
