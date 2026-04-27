@@ -27,3 +27,7 @@ proc_name   = "school_erp"
 limit_request_line        = 8190
 limit_request_fields      = 200
 limit_request_field_size  = 8190
+
+# Command to recalculate student fees
+# python manage.py recalc_student_fees
+

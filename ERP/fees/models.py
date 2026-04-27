@@ -529,6 +529,15 @@ class TaxInvoice(models.Model):
     # Line items stored as JSON snapshot
     line_items_json = models.JSONField(default=list, blank=True)
 
+    # Credit note linkage
+    original_invoice   = models.ForeignKey(
+        'self', null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='credit_notes',
+        help_text='The original invoice this credit note refers to (if any).',
+    )
+    credit_note_reason = models.TextField(blank=True, help_text='Reason for issuing credit note.')
+
     class Meta:
         ordering = ['-date', '-id']
 
