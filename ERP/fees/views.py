@@ -1707,14 +1707,14 @@ def fees_dashboard(request):
         'recent_payments': recent_payments,
         'year':            year,
         'actions': [
-            ('Collect Payment',      '/fees/collection/',                   '💳', 'primary'),
-            ('Fee Structures',       '/fees/structures/',                   '🗂️',  'slate'),
-            ('Bulk Assign Fees',     '/fees/assign/',                       '📌', 'slate'),
-            ('Outstanding Report',   '/fees/outstanding/',                  '📋', 'slate'),
-            ('Defaulters List',      '/fees/defaulters/',                   '⚠️',  'red'),
-            ('Tax Invoices',         '/fees/invoices/',                     '🧾', 'slate'),
-            ('Payroll',              '/fees/payroll/',                      '💼', 'slate'),
-            ('Fee Types',            '/fees/fee-types/',                    '🏷️',  'slate'),
+            ('Tax Invoice Entry',     '/fees/tax-invoice/',         '🧾', 'primary'),
+            ('Fee Structures',        '/fees/structures/',          '🗂️',  'slate'),
+            ('Bulk Assign Fees',      '/fees/assign/',              '📌', 'slate'),
+            ('Outstanding Report',    '/fees/outstanding/',         '📋', 'slate'),
+            ('Defaulters List',       '/fees/defaulters/',          '⚠️',  'red'),
+            ('All Tax Invoices',      '/fees/invoices/',            '📄', 'slate'),
+            ('Payroll',               '/fees/payroll/',             '💼', 'slate'),
+            ('Fee Types',             '/fees/fee-types/',           '🏷️',  'slate'),
         ],
     })
 
