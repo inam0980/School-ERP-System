@@ -18,15 +18,20 @@ _SMALL  = ('border border-slate-300 rounded-lg px-3 py-2 w-full text-sm '
 class FeeTypeForm(forms.ModelForm):
     class Meta:
         model  = FeeType
-        fields = ['name', 'category', 'is_taxable', 'description', 'default_amount']
+        fields = ['name', 'category', 'is_taxable', 'is_mandatory', 'description', 'default_amount', 'fixed_down_payment']
         widgets = {
-            'name':           forms.TextInput(attrs={'class': _INPUT}),
-            'category':       forms.Select(attrs={'class': _SELECT, 'id': 'id_category'}),
-            'description':    forms.Textarea(attrs={'class': _INPUT, 'rows': 2}),
-            'default_amount': forms.NumberInput(attrs={
+            'name':               forms.TextInput(attrs={'class': _INPUT}),
+            'category':           forms.Select(attrs={'class': _SELECT, 'id': 'id_category'}),
+            'description':        forms.Textarea(attrs={'class': _INPUT, 'rows': 2}),
+            'default_amount':     forms.NumberInput(attrs={
                 'class': _INPUT, 'step': '0.01', 'min': '0',
                 'placeholder': 'e.g. 1500.00',
                 'id': 'id_default_amount',
+            }),
+            'fixed_down_payment': forms.NumberInput(attrs={
+                'class': _INPUT, 'step': '0.01', 'min': '0',
+                'placeholder': 'e.g. 500.00 (leave blank if none)',
+                'id': 'id_fixed_down_payment',
             }),
         }
 
@@ -81,6 +86,16 @@ class FeeStructureBulkCreateForm(forms.Form):
         initial='ANNUAL',
         widget=forms.Select(attrs={'class': _SELECT}),
     )
+    min_down_payment = forms.DecimalField(
+        required=False,
+        min_value=Decimal('0'),
+        widget=forms.NumberInput(attrs={
+            'class': _INPUT, 'step': '0.01', 'min': '0',
+            'placeholder': 'e.g. 500.00 (leave blank if none)',
+        }),
+        label='Minimum Down Payment (SAR)',
+        help_text='Required first payment when collecting fees under this structure.',
+    )
 
 
 class FeeStructureBundleForm(forms.ModelForm):
@@ -91,7 +106,7 @@ class FeeStructureBundleForm(forms.ModelForm):
     class Meta:
         model  = FeeStructureBundle
         fields = [
-            'name', 'academic_year', 'division', 'grade', 'due_date',
+            'name', 'structure_type', 'academic_year', 'division', 'grade', 'due_date',
             'entrance_exam_fee', 'registration_fee',
             'gross_tuition_fee', 'group_discount_pct',
             'installments_count', 'min_down_payment',
@@ -100,6 +115,7 @@ class FeeStructureBundleForm(forms.ModelForm):
         widgets = {
             'name':               forms.TextInput(attrs={'class': _INPUT,
                                   'placeholder': 'e.g. Grade 5 English — 2026–27 Fee Schedule'}),
+            'structure_type':     forms.Select(attrs={'class': _SELECT}),
             'academic_year':      forms.Select(attrs={'class': _SELECT}),
             'division':           forms.Select(attrs={'class': _SELECT}),
             'grade':              forms.Select(attrs={'class': _SELECT}),

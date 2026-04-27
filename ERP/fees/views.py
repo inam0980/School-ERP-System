@@ -1,5 +1,6 @@
 import io
 import csv
+import json
 from decimal import Decimal
 from datetime import date, timedelta
 
@@ -125,10 +126,23 @@ def fee_structure_list(request):
         div = s.grade.division
         divisions_map.setdefault(div, []).append(s)
 
+    # Also fetch bundles for the same year filter
+    bundle_qs = FeeStructureBundle.objects.select_related(
+        'academic_year', 'division', 'grade'
+    ).prefetch_related('installments')
+    if year_id:
+        bundle_qs = bundle_qs.filter(academic_year_id=year_id)
+
+    # Group bundles by division
+    bundles_by_division = {}
+    for b in bundle_qs:
+        bundles_by_division.setdefault(b.division, []).append(b)
+
     return render(request, 'fees/fee_structure_list.html', {
-        'divisions_map': divisions_map,
-        'years':         AcademicYear.objects.all(),
-        'active_year':   year_id,
+        'divisions_map':       divisions_map,
+        'bundles_by_division': bundles_by_division,
+        'years':               AcademicYear.objects.all(),
+        'active_year':         year_id,
     })
 
 
@@ -175,68 +189,114 @@ def fee_structure_form(request, pk=None):
         return render(request, 'fees/fee_structure_form.html', {
             'form': form, 'instance': instance, 'title': 'Edit Fee Structure',
             'fee_types_with_amounts': fee_types_with_amounts,
+            'mandatory_fee_pks': [row['ft'].pk for row in fee_types_with_amounts if row['ft'].is_mandatory],
             'grades_by_division': grades_by_division,
         })
 
-    # ── CREATE: one structure per grade ────────────────────────────────
-    form = FeeStructureBulkCreateForm(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        grade         = form.cleaned_data['grade']
-        academic_year = form.cleaned_data['academic_year']
-        frequency     = form.cleaned_data['frequency']
-        name          = form.cleaned_data.get('name', '')
+    # ── CREATE: bulk by division — one bundle per grade ──────────────────
+    divisions = Division.objects.all().order_by('name')
+    all_grades = (Grade.objects
+                  .filter(division__in=divisions)
+                  .select_related('division')
+                  .order_by('division__name', 'order', 'name'))
+    grades_by_div = {}
+    for g in all_grades:
+        grades_by_div.setdefault(str(g.division_id), []).append({'pk': g.pk, 'name': g.name})
 
-        # Collect per-fee-type amounts from raw POST (amount_<ft_pk>)
-        all_fee_types = FeeType.objects.all()
-        items_to_create = []  # list of (FeeType, Decimal amount)
-        for ft in all_fee_types:
-            raw = request.POST.get(f'amount_{ft.pk}', '').strip()
-            if raw:
-                try:
-                    amt = Decimal(raw)
-                except Exception:
-                    amt = None
-                if amt and amt > 0:
-                    items_to_create.append((ft, amt))
+    if request.method == 'POST':
+        academic_year_id    = request.POST.get('academic_year', '').strip()
+        division_id         = request.POST.get('division', '').strip()
+        due_date_raw        = request.POST.get('due_date', '').strip()
+        structure_type      = request.POST.get('structure_type', 'regular').strip()
+        structure_name_base = request.POST.get('structure_name', '').strip()
+        global_discount_raw = request.POST.get('global_group_discount', '0').strip() or '0'
+        if structure_type not in ('regular', 'new'):
+            structure_type = 'regular'
+        try:
+            global_discount = Decimal(global_discount_raw)
+        except Exception:
+            global_discount = Decimal('0')
+        errors = []
+        if not academic_year_id:
+            errors.append('Academic Year is required.')
+        if not division_id:
+            errors.append('Division is required.')
+        if not due_date_raw:
+            errors.append('Instalment Due Date is required.')
+        if not structure_name_base:
+            errors.append('Structure Name is required.')
+        for e in errors:
+            messages.error(request, e)
 
-        if not items_to_create:
-            messages.error(request, 'Enter an amount for at least one fee type.')
-        else:
-            container, new_s = FeeStructure.objects.get_or_create(
-                academic_year=academic_year,
-                grade=grade,
-                defaults={'name': name, 'frequency': frequency},
-            )
-            items_created = items_skipped = 0
-            for ft, amt in items_to_create:
-                _, new_i = FeeStructureItem.objects.get_or_create(
-                    structure=container,
-                    fee_type=ft,
-                    defaults={'amount': amt},
-                )
-                if new_i:
-                    items_created += 1
+        if not errors:
+            try:
+                year      = AcademicYear.objects.get(pk=academic_year_id)
+                division  = Division.objects.get(pk=division_id)
+                due_date  = date.fromisoformat(due_date_raw)
+            except Exception as exc:
+                messages.error(request, f'Invalid input: {exc}')
+                year = division = due_date = None
+
+            if year and division and due_date:
+                grades = Grade.objects.filter(division=division).order_by('order', 'name')
+                created_count = 0
+                for grade in grades:
+                    gross_raw = request.POST.get(f'gross_tuition_{grade.pk}', '').strip()
+                    if not gross_raw:
+                        continue
+                    try:
+                        entrance     = Decimal(request.POST.get(f'entrance_exam_{grade.pk}', '0').strip() or '0')
+                        registration = Decimal(request.POST.get(f'registration_{grade.pk}', '0').strip() or '0')
+                        gross        = Decimal(gross_raw)
+                        # Per-grade discount overrides global if set, else use global
+                        per_grade_raw = request.POST.get(f'group_discount_{grade.pk}', '').strip()
+                        discount_pct  = Decimal(per_grade_raw) if per_grade_raw else global_discount
+                        down_raw     = request.POST.get(f'down_payment_{grade.pk}', '').strip()
+                        down_payment = Decimal(down_raw) if down_raw else Decimal('1.00')
+                        if down_payment <= 0:
+                            down_payment = Decimal('1.00')
+                        bundle_name = f'{structure_name_base} — {grade.name}'
+                        bundle, _ = FeeStructureBundle.objects.update_or_create(
+                            academic_year=year,
+                            division=division,
+                            grade=grade,
+                            structure_type=structure_type,
+                            defaults={
+                                'name':               bundle_name,
+                                'entrance_exam_fee':  entrance,
+                                'registration_fee':   registration,
+                                'gross_tuition_fee':  gross,
+                                'group_discount_pct': discount_pct,
+                                'min_down_payment':   down_payment,
+                                'installments_count': 3,
+                                'due_date':           due_date,
+                                'created_by':         request.user,
+                            },
+                        )
+                        bundle.generate_installments()
+                        created_count += 1
+                    except Exception as exc:
+                        messages.error(request, f'Error saving {grade.name}: {exc}')
+
+                if created_count:
+                    messages.success(
+                        request,
+                        f'{created_count} fee structure bundle(s) created for '
+                        f'{division.name} — {year}.'
+                    )
+                    return redirect('fees:bundle_list')
                 else:
-                    items_skipped += 1
+                    messages.error(request, 'No grades saved. Enter Gross Tuition for at least one grade.')
 
-            verb = 'created' if new_s else 'already existed'
-            messages.success(
-                request,
-                f"Structure '{container}' {verb}. "
-                f"{items_created} fee-type item(s) added"
-                + (f", {items_skipped} skipped (already existed)." if items_skipped else '.')
-            )
-            return redirect('fees:fee_structure_list')
-
-    all_fee_types = FeeType.objects.all()
-    grades_by_division = _grades_by_division()
-
+    years = AcademicYear.objects.all()
     return render(request, 'fees/fee_structure_form.html', {
-        'form':            form,
-        'instance':        None,
-        'title':           'Add Fee Structure',
-        'all_fee_types':   all_fee_types,
-        'grades_by_division': grades_by_division,
+        'form':        None,
+        'instance':    None,
+        'title':       'Add Fee Structure',
+        'years':       years,
+        'divisions':   divisions,
+        'grades_json': json.dumps(grades_by_div),
+        'post_data':   request.POST if request.method == 'POST' else {},
     })
 
 

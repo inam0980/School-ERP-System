@@ -63,10 +63,19 @@ class FeeType(models.Model):
     name           = models.CharField(max_length=100)
     category       = models.CharField(max_length=20, choices=FEE_CATEGORIES, default=OTHER)
     is_taxable     = models.BooleanField(default=False, help_text="Subject to VAT (ZATCA)")
+    is_mandatory   = models.BooleanField(
+        default=False,
+        help_text="Auto-selected in every fee structure (cannot be unchecked)"
+    )
     description    = models.TextField(blank=True)
     default_amount = models.DecimalField(
         max_digits=10, decimal_places=2, null=True, blank=True,
         help_text="Default price pre-filled when adding this fee to a structure (not used for Tuition)."
+    )
+    fixed_down_payment = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name='Fixed Down Payment (SAR)',
+        help_text="If set, this amount is always required as the minimum down payment for this fee type."
     )
 
     VAT_RATE = Decimal('0.15')  # Saudi ZATCA standard rate for non-Saudi students
@@ -155,8 +164,23 @@ class FeeStructureBundle(models.Model):
     in a single form, plus installment / down-payment configuration.
     When assigned it creates individual FeeStructure + StudentFee records.
     """
+    TYPE_REGULAR = 'regular'
+    TYPE_NEW     = 'new'
+    STRUCTURE_TYPE_CHOICES = [
+        (TYPE_REGULAR, 'Regular'),
+        (TYPE_NEW,     'New'),
+    ]
+
     name              = models.CharField(max_length=200,
                                          verbose_name='Structure Name')
+    code              = models.CharField(
+        max_length=50, blank=True,
+        verbose_name='Structure Code',
+        help_text='Short code for this structure, e.g. AM-REG-2526')
+    structure_type    = models.CharField(
+        max_length=20, choices=STRUCTURE_TYPE_CHOICES, default=TYPE_REGULAR,
+        verbose_name='Structure Type',
+        help_text='"Regular" for returning students, "New" for new admissions')
     academic_year     = models.ForeignKey(AcademicYear, on_delete=models.PROTECT,
                                           related_name='fee_bundles')
     division          = models.ForeignKey(Division, on_delete=models.PROTECT,
@@ -204,8 +228,8 @@ class FeeStructureBundle(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ['academic_year', 'division', 'grade']
-        ordering = ['division__name', 'grade__order', 'grade__name']
+        unique_together = ['academic_year', 'division', 'grade', 'structure_type']
+        ordering = ['division__name', 'grade__order', 'grade__name', 'structure_type']
         verbose_name = 'Fee Structure Bundle'
 
     def __str__(self):

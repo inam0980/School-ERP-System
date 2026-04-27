@@ -51,6 +51,10 @@ class Student(models.Model):
         help_text="Saudi students: National ID (هوية وطنية)  ·  Residents: Iqama (إقامة)  ·  Others: Passport"
     )
     national_id  = models.CharField(max_length=50, blank=True, verbose_name="ID Number / رقم الهوية")
+    iqama_number = models.CharField(max_length=50, blank=True, verbose_name="Iqama Number / رقم الإقامة")
+    passport_number = models.CharField(max_length=50, blank=True, verbose_name="Passport Number / رقم جواز السفر")
+    religion     = models.CharField(max_length=100, blank=True, verbose_name="Religion / الديانة")
+    birth_place  = models.CharField(max_length=200, blank=True, verbose_name="Birth Place / مكان الميلاد")
 
     # ── Academic ──────────────────────────────────────────────────────
     division      = models.ForeignKey(Division,     on_delete=models.PROTECT, related_name='students', verbose_name="Division / القسم")
@@ -59,13 +63,52 @@ class Student(models.Model):
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT, related_name='students', verbose_name="Academic Year / السنة الدراسية")
     roll_number   = models.CharField(max_length=10, blank=True, verbose_name="Roll No. / رقم السجل")
 
-    # ── Guardian ──────────────────────────────────────────────────────
-    father_name        = models.CharField(max_length=200, blank=True, verbose_name="Father's Name / اسم الأب")
-    arabic_father      = models.CharField(max_length=200, blank=True, verbose_name="اسم الأب (عربي)")
-    father_national_id = models.CharField(max_length=50, blank=True, verbose_name="Father's ID / هوية الأب")
-    mother_name     = models.CharField(max_length=200, blank=True, verbose_name="Mother's Name / اسم الأم")
-    arabic_mother   = models.CharField(max_length=200, blank=True, verbose_name="اسم الأم (عربي)")
-    guardian_phone  = models.CharField(max_length=20,  blank=True, verbose_name="Guardian Phone / هاتف ولي الأمر")
+    # ── Father Information ────────────────────────────────────────────
+    YES = 'YES'
+    NO  = 'NO'
+    YES_NO_CHOICES = [(YES, 'Yes'), (NO, 'No')]
+
+    father_name              = models.CharField(max_length=200, blank=True, verbose_name="Father Full Name (Latin) / الاسم بالكامل")
+    arabic_father            = models.CharField(max_length=200, blank=True, verbose_name="Father Full Name (Arabic) / الاسم بالكامل")
+    father_nationality       = models.CharField(max_length=100, blank=True, verbose_name="Father Nationality / الجنسية")
+    father_family_book_no    = models.CharField(max_length=50, blank=True, verbose_name="Father Family Book No. (Saudi) / رقم دفتر العائلة")
+    father_national_id       = models.CharField(max_length=50, blank=True, verbose_name="Father ID/Iqama Number / رقم الإقامة للجنسية الأجنبية")
+    father_occupation        = models.CharField(max_length=200, blank=True, verbose_name="Father Occupation / المهنة")
+    father_employer          = models.CharField(max_length=200, blank=True, verbose_name="Father Company Name / اسم الشركة")
+    father_business_phone    = models.CharField(max_length=20, blank=True, verbose_name="Father Business Phone / رقم هاتف العمل")
+    father_mobile            = models.CharField(max_length=20, blank=True, verbose_name="Father Mobile / رقم الجوال")
+    father_work_address      = models.CharField(max_length=300, blank=True, verbose_name="Father Work Address / عنوان العمل")
+    father_email             = models.EmailField(blank=True, verbose_name="Father Email / البريد الإلكتروني")
+    father_home_phone        = models.CharField(max_length=20, blank=True, verbose_name="Father Home Phone / رقم هاتف المنزل")
+    father_home_address      = models.TextField(blank=True, verbose_name="Father Home Address / عنوان المنزل")
+    father_employed_at_school = models.CharField(
+        max_length=3, choices=YES_NO_CHOICES, blank=True,
+        verbose_name="Father Employed at Al Kawthar? / الوالد عضو في هيئة التدريس؟"
+    )
+    father_school_job        = models.CharField(max_length=200, blank=True, verbose_name="Father School Job / تحديد الوظيفة")
+
+    # ── Mother Information ────────────────────────────────────────────
+    mother_name              = models.CharField(max_length=200, blank=True, verbose_name="Mother Full Name (Latin) / الاسم بالكامل")
+    arabic_mother            = models.CharField(max_length=200, blank=True, verbose_name="Mother Full Name (Arabic) / الاسم بالكامل")
+    mother_nationality       = models.CharField(max_length=100, blank=True, verbose_name="Mother Nationality / الجنسية")
+    mother_family_book_no    = models.CharField(max_length=50, blank=True, verbose_name="Mother Family Book No. (Saudi) / رقم دفتر العائلة")
+    mother_national_id       = models.CharField(max_length=50, blank=True, verbose_name="Mother ID/Iqama Number / رقم الإقامة للجنسية الأجنبية")
+    mother_occupation        = models.CharField(max_length=200, blank=True, verbose_name="Mother Occupation / المهنة")
+    mother_employer          = models.CharField(max_length=200, blank=True, verbose_name="Mother Company Name / اسم الشركة")
+    mother_business_phone    = models.CharField(max_length=20, blank=True, verbose_name="Mother Business Phone / رقم هاتف العمل")
+    mother_mobile            = models.CharField(max_length=20, blank=True, verbose_name="Mother Mobile / رقم الجوال")
+    mother_work_address      = models.CharField(max_length=300, blank=True, verbose_name="Mother Work Address / عنوان العمل")
+    mother_email             = models.EmailField(blank=True, verbose_name="Mother Email / البريد الإلكتروني")
+    mother_home_phone        = models.CharField(max_length=20, blank=True, verbose_name="Mother Home Phone / رقم هاتف المنزل")
+    mother_home_address      = models.TextField(blank=True, verbose_name="Mother Home Address / عنوان المنزل")
+    mother_employed_at_school = models.CharField(
+        max_length=3, choices=YES_NO_CHOICES, blank=True,
+        verbose_name="Mother Employed at Al Kawthar? / الأم عضو في هيئة التدريس؟"
+    )
+    mother_school_job        = models.CharField(max_length=200, blank=True, verbose_name="Mother School Job / تحديد الوظيفة")
+
+    # ── Legacy contact (kept for backward compat) ─────────────────────
+    guardian_phone  = models.CharField(max_length=20, blank=True, verbose_name="Guardian Phone / هاتف ولي الأمر")
     guardian_email  = models.EmailField(blank=True, verbose_name="Guardian Email / بريد ولي الأمر")
     guardian_phone2 = models.CharField(max_length=20, blank=True, verbose_name="Alt. Phone / هاتف بديل")
 
@@ -170,3 +213,40 @@ class StudentDocument(models.Model):
     @property
     def ext(self):
         return self.filename.rsplit('.', 1)[-1].lower() if '.' in self.filename else ''
+
+
+class Sibling(models.Model):
+    BROTHER = 'BROTHER'
+    SISTER  = 'SISTER'
+    RELATION_CHOICES = [
+        (BROTHER, 'Brother / أخ'),
+        (SISTER,  'Sister / أخت'),
+    ]
+
+    student           = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='siblings')
+    full_name         = models.CharField(max_length=200, verbose_name="Full Name / الاسم بالكامل")
+    relation          = models.CharField(max_length=10, choices=RELATION_CHOICES, verbose_name="Relation / العلاقة")
+    dob               = models.DateField(null=True, blank=True, verbose_name="Date of Birth / تاريخ الميلاد")
+    current_school    = models.CharField(max_length=200, blank=True, verbose_name="Current School / المدرسة الحالية")
+    educational_level = models.CharField(max_length=200, blank=True, verbose_name="Educational Level / المرحلة الدراسية")
+
+    class Meta:
+        ordering = ['relation', 'full_name']
+        verbose_name = 'Sibling / أخ/أخت'
+
+    def __str__(self):
+        return f"{self.student} — {self.get_relation_display()} — {self.full_name}"
+
+
+class AuthorizedPickup(models.Model):
+    student  = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='authorized_pickups')
+    full_name = models.CharField(max_length=200, verbose_name="Full Name / الاسم بالكامل")
+    relation  = models.CharField(max_length=100, verbose_name="Relation / العلاقة")
+    phone     = models.CharField(max_length=20, verbose_name="Phone / رقم الهاتف")
+
+    class Meta:
+        ordering = ['full_name']
+        verbose_name = 'Authorized Pickup Person / شخص مُصرَّح له باصطحاب الطالب'
+
+    def __str__(self):
+        return f"{self.student} — {self.full_name} ({self.relation})"

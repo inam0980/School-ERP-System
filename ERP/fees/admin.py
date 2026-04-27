@@ -20,8 +20,9 @@ class FeeStructureItemInline(admin.TabularInline):
 
 @admin.register(FeeType)
 class FeeTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'is_taxable')
-    list_filter  = ('category', 'is_taxable')
+    list_display  = ('name', 'category', 'is_taxable', 'is_mandatory', 'default_amount', 'fixed_down_payment')
+    list_filter   = ('category', 'is_taxable', 'is_mandatory')
+    list_editable = ('is_mandatory', 'fixed_down_payment')
 
 
 @admin.register(FeeStructure)
