@@ -59,7 +59,12 @@
         {% for b in bundles %}
         <tr class="hover:bg-slate-50 transition">
             <td class="px-4 py-3">
-                <a href="{% url 'fees:bundle_detail' b.pk %}" class="font-semibold text-primary hover:underline">{{ b.name }}</a>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                        {{ b.get_structure_type_display }}
+                    </span>
+                    <a href="{% url 'fees:bundle_detail' b.pk %}" class="font-semibold text-primary hover:underline">{{ b.name }}</a>
+                </div>
                 {% if b.group_discount_pct > 0 %}
                 <span class="ml-1 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">{{ b.group_discount_pct }}% off</span>
                 {% endif %}

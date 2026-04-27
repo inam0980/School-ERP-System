@@ -10,7 +10,7 @@
     </a>
     <div>
         <h1 class="text-2xl font-bold text-primary">Bulk Assign Fees</h1>
-        <p class="text-sm text-slate-500 mt-0.5">Select a fee structure → preview all fee types → apply bulk discount → assign to students</p>
+        <p class="text-sm text-slate-500 mt-0.5">Select a fee structure → preview all fee types → assign to students</p>
     </div>
 </div>
 
@@ -99,55 +99,55 @@
         </select>
     </div>
 
-    <!-- Step 3: Fee Structure (filtered by year + division) -->
+    <!-- Step 3: Grade (filtered by division) -->
     <div>
         <label class="block text-sm font-semibold text-slate-700 mb-1.5">
             <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-xs font-bold mr-1.5">3</span>
+            Grade <span class="text-red-500">*</span>
+        </label>
+        <select id="id_grade"
+                class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+            <option value="">— Select division first —</option>
+        </select>
+    </div>
+
+    <!-- Step 4: Section (filtered by grade) -->
+    <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-xs font-bold mr-1.5">4</span>
+            Section <span class="text-slate-400 text-xs font-normal">(optional — leave blank for all sections)</span>
+        </label>
+        <select name="section" id="id_section_filter"
+                class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+            <option value="">— All sections —</option>
+        </select>
+    </div>
+
+    <!-- Step 5: Fee Structure (filtered by year + division + grade) -->
+    <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-xs font-bold mr-1.5">5</span>
             Fee Structure <span class="text-red-500">*</span>
         </label>
         <select name="fee_structure" id="id_fee_structure"
                 class="border {% if form.fee_structure.errors %}border-red-400{% else %}border-slate-300{% endif %}
                        rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
-            <option value="">— Select division first —</option>
+            <option value="">— Select grade first —</option>
             {% for s in form.fields.fee_structure.queryset %}
             <option value="{{ s.pk }}"
                     data-division="{{ s.grade.division_id }}"
                     data-year="{{ s.academic_year_id }}"
+                    data-grade="{{ s.grade_id }}"
                     style="display:none"
                     {% if form.fee_structure.value|stringformat:'s' == s.pk|stringformat:'s' %}selected{% endif %}>
-                {% if s.name %}{{ s.grade.name }} — {{ s.name }}{% else %}{{ s.grade.name }} — Fee Structure{% endif %}
+                {% if s.name %}{{ s.name }}{% else %}{{ s.grade.name }} — Fee Structure{% endif %}
             </option>
             {% endfor %}
         </select>
         {% if form.fee_structure.errors %}<p class="mt-1 text-xs text-red-600">{{ form.fee_structure.errors.0 }}</p>{% endif %}
     </div>
 
-    <!-- Grade info — auto-filled when structure is selected -->
-    <div id="grade-info-box" class="hidden rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-        <p class="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">Grade (from selected structure)</p>
-        <p id="grade-info-name" class="text-sm font-bold text-emerald-800"></p>
-        <p id="grade-info-sections" class="text-xs text-emerald-600 mt-0.5"></p>
-    </div>
-    <div id="grade-info-placeholder" class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-400 italic">
-        ℹ️ Complete steps 1–3 above — grade and section info will appear here.
-    </div>
-
-    <!-- Discount % -->
-    <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Bulk Discount %</label>
-        <div class="relative">
-            <input type="number" name="discount_pct" id="id_discount_pct"
-                   min="0" max="100" step="0.01"
-                   value="{{ form.discount_pct.value|default:'0' }}"
-                   placeholder="0"
-                   class="border {% if form.discount_pct.errors %}border-red-400{% else %}border-slate-300{% endif %}
-                          rounded-lg pl-3 pr-10 py-2.5 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none
-                          [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
-            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium pointer-events-none">%</span>
-        </div>
-        {% if form.discount_pct.errors %}<p class="mt-1 text-xs text-red-600">{{ form.discount_pct.errors.0 }}</p>{% endif %}
-        <p class="mt-1 text-xs text-slate-400">Applied to every fee type in the structure. Preview updates live.</p>
-    </div>
+    <input type="hidden" name="discount_pct" value="0">
 
     <!-- Due Date -->
     <div>
@@ -166,7 +166,7 @@
     {% endif %}
 
     <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
-        <strong>Note:</strong> Assigns one fee record per fee type per active student in the structure's grade.
+        <strong>Note:</strong> Assigns one fee record per fee type per active student in the selected grade (or section if chosen).
         Already-existing records are safely skipped.
     </div>
 
@@ -199,7 +199,6 @@
                     <tr>
                         <th class="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Fee Type</th>
                         <th class="px-4 py-2.5 text-right text-xs font-semibold text-slate-500">Amount (SAR)</th>
-                        <th class="px-4 py-2.5 text-right text-xs font-semibold text-green-700">After Discount</th>
                     </tr>
                 </thead>
                 <tbody id="items-tbody" class="divide-y divide-slate-50">
@@ -208,8 +207,7 @@
                 <tfoot>
                     <tr class="bg-slate-50">
                         <td class="px-4 py-3 text-xs font-semibold text-slate-600">Total</td>
-                        <td id="total-base" class="px-4 py-3 text-right font-semibold text-slate-700"></td>
-                        <td id="total-after" class="px-4 py-3 text-right font-semibold text-primary"></td>
+                        <td id="total-base" class="px-4 py-3 text-right font-semibold text-primary"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -227,30 +225,25 @@
     let loadedItems = [];
 
     const structureSel = document.getElementById('id_fee_structure');
-    const discountInp  = document.getElementById('id_discount_pct');
     const emptyEl      = document.getElementById('items-empty');
     const loadingEl    = document.getElementById('items-loading');
     const panelEl      = document.getElementById('items-panel');
     const nameEl       = document.getElementById('items-structure-name');
     const tbody        = document.getElementById('items-tbody');
     const totalBase    = document.getElementById('total-base');
-    const totalAfter   = document.getElementById('total-after');
 
     function fmtSAR(v) {
         return parseFloat(v).toLocaleString('en-SA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function renderItems() {
-        const pct = parseFloat(discountInp.value) || 0;
+        const pct = 0;
         tbody.innerHTML = '';
-        let sumBase = 0, sumAfter = 0;
+        let sumBase = 0;
 
         loadedItems.forEach(function(item) {
             const base  = parseFloat(item.amount);
-            const disc  = base * pct / 100;
-            const after = base - disc;
-            sumBase  += base;
-            sumAfter += after;
+            sumBase += base;
 
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-slate-50/50';
@@ -259,16 +252,11 @@
                     '<span class="font-medium text-slate-700">' + item.fee_type + '</span>' +
                     (item.is_taxable ? '<span class="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">+15% for expats</span>' : '') +
                 '</td>' +
-                '<td class="px-4 py-2.5 text-right text-slate-600">' + fmtSAR(base) + '</td>' +
-                '<td class="px-4 py-2.5 text-right font-semibold text-primary">' +
-                    fmtSAR(after) +
-                    (pct > 0 ? '<span class="block text-xs text-green-600 font-normal">-' + fmtSAR(disc) + ' disc.</span>' : '') +
-                '</td>';
+                '<td class="px-4 py-2.5 text-right font-semibold text-primary">' + fmtSAR(base) + '</td>';
             tbody.appendChild(tr);
         });
 
-        totalBase.textContent  = 'SAR ' + fmtSAR(sumBase);
-        totalAfter.textContent = 'SAR ' + fmtSAR(sumAfter);
+        totalBase.textContent = 'SAR ' + fmtSAR(sumBase);
     }
 
     function loadStructure() {
@@ -302,101 +290,125 @@
 
     // ── Cascade data ─────────────────────────────────────────
     const STRUCT_MAP   = {{ structure_meta_map_json|safe }};
+    const ALL_GRADES   = {{ grades_json|safe }};
+    const ALL_SECTIONS = {{ sections_json|safe }};
+
     const yearSel      = document.getElementById('id_year_filter');
     const divisionSel  = document.getElementById('id_division');
-    const gradeInfoBox   = document.getElementById('grade-info-box');
-    const gradeInfoPH    = document.getElementById('grade-info-placeholder');
-    const gradeInfoName  = document.getElementById('grade-info-name');
-    const gradeInfoSects = document.getElementById('grade-info-sections');
+    const gradeSel     = document.getElementById('id_grade');
+    const sectionSel   = document.getElementById('id_section_filter');
 
     function resetPanel() {
         emptyEl.classList.remove('hidden');
         loadingEl.classList.add('hidden');
         panelEl.classList.add('hidden');
         loadedItems = [];
-        gradeInfoBox.classList.add('hidden');
-        gradeInfoPH.classList.remove('hidden');
     }
 
-    // Step 1 → 2: Year filters Division options
+    // Step 1 → 2: Year chosen → show all divisions
     function filterDivisions() {
         const yrPk = yearSel.value;
-        const divSet = new Set();
-        Object.values(STRUCT_MAP).forEach(function(m) {
-            if (!yrPk || m.year_pk === yrPk) divSet.add(m.division_pk);
-        });
         const divOpts = divisionSel.querySelectorAll('option[value]:not([value=""])');
-        let any = false;
         divOpts.forEach(function(opt) {
-            const show = divSet.has(opt.value);
-            opt.style.display = show ? '' : 'none';
-            if (!show && opt.selected) { opt.selected = false; divisionSel.value = ''; }
-            if (show) any = true;
+            opt.style.display = yrPk ? '' : 'none';
+            if (!yrPk && opt.selected) { opt.selected = false; divisionSel.value = ''; }
         });
-        divisionSel.options[0].text = yrPk
-            ? (any ? '— Select a division —' : '— No divisions for this year —')
-            : '— Select year first —';
+        divisionSel.options[0].text = yrPk ? '— Select a division —' : '— Select year first —';
     }
 
-    // Step 2 → 3: Year + Division filters Fee Structures
-    function filterStructures() {
-        const yrPk  = yearSel.value;
+    // Step 2 → 3: Division chosen → populate grade dropdown
+    function filterGrades() {
         const divPk = divisionSel.value;
-        const opts  = structureSel.querySelectorAll('option[data-division]');
+        const matched = ALL_GRADES.filter(function(g) { return g.division_pk === divPk; });
+
+        // Rebuild grade options
+        gradeSel.innerHTML = '';
+        const ph = document.createElement('option');
+        ph.value = '';
+        ph.textContent = divPk
+            ? (matched.length ? '— Select a grade —' : '— No grades found —')
+            : '— Select division first —';
+        gradeSel.appendChild(ph);
+
+        matched.forEach(function(g) {
+            const opt = document.createElement('option');
+            opt.value = g.pk;
+            opt.textContent = g.name;
+            gradeSel.appendChild(opt);
+        });
+    }
+
+    // Step 3 → 4: Grade chosen → populate section dropdown
+    function filterSections() {
+        const gradePk = gradeSel.value;
+        const matched = ALL_SECTIONS.filter(function(s) { return s.grade_pk === gradePk; });
+
+        sectionSel.innerHTML = '';
+        const ph = document.createElement('option');
+        ph.value = '';
+        ph.textContent = gradePk
+            ? (matched.length ? '— All sections —' : '— No sections found —')
+            : '— Select grade first —';
+        sectionSel.appendChild(ph);
+
+        matched.forEach(function(s) {
+            const opt = document.createElement('option');
+            opt.value = s.pk;
+            opt.textContent = 'Section ' + s.name;
+            sectionSel.appendChild(opt);
+        });
+    }
+
+    // Step 2+3 → 5: Year + Division + Grade filters Fee Structures
+    function filterStructures() {
+        const yrPk    = yearSel.value;
+        const divPk   = divisionSel.value;
+        const gradePk = gradeSel.value;
+        const opts    = structureSel.querySelectorAll('option[data-division]');
         let any = false;
         opts.forEach(function(opt) {
-            const show = (!yrPk || opt.dataset.year === yrPk) &&
-                         (!divPk || opt.dataset.division === divPk);
+            const show = (!yrPk   || opt.dataset.year     === yrPk)   &&
+                         (!divPk  || opt.dataset.division === divPk)  &&
+                         (!gradePk|| opt.dataset.grade    === gradePk);
             opt.style.display = show ? '' : 'none';
             if (!show && opt.selected) { opt.selected = false; structureSel.value = ''; }
             if (show) any = true;
         });
-        structureSel.options[0].text = divPk
-            ? (any ? '— Select a fee structure —' : '— No structures found —')
-            : '— Select division first —';
-    }
-
-    // Step 3 result: grade + sections info banner
-    function updateGradeInfo(pk) {
-        if (!pk || !STRUCT_MAP[pk]) {
-            gradeInfoBox.classList.add('hidden');
-            gradeInfoPH.classList.remove('hidden');
-            return;
-        }
-        const data = STRUCT_MAP[pk];
-        gradeInfoName.textContent = data.grade;
-        if (data.sections.length === 0) {
-            gradeInfoSects.textContent = 'No sections configured for this grade.';
-        } else {
-            const names = data.sections.map(function(s) { return 'Section ' + s.name; }).join(', ');
-            gradeInfoSects.innerHTML =
-                '\u2705 All ' + data.sections.length + ' section' +
-                (data.sections.length !== 1 ? 's' : '') +
-                ': <strong>' + names + '</strong>';
-        }
-        gradeInfoBox.classList.remove('hidden');
-        gradeInfoPH.classList.add('hidden');
+        structureSel.options[0].text = gradePk
+            ? (any ? '— Select a fee structure —' : '— No structures found for this grade —')
+            : '— Select grade first —';
     }
 
     // Wire events
     yearSel.addEventListener('change', function() {
         filterDivisions();
         divisionSel.value = '';
+        filterGrades();
+        gradeSel.value = '';
+        filterSections();
+        sectionSel.value = '';
         filterStructures();
         structureSel.value = '';
         resetPanel();
     });
     divisionSel.addEventListener('change', function() {
+        filterGrades();
+        gradeSel.value = '';
+        filterSections();
+        sectionSel.value = '';
+        filterStructures();
+        structureSel.value = '';
+        resetPanel();
+    });
+    gradeSel.addEventListener('change', function() {
+        filterSections();
+        sectionSel.value = '';
         filterStructures();
         structureSel.value = '';
         resetPanel();
     });
     structureSel.addEventListener('change', function() {
-        updateGradeInfo(this.value);
         loadStructure();
-    });
-    discountInp.addEventListener('input', function() {
-        if (loadedItems.length) renderItems();
     });
 
     // On page load: restore cascade if structure already selected (POST re-render)
@@ -405,11 +417,15 @@
         yearSel.value = m.year_pk;
         filterDivisions();
         divisionSel.value = m.division_pk;
+        filterGrades();
+        gradeSel.value = m.grade_pk;
+        filterSections();
         filterStructures();
-        updateGradeInfo(structureSel.value);
         loadStructure();
     } else {
         filterDivisions();
+        filterGrades();
+        filterSections();
         filterStructures();
     }
 })();
@@ -429,6 +445,7 @@
         <table class="w-full text-sm">
             <thead class="bg-slate-50 border-b border-slate-200">
                 <tr>
+                    <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Structure</th>
                     <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Academic Year</th>
                     <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Division</th>
                     <th class="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Grade</th>
@@ -440,6 +457,9 @@
             <tbody class="divide-y divide-slate-100">
                 {% for row in past_assignments %}
                 <tr class="hover:bg-slate-50 transition">
+                    <td class="px-5 py-3 font-medium text-slate-700">
+                        {{ row.fee_structure__structure__name|default:"Fee Structure" }}
+                    </td>
                     <td class="px-5 py-3 font-medium text-slate-800">
                         {{ row.fee_structure__structure__academic_year__name|default:"—" }}
                     </td>
@@ -461,7 +481,15 @@
                         <a href="{% url 'fees:collection' %}?div={{ row.fee_structure__structure__grade__division__name|urlencode }}&grade={{ row.fee_structure__structure__pk }}"
                            class="text-xs text-primary hover:underline font-medium mr-3">Browse Students →</a>
                         <a href="{% url 'fees:fee_structure_list' %}"
-                           class="text-xs text-slate-500 hover:underline">View Structure</a>
+                           class="text-xs text-slate-500 hover:underline mr-3">View Structure</a>
+                        <form method="post" class="inline"
+                              onsubmit="return confirm('De-assign ALL fee records for this structure? This includes any already-paid records.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="deassign_structure_id" value="{{ row.fee_structure__structure__pk }}">
+                            <button type="submit" class="text-xs text-red-600 hover:underline font-medium">
+                                De-assign
+                            </button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
