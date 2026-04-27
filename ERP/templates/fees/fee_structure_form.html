@@ -86,7 +86,7 @@
                 {% if form.grade.errors %}<p class="text-red-500 text-xs mt-1">{{ form.grade.errors.0 }}</p>{% endif %}
             </div>
 
-            <div>
+            <div class="mb-4">
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Frequency <span class="text-red-500">*</span></label>
                 <select name="frequency"
                         class="border {% if form.frequency.errors %}border-red-400{% else %}border-slate-300{% endif %}
@@ -96,6 +96,22 @@
                     {% endfor %}
                 </select>
                 {% if form.frequency.errors %}<p class="text-red-500 text-xs mt-1">{{ form.frequency.errors.0 }}</p>{% endif %}
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Minimum Down Payment (SAR) <span class="text-slate-400 font-normal">(optional)</span></label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
+                    <input type="number" name="min_down_payment" step="0.01" min="0"
+                           value="{{ form.min_down_payment.value|default:'' }}"
+                           placeholder="e.g. 500.00"
+                           class="border {% if form.min_down_payment.errors %}border-red-400{% else %}border-slate-300{% endif %}
+                                  rounded-lg pl-10 pr-3 py-2.5 text-sm w-full
+                                  focus:ring-2 focus:ring-primary/40 focus:outline-none
+                                  [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                </div>
+                <p class="mt-1 text-xs text-slate-400">Required first payment when collecting fees under this structure.</p>
+                {% if form.min_down_payment.errors %}<p class="text-red-500 text-xs mt-1">{{ form.min_down_payment.errors.0 }}</p>{% endif %}
             </div>
         </div>
 
@@ -112,34 +128,69 @@
     <!-- ── Right column: fee type amounts ─────────────────────── -->
     <div class="space-y-4">
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <h2 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">
-                Fee Type Amounts
-                <span class="ml-1 text-slate-400 font-normal normal-case">(leave blank to remove)</span>
-            </h2>
-            <p class="text-xs text-slate-400 mb-4">Update amounts. Leave a field blank to remove that fee type from this structure.</p>
-            <div class="divide-y divide-slate-100">
-            {% for row in fee_types_with_amounts %}
-            <div class="flex items-center gap-4 py-2.5">
-                <div class="flex-1 min-w-0">
-                    <span class="text-sm font-medium text-slate-700">{{ row.ft.name }}</span>
-                    {% if row.ft.is_taxable %}
-                    <span class="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">+15% expat VAT</span>
-                    {% else %}
-                    <span class="ml-2 text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">No VAT</span>
-                    {% endif %}
-                    <span class="block text-xs text-slate-400">{{ row.ft.get_category_display }}</span>
+            <h2 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-4">Fee Type Amounts</h2>
+
+            <!-- Mandatory fee types (always included) -->
+            <div class="mb-5">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        Mandatory (auto-selected)
+                    </span>
+                    <span class="text-xs text-slate-400">Always included</span>
                 </div>
-                <div class="relative w-36 shrink-0">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
-                    <input type="number" name="amount_{{ row.ft.pk }}" step="0.01" min="0"
-                           value="{{ row.amount }}"
-                           placeholder="—"
-                           class="ft-amount border border-slate-200 rounded-lg pl-10 pr-3 py-1.5 text-sm w-full
-                                  focus:ring-2 focus:ring-primary/40 focus:outline-none focus:border-primary
-                                  [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                <div class="divide-y divide-slate-100 rounded-lg border border-primary/20 overflow-hidden">
+                {% for row in fee_types_with_amounts %}{% if row.ft.is_mandatory %}
+                <div class="flex items-center gap-4 px-3 py-2.5 bg-primary/5">
+                    <div class="flex-1 min-w-0">
+                        <span class="text-sm font-medium text-slate-700">{{ row.ft.name }}</span>
+                        {% if row.ft.is_taxable %}<span class="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">+15% expat VAT</span>{% else %}<span class="ml-2 text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">No VAT</span>{% endif %}
+                        <span class="block text-xs text-slate-400">{{ row.ft.get_category_display }}</span>
+                    </div>
+                    <div class="relative w-36 shrink-0">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
+                        <input type="number" name="amount_{{ row.ft.pk }}" step="0.01" min="0"
+                               value="{{ row.amount }}" placeholder="0.00"
+                               class="ft-amount border border-primary/30 rounded-lg pl-10 pr-3 py-1.5 text-sm w-full
+                                      focus:ring-2 focus:ring-primary/40 focus:outline-none focus:border-primary
+                                      [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                    </div>
+                </div>
+                {% endif %}{% endfor %}
                 </div>
             </div>
-            {% endfor %}
+
+            <!-- Optional fee types (checkbox to include) -->
+            <div>
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">Optional</span>
+                    <span class="text-xs text-slate-400">Check to include in this structure</span>
+                </div>
+                <div class="divide-y divide-slate-100">
+                {% for row in fee_types_with_amounts %}{% if not row.ft.is_mandatory %}
+                <div class="flex items-center gap-3 py-2.5">
+                    <input type="checkbox" id="opt_edit_{{ row.ft.pk }}"
+                           class="ft-optional-chk w-4 h-4 accent-primary rounded shrink-0"
+                           {% if row.amount %}checked{% endif %}
+                           onchange="toggleOptional(this,'amt_edit_{{ row.ft.pk }}')">
+                    <div class="flex-1 min-w-0">
+                        <label for="opt_edit_{{ row.ft.pk }}" class="text-sm font-medium text-slate-700 cursor-pointer">{{ row.ft.name }}</label>
+                        {% if row.ft.is_taxable %}<span class="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">+15% expat VAT</span>{% else %}<span class="ml-2 text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">No VAT</span>{% endif %}
+                        <span class="block text-xs text-slate-400">{{ row.ft.get_category_display }}</span>
+                    </div>
+                    <div class="relative w-36 shrink-0">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
+                        <input type="number" id="amt_edit_{{ row.ft.pk }}" name="amount_{{ row.ft.pk }}"
+                               step="0.01" min="0" value="{{ row.amount }}" placeholder="—"
+                               {% if not row.amount %}disabled{% endif %}
+                               class="ft-amount border border-slate-200 rounded-lg pl-10 pr-3 py-1.5 text-sm w-full
+                                      focus:ring-2 focus:ring-primary/40 focus:outline-none focus:border-primary
+                                      disabled:bg-slate-50 disabled:text-slate-300 disabled:cursor-not-allowed
+                                      [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                    </div>
+                </div>
+                {% endif %}{% endfor %}
+                </div>
             </div>
         </div>
         <div id="summary-box" class="hidden bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm">
@@ -152,166 +203,213 @@
 
 {% else %}
 {# ══════════════════════════════════════════════════════════════ #}
-{#  CREATE MODE — bulk: multiple grades × multiple fee types      #}
+{#  CREATE MODE — bulk by division: all grades × 4-column table  #}
 {# ══════════════════════════════════════════════════════════════ #}
-
-{% if form.non_field_errors %}
-<div class="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
-    {% for err in form.non_field_errors %}{{ err }}{% endfor %}
-</div>
-{% endif %}
-
-<div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 flex gap-3 items-start text-sm text-blue-700">
-    <span class="text-xl mt-0.5">ℹ️</span>
-    <div>
-        Select a <strong>Division</strong>, then the <strong>Grade</strong> within that division. Set an <strong>amount per fee type</strong> (leave blank to skip).
-    </div>
-</div>
+<style>
+/* Compact table in fullscreen so all 20 columns fit without scrolling */
+#grade-table-wrapper.fs-active table {
+    font-size: 10px !important;
+    min-width: unset !important;
+    width: 100%;
+    table-layout: auto;
+}
+#grade-table-wrapper.fs-active th,
+#grade-table-wrapper.fs-active td {
+    padding: 3px 4px !important;
+    white-space: nowrap;
+}
+#grade-table-wrapper.fs-active input[type="number"] {
+    padding: 2px 3px !important;
+    font-size: 10px !important;
+    width: 70px !important;
+    min-width: unset !important;
+}
+#grade-table-wrapper.fs-active .overflow-x-auto {
+    overflow-x: visible;
+}
+</style>
 
 <form method="post" id="bulk-form">
 {% csrf_token %}
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-    <!-- ── Left column: structure details ─────────────────────── -->
-    <div class="space-y-4">
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <h2 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-4">Structure Details</h2>
-
-            <!-- Optional Name -->
-            <div class="mb-4">
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Label / Name <span class="text-slate-400">(optional)</span></label>
-                <input type="text" name="name" value="{{ form.name.value|default:'' }}"
-                       placeholder="e.g. Regular American 2026–27"
-                       class="border {% if form.name.errors %}border-red-400{% else %}border-slate-300{% endif %}
-                              rounded-lg px-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none">
-                {% if form.name.errors %}<p class="text-red-500 text-xs mt-1">{{ form.name.errors.0 }}</p>{% endif %}
-            </div>
-
-            <!-- Academic Year -->
-            <div class="mb-4">
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Academic Year <span class="text-red-500">*</span></label>
-                <select name="academic_year"
-                        class="border {% if form.academic_year.errors %}border-red-400{% else %}border-slate-300{% endif %}
-                               rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
-                    <option value="">— Select —</option>
-                    {% for val, label in form.fields.academic_year.choices %}
-                    {% if val %}
-                    <option value="{{ val }}" {% if form.academic_year.value|stringformat:'s' == val|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
-                    {% endif %}
-                    {% endfor %}
-                </select>
-                {% if form.academic_year.errors %}<p class="text-red-500 text-xs mt-1">{{ form.academic_year.errors.0 }}</p>{% endif %}
-            </div>
-
-            <!-- Division (filter only — not submitted) -->
-            <div class="mb-4">
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Division <span class="text-red-500">*</span></label>
-                <select id="edit-division-select"
-                        class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
-                    <option value="">— Select division —</option>
-                    {% for division, grades in grades_by_division %}
-                    <option value="{{ division.pk }}">{{ division }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <!-- Grade -->
-            <div class="mb-4">
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Grade <span class="text-red-500">*</span></label>
-                <select name="grade" id="edit-grade-select"
-                        class="border {% if form.grade.errors %}border-red-400{% else %}border-slate-300{% endif %}
-                               rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
-                    <option value="">— Select division first —</option>
-                    {% for division, grades in grades_by_division %}
-                    {% for grade in grades %}
-                    <option value="{{ grade.pk }}" data-division="{{ division.pk }}"
-                            style="display:none"
-                            {% if form.grade.value|stringformat:'s' == grade.pk|stringformat:'s' %}selected{% endif %}>{{ grade.name }}</option>
-                    {% endfor %}
-                    {% endfor %}
-                </select>
-                {% if form.grade.errors %}<p class="text-red-500 text-xs mt-1">{{ form.grade.errors.0 }}</p>{% endif %}
-            </div>
-
-            <!-- Frequency -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Frequency <span class="text-red-500">*</span></label>
-                <select name="frequency"
-                        class="border {% if form.frequency.errors %}border-red-400{% else %}border-slate-300{% endif %}
-                               rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
-                    {% for val, label in form.fields.frequency.choices %}
-                    <option value="{{ val }}" {% if form.frequency.value == val %}selected{% elif not form.frequency.value and val == 'ANNUAL' %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-                {% if form.frequency.errors %}<p class="text-red-500 text-xs mt-1">{{ form.frequency.errors.0 }}</p>{% endif %}
+<!-- ── Top bar: Structure details ───────────────────────────── -->
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-5">
+    <h2 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-4">Structure Details</h2>
+    <!-- Row 1: Name + Year + Division + Type -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Structure Name <span class="text-red-500">*</span></label>
+            <input type="text" name="structure_name" id="create-structure-name"
+                   value="{{ post_data.structure_name|default:'' }}"
+                   placeholder="e.g. American Division — 2025-26"
+                   class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none">
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Academic Year <span class="text-red-500">*</span></label>
+            <select name="academic_year" id="create-year"
+                    class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                <option value="">— Select —</option>
+                {% for yr in years %}
+                <option value="{{ yr.pk }}" {% if post_data.academic_year == yr.pk|stringformat:'s' %}selected{% endif %}>{{ yr }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Division <span class="text-red-500">*</span></label>
+            <select name="division" id="create-division"
+                    class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                <option value="">— Select division —</option>
+                {% for div in divisions %}
+                <option value="{{ div.pk }}" {% if post_data.division == div.pk|stringformat:'s' %}selected{% endif %}>{{ div }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <!-- Row 2: Structure Type + Group Discount + No. of Instalments + Due Date -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Structure Type <span class="text-red-500">*</span></label>
+            <select name="structure_type" id="create-structure-type"
+                    class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                <option value="regular" {% if post_data.structure_type == 'regular' or not post_data.structure_type %}selected{% endif %}>↻ Regular</option>
+                <option value="new" {% if post_data.structure_type == 'new' %}selected{% endif %}>✦ New</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+                Group Discount %
+                <span class="ml-1 text-slate-400 font-normal text-xs">(applies to all grades)</span>
+            </label>
+            <div class="relative">
+                <input type="number" name="global_group_discount" id="global-discount"
+                       value="{{ post_data.global_group_discount|default:'0' }}"
+                       step="0.01" min="0" max="100" placeholder="0.00"
+                       class="border border-slate-300 rounded-lg px-3 py-2.5 pr-8 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">%</span>
             </div>
         </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">No. of Instalments <span class="text-red-500">*</span></label>
+            <select name="installments_count" id="create-installments"
+                    class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                <option value="1" {% if post_data.installments_count == '1' %}selected{% endif %}>Full Payment (no instalments)</option>
+                <option value="2" {% if post_data.installments_count == '2' %}selected{% endif %}>2 Instalments</option>
+                <option value="3" {% if not post_data.installments_count or post_data.installments_count == '3' %}selected{% endif %}>3 Instalments</option>
+                <option value="4" {% if post_data.installments_count == '4' %}selected{% endif %}>4 Instalments</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Instalment Due Date <span class="text-red-500">*</span></label>
+            <input type="date" name="due_date" value="{{ post_data.due_date|default:'' }}"
+                   class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none">
+        </div>
+    </div>
+    <!-- Row 3: Code + Description -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Structure Code <span class="text-slate-400 font-normal">(optional)</span></label>
+            <input type="text" name="structure_code" id="create-structure-code"
+                   value="{{ post_data.structure_code|default:'' }}"
+                   placeholder="e.g. AM-REG-2526"
+                   class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none">
+        </div>
+        <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Description / Notes <span class="text-slate-400 font-normal">(optional)</span></label>
+            <input type="text" name="description" id="create-description"
+                   value="{{ post_data.description|default:'' }}"
+                   placeholder="e.g. Fee structure for returning American division students"
+                   class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none">
+        </div>
+    </div>
+</div>
 
-        <!-- Submit -->
+<!-- ── Prompt when no division chosen ─────────────────────────── -->
+<div id="no-division-msg" class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 flex gap-3 items-center text-sm text-blue-700">
+    <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z"/></svg>
+    Select a <strong class="mx-1">Division</strong> above to load all grades and enter fee amounts.
+</div>
+
+<!-- ── Grade × Amounts table ──────────────────────────────────── -->
+<div id="grade-table-wrapper" class="hidden mb-5">
+
+    <!-- ── Toolbar ──────────────────────────────────────────── -->
+    <div class="flex justify-end mb-2">
+        <button type="button" id="fullscreen-btn" title="Expand to full screen"
+                onclick="toggleFullscreen()"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition">
+            <!-- expand icon -->
+            <svg id="fs-icon-expand" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5M20 8V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5M20 16v4m0 0h-4m4 0l-5-5"/>
+            </svg>
+            <!-- collapse icon (hidden initially) -->
+            <svg id="fs-icon-collapse" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 9L4 4m0 0h4M4 4v4M15 9l5-5m0 0h-4m4 0v4M9 15l-5 5m0 0h4m-4 0v-4M15 15l5 5m0 0h-4m4 0v-4"/>
+            </svg>
+            <span id="fs-btn-label">Full Screen</span>
+        </button>
+    </div>
+
+    <div class="overflow-x-auto rounded-xl shadow-sm border border-slate-200">
+        <table class="w-full text-xs border-collapse" style="min-width:1320px">
+            <thead>
+                <!-- Group header row -->
+                <tr>
+                    <th rowspan="2" class="border border-slate-200 bg-slate-700 text-white px-3 py-2.5 text-left font-semibold whitespace-nowrap w-32">Grade Level</th>
+                    <th colspan="5" class="border border-slate-200 bg-slate-100 text-slate-700 px-3 py-2 text-center font-bold tracking-wide">Amount Before VAT</th>
+                    <th colspan="7" class="border border-slate-200 bg-green-700 text-white px-3 py-2 text-center font-bold tracking-wide">Amounts Without VAT — Saudi Students</th>
+                    <th colspan="7" class="border border-slate-200 bg-amber-600 text-white px-3 py-2 text-center font-bold tracking-wide">Amounts With VAT (+15%) — Non-Saudi Students</th>
+                </tr>
+                <!-- Sub-header row -->
+                <tr>
+                    <!-- Col 2 sub-headers -->
+                    <th class="border border-slate-200 bg-slate-50 text-slate-600 px-2 py-2 whitespace-nowrap font-semibold">Entrance Exam Fee</th>
+                    <th class="border border-slate-200 bg-slate-50 text-slate-600 px-2 py-2 whitespace-nowrap font-semibold">Registration Fee</th>
+                    <th class="border border-slate-200 bg-slate-50 text-slate-600 px-2 py-2 whitespace-nowrap font-semibold">Gross Total Tuition</th>
+                    <th class="border border-slate-200 bg-slate-50 text-slate-600 px-2 py-2 whitespace-nowrap font-semibold">Group Discount %</th>
+                    <th class="border border-slate-200 bg-slate-50 text-slate-600 px-2 py-2 whitespace-nowrap font-semibold">Reservation (Down Pmt)</th>
+                    <!-- Col 3 (Saudi) sub-headers -->
+                    <th class="border border-slate-200 bg-green-50 text-green-800 px-2 py-2 whitespace-nowrap">Entrance Exam Fee</th>
+                    <th class="border border-slate-200 bg-green-50 text-green-800 px-2 py-2 whitespace-nowrap">Registration Fee</th>
+                    <th class="border border-slate-200 bg-green-50 text-green-800 px-2 py-2 whitespace-nowrap">Reservation (Down Pmt)</th>
+                    <th class="border border-slate-200 bg-green-50 text-green-800 px-2 py-2 whitespace-nowrap">1st Instalment</th>
+                    <th class="border border-slate-200 bg-green-50 text-green-800 px-2 py-2 whitespace-nowrap">2nd Instalment</th>
+                    <th class="border border-slate-200 bg-green-50 text-green-800 px-2 py-2 whitespace-nowrap">3rd Instalment</th>
+                    <th class="border border-slate-200 bg-green-50 text-green-800 px-2 py-2 whitespace-nowrap">Net Tuition</th>
+                    <!-- Col 4 (Non-Saudi) sub-headers -->
+                    <th class="border border-slate-200 bg-amber-50 text-amber-800 px-2 py-2 whitespace-nowrap">Entrance Exam Fee</th>
+                    <th class="border border-slate-200 bg-amber-50 text-amber-800 px-2 py-2 whitespace-nowrap">Registration Fee</th>
+                    <th class="border border-slate-200 bg-amber-50 text-amber-800 px-2 py-2 whitespace-nowrap">Reservation (Down Pmt)</th>
+                    <th class="border border-slate-200 bg-amber-50 text-amber-800 px-2 py-2 whitespace-nowrap">1st Instalment</th>
+                    <th class="border border-slate-200 bg-amber-50 text-amber-800 px-2 py-2 whitespace-nowrap">2nd Instalment</th>
+                    <th class="border border-slate-200 bg-amber-50 text-amber-800 px-2 py-2 whitespace-nowrap">3rd Instalment</th>
+                    <th class="border border-slate-200 bg-amber-50 text-amber-800 px-2 py-2 whitespace-nowrap">Net Tuition</th>
+                </tr>
+            </thead>
+            <tbody id="grade-tbody"></tbody>
+        </table>
+    </div>
+
+    <div class="flex gap-3 mt-4">
         <button type="submit"
-                class="w-full py-3 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-light transition shadow">
-            Create Fee Structure
+                class="px-8 py-3 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-light transition shadow">
+            Create Fee Structures
         </button>
         <a href="{% url 'fees:fee_structure_list' %}"
-           class="block w-full py-3 text-center border border-slate-300 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition">
+           class="px-6 py-3 border border-slate-300 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition">
             Cancel
         </a>
     </div>
+</div>
 
-    <!-- ── Right column: fee type amounts ─────────────────────── -->
-    <div class="space-y-4">
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <h2 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-1">
-                Fee Type Amounts
-                <span class="ml-1 text-slate-400 font-normal normal-case">(leave blank to skip)</span>
-            </h2>
-            <p class="text-xs text-slate-400 mb-4">
-                Enter the SAR amount for each fee type to include in this structure.
-            </p>
-            <div class="divide-y divide-slate-100">
-            {% for ft in all_fee_types %}
-            <div class="flex items-center gap-4 py-2.5">
-                <div class="flex-1 min-w-0">
-                    <span class="text-sm font-medium text-slate-700">{{ ft.name }}</span>
-                    {% if ft.is_taxable %}
-                    <span class="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">+15% expat VAT</span>
-                    {% else %}
-                    <span class="ml-2 text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">No VAT</span>
-                    {% endif %}
-                    <span class="block text-xs text-slate-400">{{ ft.get_category_display }}</span>
-                </div>
-                <div class="relative w-36 shrink-0">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
-                    <input type="number" name="amount_{{ ft.pk }}" step="0.01" min="0"
-                           value="{{ ft.default_amount|default:'' }}"
-                           placeholder="—"
-                           class="ft-amount border border-slate-200 rounded-lg pl-10 pr-3 py-1.5 text-sm w-full
-                                  focus:ring-2 focus:ring-primary/40 focus:outline-none focus:border-primary
-                                  [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
-                </div>
-            </div>
-            {% endfor %}
-            </div>
-        </div>
-
-        <!-- Live summary -->
-        <div id="summary-box" class="hidden bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm">
-            <strong>Ready:</strong>
-            <strong class="text-primary"><span id="summary-fts">0</span> fee-type item(s)</strong> will be added to this structure.
-        </div>
-    </div>
-
-</div><!-- /grid -->
 </form>
 
 <script>
 (function () {
-    // ── Division → Grade cascade ─────────────────────────────
+    // ── EDIT mode: Division → Grade cascade ──────────────────
     function setupCascade(divSelId, gradeSelId) {
         const divSel   = document.getElementById(divSelId);
         const gradeSel = document.getElementById(gradeSelId);
         if (!divSel || !gradeSel) return;
-
         function filterGrades() {
             const chosen = divSel.value;
             const opts   = gradeSel.querySelectorAll('option[data-division]');
@@ -320,38 +418,191 @@
                 const show = !chosen || opt.dataset.division === chosen;
                 opt.style.display = show ? '' : 'none';
                 if (show) hasVisible = true;
-                if (!show && opt.selected) {
-                    opt.selected = false;
-                    gradeSel.value = '';
-                }
+                if (!show && opt.selected) { opt.selected = false; gradeSel.value = ''; }
             });
-            // Update placeholder
             gradeSel.options[0].text = hasVisible ? '— Select grade —' : '— Select division first —';
         }
-
-        // On load: if a grade is already selected, reveal its division
         const preselected = gradeSel.querySelector('option[data-division][selected]');
-        if (preselected) {
-            divSel.value = preselected.dataset.division;
-        }
+        if (preselected) divSel.value = preselected.dataset.division;
         filterGrades();
         divSel.addEventListener('change', filterGrades);
     }
+    setupCascade('edit-division-select', 'edit-grade-select');
 
-    setupCascade('edit-division-select',   'edit-grade-select');
-    setupCascade('create-division-select', 'create-grade-select');
-
-    // ── Fee-type amount live counter ─────────────────────────
+    // ── Fee-type toggle (EDIT mode) ───────────────────────────
     function updateCounts() {
-        const fc = Array.from(document.querySelectorAll('.ft-amount')).filter(i => i.value && parseFloat(i.value) > 0).length;
+        const fc = Array.from(document.querySelectorAll('.ft-amount'))
+                        .filter(i => !i.disabled && i.value && parseFloat(i.value) > 0).length;
         const box = document.getElementById('summary-box');
         if (!box) return;
         document.getElementById('summary-fts').textContent = fc;
         box.classList.toggle('hidden', fc === 0);
     }
+    function toggleOptional(chk, inputId) {
+        const inp = document.getElementById(inputId);
+        if (!inp) return;
+        inp.disabled = !chk.checked;
+        if (!chk.checked) inp.value = '';
+        updateCounts();
+    }
     document.querySelectorAll('.ft-amount').forEach(inp => inp.addEventListener('input', updateCounts));
     updateCounts();
+
+    // ── CREATE mode: division table ───────────────────────────
+    const gradesData  = {{ grades_json|safe }};
+    const divSel      = document.getElementById('create-division');
+    const tableWrap   = document.getElementById('grade-table-wrapper');
+    const noMsg       = document.getElementById('no-division-msg');
+    const tbody       = document.getElementById('grade-tbody');
+    if (!divSel) return;
+
+    const INP = 'border border-slate-300 rounded px-1.5 py-1 text-xs w-full focus:ring-1 focus:ring-primary/40 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
+    const CALC_SAR = 'text-right font-mono text-green-800 px-2 py-1 whitespace-nowrap';
+    const CALC_AMB = 'text-right font-mono text-amber-800 px-2 py-1 whitespace-nowrap';
+
+    function fmt(v) { return isNaN(v) ? '—' : v.toFixed(2); }
+
+    function recalc(pk) {
+        const entrance  = parseFloat(document.getElementById('en_'+pk).value)   || 0;
+        const reg       = parseFloat(document.getElementById('reg_'+pk).value)  || 0;
+        const gross     = parseFloat(document.getElementById('gt_'+pk).value)   || 0;
+        const disc      = parseFloat(document.getElementById('gd_'+pk).value)   || 0;
+        const down      = parseFloat(document.getElementById('dp_'+pk).value)   || 0;
+
+        const discAmt   = gross * disc / 100;
+        const net       = gross - discAmt;
+        const remaining = Math.max(0, net - down);
+        const instBase  = remaining / 3;
+        const inst1     = Math.floor(instBase * 100) / 100;
+        const inst2     = inst1;
+        const inst3     = Math.round((remaining - inst1 - inst2) * 100) / 100;
+
+        // Saudi
+        document.getElementById('s_en_'+pk).textContent    = fmt(entrance);
+        document.getElementById('s_reg_'+pk).textContent   = fmt(reg);
+        document.getElementById('s_dp_'+pk).textContent    = fmt(down);
+        document.getElementById('s_i1_'+pk).textContent    = fmt(inst1);
+        document.getElementById('s_i2_'+pk).textContent    = fmt(inst2);
+        document.getElementById('s_i3_'+pk).textContent    = fmt(inst3);
+        document.getElementById('s_net_'+pk).textContent   = fmt(net);
+
+        // Non-Saudi (+15%)
+        const V = 1.15;
+        document.getElementById('n_en_'+pk).textContent    = fmt(entrance * V);
+        document.getElementById('n_reg_'+pk).textContent   = fmt(reg * V);
+        document.getElementById('n_dp_'+pk).textContent    = fmt(down * V);
+        document.getElementById('n_i1_'+pk).textContent    = fmt(inst1 * V);
+        document.getElementById('n_i2_'+pk).textContent    = fmt(inst2 * V);
+        document.getElementById('n_i3_'+pk).textContent    = fmt(inst3 * V);
+        document.getElementById('n_net_'+pk).textContent   = fmt(net * V);
+    }
+
+    function buildTable(divId) {
+        const grades = gradesData[divId] || [];
+        tbody.innerHTML = '';
+        grades.forEach(function(g, idx) {
+            const odd = idx % 2 === 0;
+            const bg  = odd ? 'bg-white' : 'bg-slate-50';
+            const tr  = document.createElement('tr');
+            tr.className = bg;
+            tr.innerHTML =
+                '<td class="border border-slate-200 px-3 py-2 font-semibold text-slate-700 whitespace-nowrap">' + g.name + '</td>' +
+                // ── Col 2: inputs ────────────────────────────────────────────
+                '<td class="border border-slate-200 p-1"><input id="en_'+g.pk+'"  type="number" name="entrance_exam_'+g.pk+'"  step="0.01" min="0" placeholder="0.00" class="'+INP+'"></td>' +
+                '<td class="border border-slate-200 p-1"><input id="reg_'+g.pk+'" type="number" name="registration_'+g.pk+'"   step="0.01" min="0" placeholder="0.00" class="'+INP+'"></td>' +
+                '<td class="border border-slate-200 p-1"><input id="gt_'+g.pk+'"  type="number" name="gross_tuition_'+g.pk+'"  step="0.01" min="0" placeholder="0.00" class="'+INP+'"></td>' +
+                '<td class="border border-slate-200 p-1"><input id="gd_'+g.pk+'"  type="number" name="group_discount_'+g.pk+'" step="0.01" min="0" max="100" placeholder="0" class="'+INP+'"></td>' +
+                '<td class="border border-slate-200 p-1"><input id="dp_'+g.pk+'"  type="number" name="down_payment_'+g.pk+'"   step="0.01" min="0" placeholder="0.00" class="'+INP+'"></td>' +
+                // ── Col 3: Saudi (calculated) ─────────────────────────────────
+                '<td class="border border-slate-200 bg-green-50/40 '+CALC_SAR+'" id="s_en_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-green-50/40 '+CALC_SAR+'" id="s_reg_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-green-50/40 '+CALC_SAR+'" id="s_dp_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-green-50/40 '+CALC_SAR+'" id="s_i1_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-green-50/40 '+CALC_SAR+'" id="s_i2_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-green-50/40 '+CALC_SAR+'" id="s_i3_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-green-50/40 '+CALC_SAR+' font-bold" id="s_net_'+g.pk+'">—</td>' +
+                // ── Col 4: Non-Saudi (calculated) ─────────────────────────────
+                '<td class="border border-slate-200 bg-amber-50/40 '+CALC_AMB+'" id="n_en_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-amber-50/40 '+CALC_AMB+'" id="n_reg_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-amber-50/40 '+CALC_AMB+'" id="n_dp_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-amber-50/40 '+CALC_AMB+'" id="n_i1_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-amber-50/40 '+CALC_AMB+'" id="n_i2_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-amber-50/40 '+CALC_AMB+'" id="n_i3_'+g.pk+'">—</td>' +
+                '<td class="border border-slate-200 bg-amber-50/40 '+CALC_AMB+' font-bold" id="n_net_'+g.pk+'">—</td>';
+            tbody.appendChild(tr);
+            ['en_','reg_','gt_','gd_','dp_'].forEach(function(pfx) {
+                document.getElementById(pfx + g.pk).addEventListener('input', function() { recalc(g.pk); });
+            });
+        });
+        tableWrap.classList.remove('hidden');
+        noMsg.classList.add('hidden');
+    }
+
+    function clearTable() {
+        tbody.innerHTML = '';
+        tableWrap.classList.add('hidden');
+        noMsg.classList.remove('hidden');
+    }
+
+    divSel.addEventListener('change', function() {
+        this.value ? buildTable(this.value) : clearTable();
+    });
+
+    // Global discount → push to all visible grade rows
+    const globalDiscInp = document.getElementById('global-discount');
+    if (globalDiscInp) {
+        globalDiscInp.addEventListener('input', function() {
+            const val = this.value;
+            tbody.querySelectorAll('input[name^="group_discount_"]').forEach(function(inp) {
+                inp.value = val;
+                // find pk from id like gd_123
+                const pk = inp.id.replace('gd_', '');
+                recalc(pk);
+            });
+        });
+    }
+
+    // On page load (e.g. validation error re-render): restore table
+    if (divSel.value) buildTable(divSel.value);
+
 })();
+
+// ── Fullscreen toggle (outside IIFE so onclick="" works) ────────
+function toggleFullscreen() {
+    const wrapper = document.getElementById('grade-table-wrapper');
+    const iconExpand   = document.getElementById('fs-icon-expand');
+    const iconCollapse = document.getElementById('fs-icon-collapse');
+    const label        = document.getElementById('fs-btn-label');
+
+    const isFS = wrapper.classList.contains('fs-active');
+
+    if (!isFS) {
+        // Enter fullscreen
+        wrapper.classList.add('fs-active');
+        wrapper.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#f8fafc;overflow-y:auto;padding:1rem;margin:0;border-radius:0;display:block;';
+        iconExpand.classList.add('hidden');
+        iconCollapse.classList.remove('hidden');
+        label.textContent = 'Exit Full Screen';
+        document.body.style.overflow = 'hidden';
+    } else {
+        // Exit fullscreen
+        wrapper.classList.remove('fs-active');
+        wrapper.style.cssText = '';
+        wrapper.classList.remove('hidden'); // keep visible
+        iconExpand.classList.remove('hidden');
+        iconCollapse.classList.add('hidden');
+        label.textContent = 'Full Screen';
+        document.body.style.overflow = '';
+    }
+}
+
+// Allow Escape key to exit fullscreen
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const wrapper = document.getElementById('grade-table-wrapper');
+        if (wrapper && wrapper.classList.contains('fs-active')) toggleFullscreen();
+    }
+});
 </script>
 {% endif %}
 {% endblock %}

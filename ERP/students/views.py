@@ -8,8 +8,8 @@ from django.db.models import Q
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import role_required
-from .models import Student, StudentDocument
-from .forms import StudentForm, DocumentUploadForm, StudentFilterForm
+from .models import Student, StudentDocument, Sibling, AuthorizedPickup
+from .forms import StudentForm, DocumentUploadForm, StudentFilterForm, SiblingForm, AuthorizedPickupForm
 
 _ADMIN   = ('SUPER_ADMIN', 'ADMIN')
 _STAFF   = ('SUPER_ADMIN', 'ADMIN', 'TEACHER', 'ACCOUNTANT', 'STAFF')
@@ -140,6 +140,54 @@ def student_export_csv(request):
 
 # ────────────────────────── ADD ──────────────────────────
 
+def _save_siblings_from_post(post, student):
+    """Parse sibling array fields from POST and bulk-create Sibling records."""
+    names    = post.getlist('sibling_full_name[]')
+    relations = post.getlist('sibling_relation[]')
+    dobs     = post.getlist('sibling_dob[]')
+    schools  = post.getlist('sibling_school[]')
+    levels   = post.getlist('sibling_level[]')
+    to_create = []
+    for i, name in enumerate(names):
+        name = name.strip()
+        if not name:
+            continue
+        relation = relations[i] if i < len(relations) else ''
+        if relation not in ('BROTHER', 'SISTER'):
+            continue
+        dob = dobs[i].strip() if i < len(dobs) else ''
+        to_create.append(Sibling(
+            student=student,
+            full_name=name,
+            relation=relation,
+            dob=dob or None,
+            current_school=(schools[i].strip() if i < len(schools) else ''),
+            educational_level=(levels[i].strip() if i < len(levels) else ''),
+        ))
+    if to_create:
+        Sibling.objects.bulk_create(to_create)
+
+
+def _save_pickups_from_post(post, student):
+    """Parse pickup array fields from POST and bulk-create AuthorizedPickup records."""
+    names     = post.getlist('pickup_full_name[]')
+    relations = post.getlist('pickup_relation[]')
+    phones    = post.getlist('pickup_phone[]')
+    to_create = []
+    for i, name in enumerate(names):
+        name = name.strip()
+        if not name:
+            continue
+        to_create.append(AuthorizedPickup(
+            student=student,
+            full_name=name,
+            relation=(relations[i].strip() if i < len(relations) else ''),
+            phone=(phones[i].strip() if i < len(phones) else ''),
+        ))
+    if to_create:
+        AuthorizedPickup.objects.bulk_create(to_create)
+
+
 @login_required
 @role_required(*_ADMIN)
 def student_add(request):
@@ -148,6 +196,8 @@ def student_add(request):
         student = form.save(commit=False)
         student.created_by = request.user
         student.save()
+        _save_siblings_from_post(request.POST, student)
+        _save_pickups_from_post(request.POST, student)
         messages.success(request, f"Student {student.full_name} added (ID: {student.student_id}). Please upload identity documents (National ID / Iqama / Passport) below.")
         return redirect('students:detail', pk=student.pk)
     return render(request, 'students/student_form.html', {'form': form, 'title': 'Add Student / إضافة طالب'})
@@ -161,11 +211,17 @@ def student_detail(request, pk):
     student = get_object_or_404(Student.objects.select_related(
         'division', 'grade', 'section', 'academic_year', 'created_by'
     ), pk=pk)
-    doc_form = DocumentUploadForm()
+    doc_form     = DocumentUploadForm()
+    sibling_form = SiblingForm()
+    pickup_form  = AuthorizedPickupForm()
     return render(request, 'students/student_detail.html', {
-        'student': student,
-        'doc_form': doc_form,
-        'documents': student.documents.all(),
+        'student':      student,
+        'doc_form':     doc_form,
+        'documents':    student.documents.all(),
+        'sibling_form': sibling_form,
+        'siblings':     student.siblings.all(),
+        'pickup_form':  pickup_form,
+        'pickups':      student.authorized_pickups.all(),
     })
 
 
@@ -178,11 +234,19 @@ def student_edit(request, pk):
     form    = StudentForm(request.POST or None, request.FILES or None, instance=student)
     if form.is_valid():
         form.save()
+        # Replace all siblings with what was submitted
+        student.siblings.all().delete()
+        _save_siblings_from_post(request.POST, student)
+        # Replace all pickups with what was submitted
+        student.authorized_pickups.all().delete()
+        _save_pickups_from_post(request.POST, student)
         messages.success(request, "Student updated successfully.")
         return redirect('students:detail', pk=student.pk)
     return render(request, 'students/student_form.html', {
         'form': form,
         'student': student,
+        'existing_siblings': student.siblings.all(),
+        'existing_pickups':  student.authorized_pickups.all(),
         'title': f'Edit: {student.full_name}',
     })
 
@@ -241,6 +305,64 @@ def document_delete(request, doc_pk):
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({'success': True})
         messages.success(request, "Document deleted.")
+    return redirect('students:detail', pk=student_pk)
+
+
+# ────────────────────────── SIBLING ADD / DELETE ──────────────────────────
+
+@login_required
+@role_required(*_ADMIN)
+@require_POST
+def sibling_add(request, pk):
+    student = get_object_or_404(Student, pk=pk)
+    form = SiblingForm(request.POST)
+    if form.is_valid():
+        sibling = form.save(commit=False)
+        sibling.student = student
+        sibling.save()
+        messages.success(request, "Sibling added.")
+    else:
+        messages.error(request, "Please correct the sibling form errors.")
+    return redirect('students:detail', pk=pk)
+
+
+@login_required
+@role_required(*_ADMIN)
+@require_POST
+def sibling_delete(request, sibling_pk):
+    sibling = get_object_or_404(Sibling, pk=sibling_pk)
+    student_pk = sibling.student.pk
+    sibling.delete()
+    messages.success(request, "Sibling removed.")
+    return redirect('students:detail', pk=student_pk)
+
+
+# ────────────────────────── AUTHORIZED PICKUP ADD / DELETE ───────────
+
+@login_required
+@role_required(*_ADMIN)
+@require_POST
+def pickup_add(request, pk):
+    student = get_object_or_404(Student, pk=pk)
+    form = AuthorizedPickupForm(request.POST)
+    if form.is_valid():
+        pickup = form.save(commit=False)
+        pickup.student = student
+        pickup.save()
+        messages.success(request, "Authorized person added.")
+    else:
+        messages.error(request, "Please correct the form errors.")
+    return redirect('students:detail', pk=pk)
+
+
+@login_required
+@role_required(*_ADMIN)
+@require_POST
+def pickup_delete(request, pickup_pk):
+    pickup = get_object_or_404(AuthorizedPickup, pk=pickup_pk)
+    student_pk = pickup.student.pk
+    pickup.delete()
+    messages.success(request, "Authorized person removed.")
     return redirect('students:detail', pk=student_pk)
 
 
