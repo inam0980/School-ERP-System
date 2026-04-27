@@ -2,7 +2,7 @@
 {% block title %}{{ title }} — Al-Kawthar{% endblock %}
 
 {% block content %}
-<div class="flex items-center gap-3 mb-6">
+<div id="page-heading" class="flex items-center gap-3 mb-6">
     <a href="{% url 'fees:fee_structure_list' %}"
        class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition">
         <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -10,7 +10,35 @@
         </svg>
     </a>
     <h1 class="text-2xl font-bold text-primary">{{ title }}</h1>
+    {% if not instance %}
+    <button type="button" id="fullscreen-btn" title="Expand to full screen"
+            onclick="toggleFullscreen()"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold shadow-lg hover:bg-primary-light hover:shadow-primary/40 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 ring-2 ring-primary/30 animate-pulse-once">
+        <svg id="fs-icon-expand" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5M20 8V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5M20 16v4m0 0h-4m4 0l-5-5"/>
+        </svg>
+        <svg id="fs-icon-collapse" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 9L4 4m0 0h4M4 4v4M15 9l5-5m0 0h-4m4 0v4M9 15l-5 5m0 0h4m-4 0v-4M15 15l5 5m0 0h-4m4 0v-4"/>
+        </svg>
+        <span id="fs-btn-label">Full Screen</span>
+    </button>
+    {% endif %}
 </div>
+
+{% if not instance %}
+<div id="fs-hint" class="flex items-center gap-3 mb-4 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-sm shadow-sm">
+    <svg class="w-5 h-5 shrink-0 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z"/>
+    </svg>
+    <span>For the best experience filling in grade amounts, click the <strong>Full Screen</strong> button above ☝️</span>
+    <button type="button" onclick="document.getElementById('fs-hint').remove()"
+            class="ml-auto text-amber-500 hover:text-amber-700 transition" title="Dismiss">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+    </button>
+</div>
+{% endif %}
 
 {% if messages %}
 {% for msg in messages %}
@@ -207,25 +235,80 @@
 {# ══════════════════════════════════════════════════════════════ #}
 <style>
 /* Compact table in fullscreen so all 20 columns fit without scrolling */
+@keyframes pulse-once {
+    0%   { box-shadow: 0 0 0 0 rgba(99,102,241,.55); }
+    60%  { box-shadow: 0 0 0 10px rgba(99,102,241,0); }
+    100% { box-shadow: 0 0 0 0 rgba(99,102,241,0); }
+}
+.animate-pulse-once {
+    animation: pulse-once 1.4s ease-out 0.4s 2;
+}
 #grade-table-wrapper.fs-active table {
     font-size: 10px !important;
     min-width: unset !important;
-    width: 100%;
-    table-layout: auto;
+    width: 100% !important;
+    table-layout: fixed !important;
 }
-#grade-table-wrapper.fs-active th,
+#grade-table-wrapper.fs-active th {
+    padding: 2px 3px !important;
+    white-space: normal !important;
+    word-break: break-word;
+    vertical-align: bottom;
+    font-size: 8.5px !important;
+    line-height: 1.25;
+    overflow: hidden;
+}
 #grade-table-wrapper.fs-active td {
-    padding: 3px 4px !important;
+    padding: 2px 2px !important;
     white-space: nowrap;
+    overflow: hidden;
+}
+/* Grade column: keep name on one line, allow wrapping only if needed */
+#grade-table-wrapper.fs-active td:first-child {
+    white-space: normal;
+    word-break: break-word;
+    font-size: 9px !important;
+    line-height: 1.3;
+    padding: 3px 2px !important;
 }
 #grade-table-wrapper.fs-active input[type="number"] {
-    padding: 2px 3px !important;
+    padding: 2px 2px !important;
     font-size: 10px !important;
-    width: 70px !important;
+    width: 100% !important;
     min-width: unset !important;
+    box-sizing: border-box;
 }
 #grade-table-wrapper.fs-active .overflow-x-auto {
-    overflow-x: visible;
+    overflow-x: hidden;
+}
+/* Structure details panel when moved inside fullscreen wrapper */
+#grade-table-wrapper.fs-active #structure-details-panel {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+}
+#grade-table-wrapper.fs-active #structure-details-panel h2 {
+    font-size: 0.65rem;
+    margin-bottom: 0.5rem;
+}
+#grade-table-wrapper.fs-active #structure-details-panel .grid {
+    gap: 0.375rem;
+    margin-bottom: 0.375rem !important;
+}
+#grade-table-wrapper.fs-active #structure-details-panel input,
+#grade-table-wrapper.fs-active #structure-details-panel select {
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.7rem !important;
+}
+#grade-table-wrapper.fs-active #structure-details-panel .relative input {
+    padding-left: 2.25rem !important;
+}
+#grade-table-wrapper.fs-active #structure-details-panel label {
+    font-size: 0.65rem;
+    margin-bottom: 0.1rem;
+}
+#grade-table-wrapper.fs-active #structure-details-panel p {
+    font-size: 0.65rem;
 }
 </style>
 
@@ -233,7 +316,7 @@
 {% csrf_token %}
 
 <!-- ── Top bar: Structure details ───────────────────────────── -->
-<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-5">
+<div id="structure-details-panel" class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 mb-5">
     <h2 class="text-xs font-bold uppercase tracking-wide text-slate-500 mb-4">Structure Details</h2>
     <!-- Row 1: Name + Year + Division + Type -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -265,8 +348,8 @@
             </select>
         </div>
     </div>
-    <!-- Row 2: Structure Type + Group Discount + No. of Instalments + Due Date -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+    <!-- Row 2: Structure Type + Group Discount + No. of Instalments + VAT % + Due Date -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
         <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Structure Type <span class="text-red-500">*</span></label>
             <select name="structure_type" id="create-structure-type"
@@ -299,12 +382,61 @@
             </select>
         </div>
         <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+                VAT %
+                <span class="ml-1 text-slate-400 font-normal text-xs">(Non-Saudi)</span>
+            </label>
+            <div class="relative">
+                <input type="number" id="vat-pct" name="vat_pct"
+                       value="{{ post_data.vat_pct|default:'15' }}"
+                       step="0.01" min="0" max="100" placeholder="15"
+                       class="border border-slate-300 rounded-lg px-3 py-2.5 pr-8 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">%</span>
+            </div>
+        </div>
+        <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Instalment Due Date <span class="text-red-500">*</span></label>
             <input type="date" name="due_date" value="{{ post_data.due_date|default:'' }}"
                    class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none">
         </div>
     </div>
-    <!-- Row 3: Code + Description -->
+    <!-- Row 3: Global price defaults -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+        <div class="md:col-span-3 mb-1">
+            <p class="text-xs font-semibold text-amber-700">&#9889; Quick-fill common fees (same for all grades) — leave blank to enter per grade</p>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Entrance Exam Fee
+                <span class="ml-1 text-slate-400 font-normal text-xs">(fill all grades)</span>
+            </label>
+            <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
+                <input type="number" id="global-entrance" step="0.01" min="0" placeholder="0.00"
+                       class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+            </div>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Registration Fee
+                <span class="ml-1 text-slate-400 font-normal text-xs">(fill all grades)</span>
+            </label>
+            <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
+                <input type="number" id="global-registration" step="0.01" min="0" placeholder="0.00"
+                       class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+            </div>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Down Payment
+                <span class="ml-1 text-slate-400 font-normal text-xs">(fill all grades)</span>
+            </label>
+            <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
+                <input type="number" id="global-downpayment" step="0.01" min="0" placeholder="0.00"
+                       class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+            </div>
+        </div>
+    </div>
+    <!-- Row 4: Code + Description -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Structure Code <span class="text-slate-400 font-normal">(optional)</span></label>
@@ -332,29 +464,22 @@
 <!-- ── Grade × Amounts table ──────────────────────────────────── -->
 <div id="grade-table-wrapper" class="hidden mb-5">
 
-    <!-- ── Toolbar ──────────────────────────────────────────── -->
-    <div class="flex justify-end mb-2">
-        <button type="button" id="fullscreen-btn" title="Expand to full screen"
-                onclick="toggleFullscreen()"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-medium text-slate-600 hover:bg-slate-50 shadow-sm transition">
-            <!-- expand icon -->
-            <svg id="fs-icon-expand" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5M20 8V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5M20 16v4m0 0h-4m4 0l-5-5"/>
-            </svg>
-            <!-- collapse icon (hidden initially) -->
-            <svg id="fs-icon-collapse" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 9L4 4m0 0h4M4 4v4M15 9l5-5m0 0h-4m4 0v4M9 15l-5 5m0 0h4m-4 0v-4M15 15l5 5m0 0h-4m4 0v-4"/>
-            </svg>
-            <span id="fs-btn-label">Full Screen</span>
-        </button>
-    </div>
-
     <div class="overflow-x-auto rounded-xl shadow-sm border border-slate-200">
-        <table class="w-full text-xs border-collapse" style="min-width:1320px">
+        <table class="w-full text-xs border-collapse" id="grade-table">
+            <colgroup>
+                <!-- Grade Level: wider ~5.5% -->
+                <col style="width:5.5%">
+                <!-- 5 input cols (Amount Before VAT): ~5% each = 25% -->
+                <col style="width:5%"><col style="width:5%"><col style="width:5%"><col style="width:5%"><col style="width:5%">
+                <!-- 7 Saudi calc cols: ~4.4% each = 30.8% -->
+                <col style="width:4.4%"><col style="width:4.4%"><col style="width:4.4%"><col style="width:4.4%"><col style="width:4.4%"><col style="width:4.4%"><col style="width:4.4%">
+                <!-- 7 Non-Saudi calc cols: ~5.2% each = 36.4% → total ~100% -->
+                <col style="width:5.2%"><col style="width:5.2%"><col style="width:5.2%"><col style="width:5.2%"><col style="width:5.2%"><col style="width:5.2%"><col style="width:5.2%">
+            </colgroup>
             <thead>
                 <!-- Group header row -->
                 <tr>
-                    <th rowspan="2" class="border border-slate-200 bg-slate-700 text-white px-3 py-2.5 text-left font-semibold whitespace-nowrap w-32">Grade Level</th>
+                    <th rowspan="2" class="border border-slate-200 bg-slate-700 text-white px-1 py-2.5 text-left font-semibold">Grade</th>
                     <th colspan="5" class="border border-slate-200 bg-slate-100 text-slate-700 px-3 py-2 text-center font-bold tracking-wide">Amount Before VAT</th>
                     <th colspan="7" class="border border-slate-200 bg-green-700 text-white px-3 py-2 text-center font-bold tracking-wide">Amounts Without VAT — Saudi Students</th>
                     <th colspan="7" class="border border-slate-200 bg-amber-600 text-white px-3 py-2 text-center font-bold tracking-wide">Amounts With VAT (+15%) — Non-Saudi Students</th>
@@ -468,14 +593,18 @@
         const gross     = parseFloat(document.getElementById('gt_'+pk).value)   || 0;
         const disc      = parseFloat(document.getElementById('gd_'+pk).value)   || 0;
         const down      = parseFloat(document.getElementById('dp_'+pk).value)   || 0;
+        const nInst     = parseInt(document.getElementById('create-installments') && document.getElementById('create-installments').value || '3', 10) || 3;
+        const vatPctEl  = document.getElementById('vat-pct');
+        const V         = 1 + (parseFloat(vatPctEl ? vatPctEl.value : '15') || 0) / 100;
 
         const discAmt   = gross * disc / 100;
         const net       = gross - discAmt;
         const remaining = Math.max(0, net - down);
-        const instBase  = remaining / 3;
+        const splits    = Math.max(1, nInst - 1);
+        const instBase  = remaining / splits;
         const inst1     = Math.floor(instBase * 100) / 100;
-        const inst2     = inst1;
-        const inst3     = Math.round((remaining - inst1 - inst2) * 100) / 100;
+        const inst2     = nInst > 2 ? inst1 : 0;
+        const inst3     = nInst > 3 ? Math.round((remaining - inst1 - inst2) * 100) / 100 : (nInst === 3 ? Math.round((remaining - inst1 - inst1) * 100) / 100 : 0);
 
         // Saudi
         document.getElementById('s_en_'+pk).textContent    = fmt(entrance);
@@ -486,8 +615,7 @@
         document.getElementById('s_i3_'+pk).textContent    = fmt(inst3);
         document.getElementById('s_net_'+pk).textContent   = fmt(net);
 
-        // Non-Saudi (+15%)
-        const V = 1.15;
+        // Non-Saudi (+VAT%)
         document.getElementById('n_en_'+pk).textContent    = fmt(entrance * V);
         document.getElementById('n_reg_'+pk).textContent   = fmt(reg * V);
         document.getElementById('n_dp_'+pk).textContent    = fmt(down * V);
@@ -506,7 +634,7 @@
             const tr  = document.createElement('tr');
             tr.className = bg;
             tr.innerHTML =
-                '<td class="border border-slate-200 px-3 py-2 font-semibold text-slate-700 whitespace-nowrap">' + g.name + '</td>' +
+                '<td class="border border-slate-200 px-1 py-2 font-semibold text-slate-700 text-center">' + g.name + '</td>' +
                 // ── Col 2: inputs ────────────────────────────────────────────
                 '<td class="border border-slate-200 p-1"><input id="en_'+g.pk+'"  type="number" name="entrance_exam_'+g.pk+'"  step="0.01" min="0" placeholder="0.00" class="'+INP+'"></td>' +
                 '<td class="border border-slate-200 p-1"><input id="reg_'+g.pk+'" type="number" name="registration_'+g.pk+'"   step="0.01" min="0" placeholder="0.00" class="'+INP+'"></td>' +
@@ -533,6 +661,16 @@
             ['en_','reg_','gt_','gd_','dp_'].forEach(function(pfx) {
                 document.getElementById(pfx + g.pk).addEventListener('input', function() { recalc(g.pk); });
             });
+            // Pre-fill from global price defaults if already set
+            const gEn  = document.getElementById('global-entrance');
+            const gReg = document.getElementById('global-registration');
+            const gDp  = document.getElementById('global-downpayment');
+            const gDisc = document.getElementById('global-discount');
+            if (gEn  && gEn.value)  document.getElementById('en_'  + g.pk).value = gEn.value;
+            if (gReg && gReg.value) document.getElementById('reg_' + g.pk).value = gReg.value;
+            if (gDp  && gDp.value)  document.getElementById('dp_'  + g.pk).value = gDp.value;
+            if (gDisc && gDisc.value) document.getElementById('gd_' + g.pk).value = gDisc.value;
+            recalc(g.pk);
         });
         tableWrap.classList.remove('hidden');
         noMsg.classList.add('hidden');
@@ -555,12 +693,49 @@
             const val = this.value;
             tbody.querySelectorAll('input[name^="group_discount_"]').forEach(function(inp) {
                 inp.value = val;
-                // find pk from id like gd_123
                 const pk = inp.id.replace('gd_', '');
                 recalc(pk);
             });
         });
     }
+
+    // No. of instalments change → recalc all rows
+    const instSel = document.getElementById('create-installments');
+    if (instSel) {
+        instSel.addEventListener('change', function() {
+            tbody.querySelectorAll('input[name^="gross_tuition_"]').forEach(function(inp) {
+                const pk = inp.id.replace('gt_', '');
+                recalc(pk);
+            });
+        });
+    }
+
+    // VAT % change → recalc all rows
+    const vatInp = document.getElementById('vat-pct');
+    if (vatInp) {
+        vatInp.addEventListener('input', function() {
+            tbody.querySelectorAll('input[name^="gross_tuition_"]').forEach(function(inp) {
+                recalc(inp.id.replace('gt_', ''));
+            });
+        });
+    }
+
+    // Global price defaults → push to all visible grade rows
+    function makeGlobalPriceFiller(globalId, inputPrefix, namePrefix) {
+        const globalInp = document.getElementById(globalId);
+        if (!globalInp) return;
+        globalInp.addEventListener('input', function() {
+            const val = this.value;
+            tbody.querySelectorAll('input[name^="' + namePrefix + '"]').forEach(function(inp) {
+                inp.value = val;
+                const pk = inp.id.replace(inputPrefix, '');
+                recalc(pk);
+            });
+        });
+    }
+    makeGlobalPriceFiller('global-entrance',     'en_',  'entrance_exam_');
+    makeGlobalPriceFiller('global-registration', 'reg_', 'registration_');
+    makeGlobalPriceFiller('global-downpayment',  'dp_',  'down_payment_');
 
     // On page load (e.g. validation error re-render): restore table
     if (divSel.value) buildTable(divSel.value);
@@ -569,7 +744,11 @@
 
 // ── Fullscreen toggle (outside IIFE so onclick="" works) ────────
 function toggleFullscreen() {
-    const wrapper = document.getElementById('grade-table-wrapper');
+    const wrapper  = document.getElementById('grade-table-wrapper');
+    const panel    = document.getElementById('structure-details-panel');
+    const noMsg    = document.getElementById('no-division-msg');
+    const btn      = document.getElementById('fullscreen-btn');
+    const heading  = document.getElementById('page-heading');
     const iconExpand   = document.getElementById('fs-icon-expand');
     const iconCollapse = document.getElementById('fs-icon-collapse');
     const label        = document.getElementById('fs-btn-label');
@@ -577,21 +756,49 @@ function toggleFullscreen() {
     const isFS = wrapper.classList.contains('fs-active');
 
     if (!isFS) {
-        // Enter fullscreen
+        // Enter fullscreen: move panel + button bar into wrapper at top
+        if (panel) wrapper.insertBefore(panel, wrapper.firstChild);
+        // Create a small top bar inside fullscreen to hold the Exit button
+        let fsBar = document.getElementById('fs-topbar');
+        if (!fsBar) {
+            fsBar = document.createElement('div');
+            fsBar.id = 'fs-topbar';
+            fsBar.className = 'flex justify-end mb-3';
+        }
+        if (btn) {
+            btn.className = btn.className.replace('bg-primary', 'bg-slate-700').replace('ring-primary/30', 'ring-slate-400/30');
+            fsBar.appendChild(btn);
+        }
+        wrapper.insertBefore(fsBar, wrapper.firstChild);
+
         wrapper.classList.add('fs-active');
         wrapper.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#f8fafc;overflow-y:auto;padding:1rem;margin:0;border-radius:0;display:block;';
-        iconExpand.classList.add('hidden');
-        iconCollapse.classList.remove('hidden');
-        label.textContent = 'Exit Full Screen';
+        if (iconExpand) iconExpand.classList.add('hidden');
+        if (iconCollapse) iconCollapse.classList.remove('hidden');
+        if (label) label.textContent = 'Exit Full Screen';
         document.body.style.overflow = 'hidden';
     } else {
-        // Exit fullscreen
+        // Exit fullscreen: restore panel and button back to heading
         wrapper.classList.remove('fs-active');
         wrapper.style.cssText = '';
-        wrapper.classList.remove('hidden'); // keep visible
-        iconExpand.classList.remove('hidden');
-        iconCollapse.classList.add('hidden');
-        label.textContent = 'Full Screen';
+        wrapper.classList.remove('hidden');
+
+        // Move button back to heading and restore original style
+        if (btn && heading) {
+            btn.className = btn.className.replace('bg-slate-700', 'bg-primary').replace('ring-slate-400/30', 'ring-primary/30');
+            heading.appendChild(btn);
+        }
+        const fsBar = document.getElementById('fs-topbar');
+        if (fsBar && fsBar.parentNode) fsBar.parentNode.removeChild(fsBar);
+
+        // Move panel back before no-division-msg
+        if (panel && noMsg && noMsg.parentNode) {
+            noMsg.parentNode.insertBefore(panel, noMsg);
+        }
+
+        if (iconExpand) iconExpand.classList.remove('hidden');
+        if (iconCollapse) iconCollapse.classList.add('hidden');
+        if (label) label.textContent = 'Full Screen';
         document.body.style.overflow = '';
     }
 }
