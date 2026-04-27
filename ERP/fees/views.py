@@ -209,13 +209,22 @@ def fee_structure_form(request, pk=None):
         due_date_raw        = request.POST.get('due_date', '').strip()
         structure_type      = request.POST.get('structure_type', 'regular').strip()
         structure_name_base = request.POST.get('structure_name', '').strip()
+        structure_code      = request.POST.get('structure_code', '').strip()
+        description         = request.POST.get('description', '').strip()
         global_discount_raw = request.POST.get('global_group_discount', '0').strip() or '0'
+        installments_raw    = request.POST.get('installments_count', '3').strip()
         if structure_type not in ('regular', 'new'):
             structure_type = 'regular'
         try:
             global_discount = Decimal(global_discount_raw)
         except Exception:
             global_discount = Decimal('0')
+        try:
+            installments_count = int(installments_raw)
+            if installments_count not in (1, 2, 3, 4):
+                installments_count = 3
+        except Exception:
+            installments_count = 3
         errors = []
         if not academic_year_id:
             errors.append('Academic Year is required.')
@@ -263,13 +272,15 @@ def fee_structure_form(request, pk=None):
                             structure_type=structure_type,
                             defaults={
                                 'name':               bundle_name,
+                                'code':               structure_code,
                                 'entrance_exam_fee':  entrance,
                                 'registration_fee':   registration,
                                 'gross_tuition_fee':  gross,
                                 'group_discount_pct': discount_pct,
                                 'min_down_payment':   down_payment,
-                                'installments_count': 3,
+                                'installments_count': installments_count,
                                 'due_date':           due_date,
+                                'notes':              description,
                                 'created_by':         request.user,
                             },
                         )
