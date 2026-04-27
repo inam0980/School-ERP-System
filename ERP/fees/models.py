@@ -301,6 +301,46 @@ class FeeStructureBundle(models.Model):
                 amount=amt, due_date=self.due_date,
             )
 
+    def sync_to_fee_structure(self):
+        """
+        Create or update the linked FeeStructure + FeeStructureItems so this
+        bundle is visible on the bulk-assign page.
+        Fee amounts stored are the NET values (after group discount on tuition).
+        """
+        def _get_fee_type(category, name):
+            ft = FeeType.objects.filter(category=category).first()
+            if not ft:
+                ft = FeeType.objects.create(name=name, category=category, is_mandatory=False)
+            return ft
+
+        components = []
+        if self.entrance_exam_fee > 0:
+            components.append(
+                (_get_fee_type(FeeType.ENTRANCE_EXAM, 'Entrance Exam Fee'), self.entrance_exam_fee)
+            )
+        if self.registration_fee > 0:
+            components.append(
+                (_get_fee_type(FeeType.REGISTRATION, 'Registration Fee'), self.registration_fee)
+            )
+        components.append(
+            (_get_fee_type(FeeType.TUITION, 'Tuition Fee'), self.net_tuition_fee)
+        )
+
+        structure, _ = FeeStructure.objects.update_or_create(
+            academic_year=self.academic_year,
+            grade=self.grade,
+            defaults={
+                'name':      self.name,
+                'frequency': 'ANNUAL',
+            },
+        )
+        for fee_type, amount in components:
+            FeeStructureItem.objects.update_or_create(
+                structure=structure,
+                fee_type=fee_type,
+                defaults={'amount': amount},
+            )
+
 
 class BundleInstallment(models.Model):
     """Editable instalment row belonging to a FeeStructureBundle."""

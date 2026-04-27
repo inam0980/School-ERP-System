@@ -8,6 +8,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
+from django.db.models.deletion import ProtectedError
+from django.db import transaction
 from django.db.models import Q, Sum, Count
 from django.views.decorators.http import require_POST
 from django.utils import timezone
@@ -132,6 +134,16 @@ def fee_structure_list(request):
     ).prefetch_related('installments')
     if year_id:
         bundle_qs = bundle_qs.filter(academic_year_id=year_id)
+
+    # Build a lookup: (grade_pk, year_pk) → structure_type so we can badge FeeStructure rows
+    bundle_type_map = {
+        (b.grade_id, b.academic_year_id): b.structure_type
+        for b in bundle_qs
+    }
+    # Annotate each structure with its type (from the matching bundle, or empty)
+    for structs in divisions_map.values():
+        for s in structs:
+            s.structure_type = bundle_type_map.get((s.grade_id, s.academic_year_id), '')
 
     # Group bundles by division
     bundles_by_division = {}
@@ -285,6 +297,7 @@ def fee_structure_form(request, pk=None):
                             },
                         )
                         bundle.generate_installments()
+                        bundle.sync_to_fee_structure()
                         created_count += 1
                     except Exception as exc:
                         messages.error(request, f'Error saving {grade.name}: {exc}')
@@ -315,8 +328,19 @@ def fee_structure_form(request, pk=None):
 @role_required(*_ADMIN)
 @require_POST
 def fee_structure_delete(request, pk):
-    get_object_or_404(FeeStructure, pk=pk).delete()
-    messages.success(request, "Fee structure deleted.")
+    structure = get_object_or_404(FeeStructure, pk=pk)
+    assigned_qs = StudentFee.objects.filter(fee_structure__structure=structure)
+    removed_assignments = assigned_qs.count()
+    with transaction.atomic():
+        assigned_qs.delete()   # cascades: payments, payment plans all removed
+        structure.delete()
+    if removed_assignments:
+        messages.success(
+            request,
+            f'Fee structure deleted along with {removed_assignments} assigned student fee record(s).'
+        )
+    else:
+        messages.success(request, "Fee structure deleted.")
     return redirect('fees:fee_structure_list')
 
 
@@ -352,6 +376,7 @@ def bundle_form(request, pk=None):
             bundle.created_by = request.user
         bundle.save()
         bundle.generate_installments()
+        bundle.sync_to_fee_structure()
         messages.success(request, f"Bundle '{bundle.name}' saved — instalments auto-generated.")
         return redirect('fees:bundle_detail', pk=bundle.pk)
 
@@ -601,6 +626,29 @@ def fee_structure_items_json(request, pk):
 @login_required
 @role_required(*_ACCOUNTANT)
 def bulk_assign_fees(request):
+    deassign_structure_id = request.POST.get('deassign_structure_id', '').strip() if request.method == 'POST' else ''
+    if request.method == 'POST' and deassign_structure_id:
+        try:
+            structure = FeeStructure.objects.get(pk=deassign_structure_id)
+        except FeeStructure.DoesNotExist:
+            messages.error(request, 'Selected fee structure was not found.')
+            return redirect('fees:bulk_assign')
+
+        assigned_qs = StudentFee.objects.filter(fee_structure__structure=structure)
+        total_assigned = assigned_qs.count()
+        if total_assigned == 0:
+            messages.warning(request, 'No assigned student fees found for this structure.')
+            return redirect('fees:bulk_assign')
+
+        with transaction.atomic():
+            assigned_qs.delete()
+
+        messages.success(
+            request,
+            f'De-assigned {total_assigned} student fee record(s) from "{structure}".'
+        )
+        return redirect('fees:bulk_assign')
+
     form    = BulkAssignFeeForm(request.POST or None)
     results = None
 
@@ -614,10 +662,13 @@ def bulk_assign_fees(request):
             messages.warning(request, 'This fee structure has no fee-type items yet.')
             return redirect('fees:fee_structure_list')
 
-        # Filter students by the structure's grade (division is implicit via grade)
+        # Filter students by the structure's grade, optionally by section
+        section = form.cleaned_data.get('section')
         students = Student.objects.filter(
             grade=structure.grade, is_active=True
         )
+        if section:
+            students = students.filter(section=section)
 
         created = skipped = 0
         assigned_students = []
@@ -675,6 +726,7 @@ def bulk_assign_fees(request):
     for fs in structures_qs:
         structure_meta_map[str(fs.pk)] = {
             'grade':       str(fs.grade),
+            'grade_pk':    str(fs.grade_id),
             'division_pk': str(fs.grade.division_id),
             'year_pk':     str(fs.academic_year_id),
             'sections': [
@@ -683,9 +735,20 @@ def bulk_assign_fees(request):
             ],
         }
 
-    from core.models import AcademicYear
+    from core.models import AcademicYear, Grade as CoreGrade, Section as CoreSection
     years     = AcademicYear.objects.order_by('-start_date')
     divisions = Division.objects.order_by('name')
+
+    all_grades = CoreGrade.objects.select_related('division').order_by('division', 'order', 'name')
+    all_sections = CoreSection.objects.select_related('grade__division').order_by('grade', 'name')
+    grades_json = _json.dumps([
+        {'pk': str(g.pk), 'name': g.name, 'division_pk': str(g.division_id)}
+        for g in all_grades
+    ])
+    sections_json = _json.dumps([
+        {'pk': str(s.pk), 'name': s.name, 'grade_pk': str(s.grade_id)}
+        for s in all_sections
+    ])
 
     # ── Past assignment summary: group StudentFee by fee structure ──
     from django.db.models import Count, Max
@@ -693,6 +756,7 @@ def bulk_assign_fees(request):
         StudentFee.objects
         .values(
             'fee_structure__structure__pk',
+            'fee_structure__structure__name',
             'fee_structure__structure__academic_year__name',
             'fee_structure__structure__grade__name',
             'fee_structure__structure__grade__division__name',
@@ -711,6 +775,8 @@ def bulk_assign_fees(request):
         'structure_meta_map_json': _json.dumps(structure_meta_map),
         'years':          years,
         'divisions':      divisions,
+        'grades_json':    grades_json,
+        'sections_json':  sections_json,
         'past_assignments': past_assignments,
     })
 
