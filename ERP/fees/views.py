@@ -2041,3 +2041,340 @@ def delete_payment_plan(request, plan_pk):
     return redirect(reverse('fees:collection') + f"?student_id={student_id}")
 
 
+# ════════════════════════════════════════════════════════════════
+#  SIMPLIFIED TAX INVOICE ENTRY  —  landing menu
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def tax_invoice_menu(request):
+    """Landing page for Simplified Tax Invoice Entry (4 options)."""
+    return render(request, 'fees/tax_invoice_menu.html')
+
+
+# ════════════════════════════════════════════════════════════════
+#  OPTION 2 — INVOICE (RESERVATION / ENTRANCE)
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def reservation_invoice(request):
+    """
+    Generate a ZATCA simplified tax invoice specifically for
+    Reservation and/or Entrance Exam fees of a selected student.
+    Unlike the regular generate_invoice, this covers *all* paid fees
+    of those two categories that are not yet invoiced, OR it can
+    generate for a manually entered amount (e.g. pre-payment invoice).
+    """
+    query    = request.GET.get('q', '').strip()
+    students = []
+    student  = None
+    res_fees = []
+
+    if query:
+        students = Student.objects.filter(
+            Q(full_name__icontains=query) |
+            Q(student_id__icontains=query) |
+            Q(arabic_name__icontains=query),
+            is_active=True,
+        ).select_related('grade', 'section', 'division')[:30]
+
+    student_pk = request.GET.get('student_id') or request.POST.get('student_id')
+    if student_pk:
+        students = []
+        student  = get_object_or_404(
+            Student.objects.select_related('grade', 'section', 'division'),
+            pk=student_pk,
+        )
+        # Reservation & Entrance fees (paid + pending)
+        res_fees = list(
+            StudentFee.objects.filter(
+                student=student,
+                fee_structure__fee_type__category__in=[
+                    FeeType.RESERVATION, FeeType.ENTRANCE_EXAM, FeeType.ADMISSION,
+                    FeeType.REGISTRATION,
+                ],
+            )
+            .select_related('fee_structure__fee_type')
+            .order_by('fee_structure__fee_type__category', 'due_date')
+        )
+
+    if request.method == 'POST' and student:
+        selected_pks = request.POST.getlist('selected_fees')
+        notes        = request.POST.get('notes', '').strip()
+        if not selected_pks:
+            messages.error(request, "Select at least one fee line to invoice.")
+        else:
+            subtotal   = Decimal('0')
+            tax_total  = Decimal('0')
+            line_items = []
+            for pk_str in selected_pks:
+                try:
+                    sf = StudentFee.objects.select_related(
+                        'fee_structure__fee_type').get(pk=pk_str, student=student)
+                except StudentFee.DoesNotExist:
+                    continue
+                base = sf.amount - sf.discount
+                if base < Decimal('0'):
+                    base = Decimal('0')
+                rate = sf.fee_structure.fee_type.vat_rate_for(student.is_saudi)
+                tax  = (base * rate).quantize(Decimal('0.01'))
+                subtotal  += base
+                tax_total += tax
+                line_items.append({
+                    'description':    sf.fee_structure.fee_type.name,
+                    'qty':            1,
+                    'gross_amount':   float(sf.amount),
+                    'discount':       float(sf.discount),
+                    'net_before_vat': float(base),
+                    'vat_rate':       int(rate * 100),
+                    'vat':            float(tax),
+                    'total':          float(base + tax),
+                })
+
+            invoice = TaxInvoice.objects.create(
+                student         = student,
+                subtotal        = subtotal,
+                tax_amount      = tax_total,
+                total           = subtotal + tax_total,
+                status          = TaxInvoice.ISSUED,
+                invoice_type    = TaxInvoice.INVOICE_TYPE_STANDARD,
+                notes           = notes or 'Reservation / Entrance Fees Invoice',
+                created_by      = request.user,
+                line_items_json = line_items,
+            )
+            messages.success(request, f"Invoice {invoice.invoice_number} generated.")
+            return redirect('fees:invoice_print', pk=invoice.pk)
+
+    return render(request, 'fees/reservation_invoice.html', {
+        'query':    query,
+        'students': students,
+        'student':  student,
+        'res_fees': res_fees,
+    })
+
+
+# ════════════════════════════════════════════════════════════════
+#  OPTION 3 — TAX CREDIT NOTE  (Discount / Adjustment)
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def tax_credit_note(request):
+    """
+    Issue a standalone Tax Credit Note for a student to record a discount,
+    fee reversal, or general credit adjustment.  Not tied to a specific
+    original invoice.
+    """
+    query    = request.GET.get('q', '').strip()
+    students = []
+    student  = None
+
+    if query:
+        students = Student.objects.filter(
+            Q(full_name__icontains=query) |
+            Q(student_id__icontains=query) |
+            Q(arabic_name__icontains=query),
+            is_active=True,
+        ).select_related('grade', 'section', 'division')[:30]
+
+    student_pk = request.GET.get('student_id') or request.POST.get('student_id')
+    if student_pk:
+        students = []
+        student  = get_object_or_404(
+            Student.objects.select_related('grade', 'section', 'division'),
+            pk=student_pk,
+        )
+
+    if request.method == 'POST' and student:
+        # Dynamic line items submitted via JS rows
+        descriptions = request.POST.getlist('item_description[]')
+        gross_amounts = request.POST.getlist('item_gross[]')
+        discounts    = request.POST.getlist('item_discount[]')
+        vat_rates    = request.POST.getlist('item_vat_rate[]')
+        reason       = request.POST.get('credit_note_reason', '').strip()
+        notes        = request.POST.get('notes', '').strip()
+
+        line_items = []
+        subtotal   = Decimal('0')
+        tax_total  = Decimal('0')
+        errors     = []
+
+        for i, desc in enumerate(descriptions):
+            desc = desc.strip()
+            if not desc:
+                continue
+            try:
+                gross = Decimal(gross_amounts[i].strip() or '0')
+                disc  = Decimal(discounts[i].strip() or '0') if i < len(discounts) else Decimal('0')
+                rate  = Decimal(vat_rates[i].strip() or '0') / 100 if i < len(vat_rates) else Decimal('0')
+            except Exception:
+                errors.append(f"Row {i+1}: invalid number entered.")
+                continue
+            base = gross - disc
+            if base < Decimal('0'):
+                errors.append(f"Row {i+1}: discount exceeds gross amount.")
+                continue
+            tax = (base * rate).quantize(Decimal('0.01'))
+            subtotal  += base
+            tax_total += tax
+            line_items.append({
+                'description':    desc,
+                'qty':            1,
+                'gross_amount':   float(gross),
+                'discount':       float(disc),
+                'net_before_vat': float(base),
+                'vat_rate':       int(rate * 100),
+                'vat':            float(tax),
+                'total':          float(base + tax),
+                'is_credit':      True,
+            })
+
+        if errors:
+            for e in errors:
+                messages.error(request, e)
+        elif not line_items:
+            messages.error(request, "Add at least one credit line item.")
+        else:
+            invoice = TaxInvoice.objects.create(
+                student             = student,
+                subtotal            = subtotal,
+                tax_amount          = tax_total,
+                total               = subtotal + tax_total,
+                status              = TaxInvoice.ISSUED,
+                invoice_type        = TaxInvoice.INVOICE_TYPE_CREDIT_NOTE,
+                notes               = notes,
+                credit_note_reason  = reason,
+                created_by          = request.user,
+                line_items_json     = line_items,
+            )
+            messages.success(request, f"Tax Credit Note {invoice.invoice_number} issued.")
+            return redirect('fees:invoice_print', pk=invoice.pk)
+
+    fee_types = FeeType.objects.order_by('category', 'name')
+    return render(request, 'fees/tax_credit_note.html', {
+        'query':      query,
+        'students':   students,
+        'student':    student,
+        'fee_types':  fee_types,
+    })
+
+
+# ════════════════════════════════════════════════════════════════
+#  OPTION 4 — INVOICE TAX CREDIT NOTE  (against an existing invoice)
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def invoice_credit_note(request):
+    """
+    Issue a Tax Credit Note against a specific existing invoice.
+    Steps:
+      1. Search student → see their issued invoices
+      2. Select invoice → line items pre-filled (negated)
+      3. Adjust amounts / reason → create credit note TaxInvoice
+    """
+    query    = request.GET.get('q', '').strip()
+    students = []
+    student  = None
+    invoices = []
+    original = None
+
+    if query:
+        students = Student.objects.filter(
+            Q(full_name__icontains=query) |
+            Q(student_id__icontains=query) |
+            Q(arabic_name__icontains=query),
+            is_active=True,
+        ).select_related('grade', 'section', 'division')[:30]
+
+    student_pk = request.GET.get('student_id') or request.POST.get('student_id')
+    if student_pk:
+        students = []
+        student  = get_object_or_404(
+            Student.objects.select_related('grade', 'section', 'division'),
+            pk=student_pk,
+        )
+        invoices = TaxInvoice.objects.filter(
+            student=student,
+            invoice_type=TaxInvoice.INVOICE_TYPE_STANDARD,
+            status=TaxInvoice.ISSUED,
+        ).order_by('-date')
+
+    original_pk = request.GET.get('invoice_id') or request.POST.get('original_invoice_id')
+    if original_pk and student:
+        original = get_object_or_404(
+            TaxInvoice, pk=original_pk, student=student,
+        )
+
+    if request.method == 'POST' and student and original:
+        descriptions  = request.POST.getlist('item_description[]')
+        net_amounts   = request.POST.getlist('item_net[]')
+        vat_rates     = request.POST.getlist('item_vat_rate[]')
+        reason        = request.POST.get('credit_note_reason', '').strip()
+        notes         = request.POST.get('notes', '').strip()
+
+        line_items = []
+        subtotal   = Decimal('0')
+        tax_total  = Decimal('0')
+        errors     = []
+
+        for i, desc in enumerate(descriptions):
+            desc = desc.strip()
+            if not desc:
+                continue
+            try:
+                net  = Decimal(net_amounts[i].strip() or '0')
+                rate = Decimal(vat_rates[i].strip() or '0') / 100 if i < len(vat_rates) else Decimal('0')
+            except Exception:
+                errors.append(f"Row {i+1}: invalid number.")
+                continue
+            if net < Decimal('0'):
+                errors.append(f"Row {i+1}: amount must be ≥ 0.")
+                continue
+            tax = (net * rate).quantize(Decimal('0.01'))
+            subtotal  += net
+            tax_total += tax
+            line_items.append({
+                'description':    desc,
+                'qty':            1,
+                'gross_amount':   float(net),
+                'discount':       0.0,
+                'net_before_vat': float(net),
+                'vat_rate':       int(rate * 100),
+                'vat':            float(tax),
+                'total':          float(net + tax),
+                'is_credit':      True,
+            })
+
+        if errors:
+            for e in errors:
+                messages.error(request, e)
+        elif not line_items:
+            messages.error(request, "Add at least one credit line item.")
+        else:
+            credit_note = TaxInvoice.objects.create(
+                student             = student,
+                subtotal            = subtotal,
+                tax_amount          = tax_total,
+                total               = subtotal + tax_total,
+                status              = TaxInvoice.ISSUED,
+                invoice_type        = TaxInvoice.INVOICE_TYPE_CREDIT_NOTE,
+                notes               = notes,
+                credit_note_reason  = reason,
+                original_invoice    = original,
+                created_by          = request.user,
+                line_items_json     = line_items,
+            )
+            messages.success(request, f"Credit Note {credit_note.invoice_number} issued against {original.invoice_number}.")
+            return redirect('fees:invoice_print', pk=credit_note.pk)
+
+    return render(request, 'fees/invoice_credit_note.html', {
+        'query':    query,
+        'students': students,
+        'student':  student,
+        'invoices': invoices,
+        'original': original,
+    })
+
+

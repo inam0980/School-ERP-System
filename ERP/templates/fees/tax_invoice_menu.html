@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Simplified Tax Invoice Entry — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-8 pb-12">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+        <a href="{% url 'fees:dashboard' %}"
+           class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition" title="Back to Finance">
+            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-primary">Simplified Tax Invoice Entry</h1>
+            <p class="text-sm text-slate-500 mt-0.5">إدخال الفاتورة الضريبية المبسطة — Select an entry type below</p>
+        </div>
+    </div>
+
+    <!-- 4 Option Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+        <!-- 1. Invoice / Cash Collection -->
+        <a href="{% url 'fees:collection' %}"
+           class="group flex flex-col items-center justify-center gap-4 bg-white border-2 border-primary/20
+                  rounded-2xl p-8 shadow-sm hover:shadow-md hover:border-primary transition-all text-center">
+            <div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
+                <svg class="w-8 h-8 text-primary group-hover:text-white transition-colors" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="font-bold text-primary text-lg leading-tight">Invoice / Cash Collection</p>
+                <p class="text-slate-500 text-xs mt-1">فاتورة / تحصيل نقدي</p>
+                <p class="text-slate-400 text-xs mt-2">Collect payment and generate receipt for any fee type</p>
+            </div>
+        </a>
+
+        <!-- 2. Invoice (Reservation / Entrance) -->
+        <a href="{% url 'fees:reservation_invoice' %}"
+           class="group flex flex-col items-center justify-center gap-4 bg-white border-2 border-indigo-200
+                  rounded-2xl p-8 shadow-sm hover:shadow-md hover:border-indigo-500 transition-all text-center">
+            <div class="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-500 transition-all">
+                <svg class="w-8 h-8 text-indigo-500 group-hover:text-white transition-colors" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="font-bold text-indigo-700 text-lg leading-tight">Invoice (Reservation/Entrance)</p>
+                <p class="text-slate-500 text-xs mt-1">فاتورة حجز / اختبار قبول</p>
+                <p class="text-slate-400 text-xs mt-2">Generate ZATCA invoice for reservation & entrance exam fees</p>
+            </div>
+        </a>
+
+        <!-- 3. Tax Credit Note (Discount) -->
+        <a href="{% url 'fees:tax_credit_note' %}"
+           class="group flex flex-col items-center justify-center gap-4 bg-white border-2 border-amber-200
+                  rounded-2xl p-8 shadow-sm hover:shadow-md hover:border-amber-500 transition-all text-center">
+            <div class="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center group-hover:bg-amber-500 transition-all">
+                <svg class="w-8 h-8 text-amber-500 group-hover:text-white transition-colors" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="font-bold text-amber-700 text-lg leading-tight">Tax Credit Note (Discount)</p>
+                <p class="text-slate-500 text-xs mt-1">إشعار دائن ضريبي (خصم)</p>
+                <p class="text-slate-400 text-xs mt-2">Issue a standalone credit note / discount adjustment</p>
+            </div>
+        </a>
+
+        <!-- 4. Invoice Tax Credit Note -->
+        <a href="{% url 'fees:invoice_credit_note' %}"
+           class="group flex flex-col items-center justify-center gap-4 bg-white border-2 border-rose-200
+                  rounded-2xl p-8 shadow-sm hover:shadow-md hover:border-rose-500 transition-all text-center">
+            <div class="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center group-hover:bg-rose-500 transition-all">
+                <svg class="w-8 h-8 text-rose-500 group-hover:text-white transition-colors" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="font-bold text-rose-700 text-lg leading-tight">Invoice Tax Credit Note</p>
+                <p class="text-slate-500 text-xs mt-1">إشعار دائن ضريبي للفاتورة</p>
+                <p class="text-slate-400 text-xs mt-2">Create a credit note against a specific existing invoice</p>
+            </div>
+        </a>
+
+    </div>
+
+    <!-- Quick links row -->
+    <div class="flex flex-wrap gap-3 justify-center pt-2">
+        <a href="{% url 'fees:invoice_list' %}"
+           class="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-primary border border-slate-200 rounded-lg px-4 py-2 hover:border-primary transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+            </svg>
+            All Invoices
+        </a>
+        <a href="{% url 'fees:collection' %}"
+           class="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-primary border border-slate-200 rounded-lg px-4 py-2 hover:border-primary transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
+            </svg>
+            Fee Collection
+        </a>
+    </div>
+
+</div>
+{% endblock %}

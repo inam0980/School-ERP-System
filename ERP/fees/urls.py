@@ -76,5 +76,11 @@ urlpatterns = [
     # Installment Payment Plans (per student fee)
     path('payment-plan/<int:student_fee_pk>/setup/', views.setup_payment_plan, name='payment_plan_setup'),
     path('payment-plan/<int:plan_pk>/delete/',       views.delete_payment_plan, name='payment_plan_delete'),
+
+    # ── Simplified Tax Invoice Entry ──────────────────────────
+    path('tax-invoice/',                          views.tax_invoice_menu,        name='tax_invoice_menu'),
+    path('tax-invoice/reservation/',              views.reservation_invoice,     name='reservation_invoice'),
+    path('tax-invoice/credit-note/',              views.tax_credit_note,         name='tax_credit_note'),
+    path('tax-invoice/invoice-credit-note/',      views.invoice_credit_note,     name='invoice_credit_note'),
 ]
 
