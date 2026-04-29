@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load fee_pdf_filters %}
+{% block title %}Fee Structure PDF Export{% endblock %}
+{% block content %}
+<style>
+body { font-family: 'DejaVu Sans', Arial, sans-serif; }
+table { border-collapse: collapse; width: 100%; font-size: 11px; }
+th, td { border: 1px solid #888; padding: 4px 6px; }
+th { background: #f0f0f0; }
+.section-title { font-size: 15px; font-weight: bold; margin-top: 18px; margin-bottom: 6px; }
+.meta-table td { border: none; padding: 2px 6px; }
+</style>
+
+<div style="margin-bottom: 18px;">
+  <span class="section-title">Fee Structure Group Export</span>
+  <table class="meta-table">
+    <tr><td><b>Division:</b></td><td>{{ division.name }}</td></tr>
+    <tr><td><b>Academic Year:</b></td><td>{{ year }}</td></tr>
+    <tr><td><b>Structure Type:</b></td><td>{{ structure_type|capfirst }}</td></tr>
+    <tr><td><b>Exported:</b></td><td>{{ now }}</td></tr>
+  </table>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Grade</th>
+      <th>Structure Name</th>
+      <th>Frequency</th>
+      <th>Group Discount %</th>
+      <th>VAT %</th>
+      <th>Due Date</th>
+      <th>Structure Code</th>
+      <th>Description / Notes</th>
+      {% for ft in fee_types %}
+        <th>{{ ft.name }}</th>
+      {% endfor %}
+      {% for ft in fee_types %}
+        {% if ft.is_taxable %}<th>{{ ft.name }} + VAT</th>{% endif %}
+      {% endfor %}
+      <th>Total Before VAT</th>
+      <th>Total With VAT</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in structures %}
+    <tr>
+      <td>{{ s.grade.name }}</td>
+      <td>{{ s.name }}</td>
+      <td>{{ s.get_frequency_display }}</td>
+      <td>{{ s.group_discount|default:"-" }}</td>
+      <td>{{ s.vat_pct|default:"-" }}</td>
+      <td>{{ s.due_date|default:"-" }}</td>
+      <td>{{ s.structure_code|default:"-" }}</td>
+      <td>{{ s.description|default:"-" }}</td>
+      {% for ft in fee_types %}
+        <td>{{ s.items_by_type|get_item:ft.pk|default:"0.00" }}</td>
+      {% endfor %}
+      {% for ft in fee_types %}
+        {% if ft.is_taxable %}
+          <td>{{ s.items_by_type|get_item:ft.pk|add_vat:s.vat_pct|default:"0.00" }}</td>
+        {% endif %}
+      {% endfor %}
+      <td>{{ s.total_before_vat }}</td>
+      <td>{{ s.total_with_vat }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
