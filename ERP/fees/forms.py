@@ -3,7 +3,7 @@ from django.utils import timezone
 from decimal import Decimal
 from core.models import AcademicYear, Division, Grade, Section
 from .models import (
-    FeeType, FeeStructure, FeeStructureItem, FeeStructureBundle, BundleInstallment,
+    FeeType, FeeStructure, FeeStructureItem,
     StudentFee, Payment, TaxInvoice, Salary,
     TuitionFeeConfig, TuitionInstallment,
 )
@@ -39,12 +39,13 @@ class FeeTypeForm(forms.ModelForm):
 class FeeStructureForm(forms.ModelForm):
     class Meta:
         model  = FeeStructure
-        fields = ['name', 'academic_year', 'grade', 'frequency']
+        fields = ['name', 'structure_type', 'academic_year', 'grade', 'frequency']
         widgets = {
-            'name':          forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'Optional label, e.g. "Grade 1 American 2026–27"'}),
-            'academic_year': forms.Select(attrs={'class': _SELECT}),
-            'grade':         forms.Select(attrs={'class': _SELECT}),
-            'frequency':     forms.Select(attrs={'class': _SELECT}),
+            'name':           forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'Optional label, e.g. "Grade 1 American 2026–27"'}),
+            'structure_type': forms.Select(attrs={'class': _SELECT}),
+            'academic_year':  forms.Select(attrs={'class': _SELECT}),
+            'grade':          forms.Select(attrs={'class': _SELECT}),
+            'frequency':      forms.Select(attrs={'class': _SELECT}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -96,72 +97,6 @@ class FeeStructureBulkCreateForm(forms.Form):
         label='Minimum Down Payment (SAR)',
         help_text='Required first payment when collecting fees under this structure.',
     )
-
-
-class FeeStructureBundleForm(forms.ModelForm):
-    """
-    Single form that captures all fee amounts for a Division+Grade bundle:
-    Entrance Exam, Registration, Gross Tuition, Group Discount, Instalment config.
-    """
-    class Meta:
-        model  = FeeStructureBundle
-        fields = [
-            'name', 'structure_type', 'academic_year', 'division', 'grade', 'due_date',
-            'entrance_exam_fee', 'registration_fee',
-            'gross_tuition_fee', 'group_discount_pct',
-            'installments_count', 'min_down_payment',
-            'notes',
-        ]
-        widgets = {
-            'name':               forms.TextInput(attrs={'class': _INPUT,
-                                  'placeholder': 'e.g. Grade 5 English — 2026–27 Fee Schedule'}),
-            'structure_type':     forms.Select(attrs={'class': _SELECT}),
-            'academic_year':      forms.Select(attrs={'class': _SELECT}),
-            'division':           forms.Select(attrs={'class': _SELECT}),
-            'grade':              forms.Select(attrs={'class': _SELECT}),
-            'due_date':           forms.DateInput(attrs={'class': _INPUT, 'type': 'date'}),
-            'entrance_exam_fee':  forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0'}),
-            'registration_fee':   forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0'}),
-            'gross_tuition_fee':  forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0'}),
-            'group_discount_pct': forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01',
-                                  'min': '0', 'max': '100', 'placeholder': '0.00'}),
-            'installments_count': forms.Select(attrs={'class': _SELECT}),
-            'min_down_payment':   forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0.01'}),
-            'notes':              forms.Textarea(attrs={'class': _INPUT, 'rows': 2}),
-        }
-        labels = {
-            'entrance_exam_fee':  'Grade Level Entrance Exam Fee (SAR)',
-            'registration_fee':   'Registration Fee (SAR)',
-            'gross_tuition_fee':  'Gross Total Tuition Fee (SAR)',
-            'group_discount_pct': 'Group Discount (%)',
-            'min_down_payment':   'Minimum Down Payment (SAR)',
-        }
-
-    def clean_min_down_payment(self):
-        val = self.cleaned_data.get('min_down_payment')
-        if val is not None and val <= 0:
-            raise forms.ValidationError('Minimum down payment must be greater than 0.')
-        return val
-
-    def clean(self):
-        cleaned = super().clean()
-        gross = cleaned.get('gross_tuition_fee')
-        down  = cleaned.get('min_down_payment')
-        if gross is not None and down is not None and down > gross:
-            self.add_error('min_down_payment',
-                           f'Down payment (SAR {down:.2f}) cannot exceed gross tuition (SAR {gross:.2f}).')
-        return cleaned
-
-
-class BundleInstallmentForm(forms.ModelForm):
-    class Meta:
-        model  = BundleInstallment
-        fields = ['label', 'amount', 'due_date']
-        widgets = {
-            'label':    forms.TextInput(attrs={'class': _INPUT}),
-            'amount':   forms.NumberInput(attrs={'class': _INPUT, 'step': '0.01', 'min': '0.01'}),
-            'due_date': forms.DateInput(attrs={'class': _INPUT, 'type': 'date'}),
-        }
 
 
 class BulkAssignFeeForm(forms.Form):

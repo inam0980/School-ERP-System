@@ -71,6 +71,18 @@
             </div>
 
             <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Structure Type <span class="text-red-500">*</span></label>
+                <select name="structure_type"
+                        class="border {% if form.structure_type.errors %}border-red-400{% else %}border-slate-300{% endif %}
+                               rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    {% for val, label in form.fields.structure_type.choices %}
+                    <option value="{{ val }}" {% if form.structure_type.value == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                {% if form.structure_type.errors %}<p class="text-red-500 text-xs mt-1">{{ form.structure_type.errors.0 }}</p>{% endif %}
+            </div>
+
+            <div class="mb-4">
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Academic Year <span class="text-red-500">*</span></label>
                 <select name="academic_year"
                         class="border {% if form.academic_year.errors %}border-red-400{% else %}border-slate-300{% endif %}
@@ -356,6 +368,7 @@
                     class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
                 <option value="regular" {% if post_data.structure_type == 'regular' or not post_data.structure_type %}selected{% endif %}>↻ Regular</option>
                 <option value="new" {% if post_data.structure_type == 'new' %}selected{% endif %}>✦ New</option>
+                <option value="other" {% if post_data.structure_type == 'other' %}selected{% endif %}>◈ Other</option>
             </select>
         </div>
         <div>

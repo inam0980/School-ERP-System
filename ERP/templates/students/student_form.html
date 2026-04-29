@@ -221,6 +221,7 @@
             </div>
             <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-5">
                 {% include 'students/_field.html' with field=form.enrollment_type %}
+                {% include 'students/_field.html' with field=form.fee_category %}
                 {% include 'students/_field.html' with field=form.admission_date %}
                 <div class="md:col-span-2">
                     {% include 'students/_field.html' with field=form.previous_school %}

@@ -66,7 +66,7 @@ class StudentForm(forms.ModelForm):
             # Address
             'address', 'arabic_address',
             # Status
-            'enrollment_type', 'admission_date', 'previous_school', 'is_active',
+            'enrollment_type', 'fee_category', 'admission_date', 'previous_school', 'is_active',
             # Photo
             'photo',
         ]
@@ -83,6 +83,7 @@ class StudentForm(forms.ModelForm):
             'mother_home_address': forms.Textarea(attrs={'rows': 2, 'class': _INPUT}),
             'father_employed_at_school': forms.Select(attrs={'class': _INPUT}),
             'mother_employed_at_school': forms.Select(attrs={'class': _INPUT}),
+            'fee_category':              forms.Select(attrs={'class': _INPUT}),
             'is_active':       forms.CheckboxInput(attrs={'class': _CHECK}),
             'photo':           forms.FileInput(attrs={'class': _FILE, 'accept': 'image/*'}),
         }
