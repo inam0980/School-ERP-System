@@ -55,7 +55,7 @@
 
 {# ── Division sections ── #}
 {% if divisions_map %}
-{% for division, structures in divisions_map.items %}
+{% for division, grades_map in divisions_map.items %}
 <div class="mb-8">
 
     {# Division header #}
@@ -66,124 +66,114 @@
         <div class="flex-1 min-w-0">
             <h2 class="text-white font-bold text-base leading-snug">{{ division }} Division</h2>
             <p class="text-white/65 text-xs mt-0.5">
-                {{ structures|length }} grade structure{{ structures|length|pluralize }}
+                {{ grades_map|length }} grade{{ grades_map|length|pluralize }}
             </p>
         </div>
         <span class="shrink-0 bg-white/15 text-white text-xs font-semibold px-3 py-1 rounded-full">
-            {{ structures|length }} grade{{ structures|length|pluralize }}
+            {{ grades_map|length }} grade{{ grades_map|length|pluralize }}
         </span>
     </div>
 
-    {# Grade rows #}
-    <div class="border border-slate-200 rounded-b-xl overflow-hidden bg-white shadow-sm divide-y divide-slate-100">
-    {% for s in structures %}
-    <div class="structure-row">
+    {# Tabbed type view #}
+    <div class="border border-t-0 border-slate-200 rounded-b-xl bg-white shadow-sm overflow-hidden" id="divtabs-{{ forloop.counter }}">
 
-        {# Always-visible info row #}
-        <div class="flex items-center gap-4 px-5 py-4">
-
-            {# Toggle chevron #}
+        {# Tab buttons #}
+        <div class="flex border-b border-slate-200 bg-slate-50/70">
             <button type="button"
-                    onclick="toggleFees(this.closest('.structure-row'))"
-                    class="shrink-0 w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition"
-                    title="Show / hide fee types">
-                <svg class="w-3.5 h-3.5 text-slate-500 chevron transition-transform duration-200"
-                     fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
-                </svg>
+                    onclick="switchTab('divtabs-{{ forloop.counter }}', 'regular')"
+                    data-tab-btn="regular"
+                    data-active-classes="border-blue-500 text-blue-600 bg-white"
+                    class="px-6 py-3 text-sm font-semibold border-b-2 border-blue-500 text-blue-600 bg-white -mb-px transition-all">
+                ↻ Regular
             </button>
+            <button type="button"
+                    onclick="switchTab('divtabs-{{ forloop.counter }}', 'new')"
+                    data-tab-btn="new"
+                    data-active-classes="border-emerald-500 text-emerald-600 bg-white"
+                    class="px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-600 -mb-px transition-all">
+                ✦ New
+            </button>
+            <button type="button"
+                    onclick="switchTab('divtabs-{{ forloop.counter }}', 'other')"
+                    data-tab-btn="other"
+                    data-active-classes="border-slate-500 text-slate-700 bg-white"
+                    class="px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-600 -mb-px transition-all">
+                ◈ Other
+            </button>
+        </div>
 
-            {# Grade info #}
-            <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <p class="font-semibold text-slate-800 text-sm leading-snug">
-                        {{ s.grade.name }}
-                        {% if s.name %}
-                        <span class="text-slate-400 font-normal"> — {{ s.name }}</span>
-                        {% endif %}
-                    </p>
-                    {% if s.structure_type == 'new' %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">✦ New</span>
-                    {% elif s.structure_type == 'regular' %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">↻ Regular</span>
-                    {% endif %}
-                </div>
-                <p class="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                    <span>{{ s.academic_year }}</span>
-                    <span class="text-slate-300">·</span>
-                    <span>{{ s.get_frequency_display }}</span>
-                    <span class="text-slate-300">·</span>
-                    <span class="text-primary font-semibold">
+        {# ── Regular panel ── #}
+        <div data-tab-panel="regular" class="divide-y divide-slate-100">
+            {% for grade, types in grades_map.items %}{% with s=types.regular %}{% if s %}
+            <div class="flex items-center gap-4 px-5 py-3.5">
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-slate-800 text-sm">{{ grade.name }}{% if s.name %} <span class="text-slate-400 font-normal text-xs">— {{ s.name }}</span>{% endif %}</p>
+                    <p class="text-xs text-slate-400 mt-0.5">
                         {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
-                    </span>
-                </p>
+                        &middot; {{ s.academic_year }} &middot; {{ s.get_frequency_display }}
+                    </p>
+                </div>
+                <div class="shrink-0 flex gap-1.5">
+                    <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}" class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">✏️ Edit</a>
+                    <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}" class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">Assign →</a>
+                    <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}" onsubmit="return confirm('Delete this structure and ALL linked fee records? This cannot be undone.');" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">🗑 Delete</button>
+                    </form>
+                </div>
             </div>
-
-            {# Action buttons #}
-            <div class="shrink-0 flex items-center gap-2">
-                <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}"
-                   class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">
-                    ✏️ Edit
-                </a>
-                <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}"
-                   class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">
-                    Assign →
-                </a>
-                <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}"
-                      onsubmit="return confirm('Delete this structure and ALL linked fee records (including any payments)? This cannot be undone.');" class="inline">
-                    {% csrf_token %}
-                    <button type="submit"
-                            class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">
-                        🗑 Delete
-                    </button>
-                </form>
-            </div>
+            {% endif %}{% endwith %}{% endfor %}
+            <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No Regular structures set for this division.</div>
         </div>
 
-        {# Expandable fee table #}
-        <div class="fees-panel hidden">
-            {% if s.items.all %}
-            <div class="border-t border-slate-100 bg-slate-50/60">
-                <table class="min-w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-slate-200">
-                            <th class="pl-16 pr-5 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Fee Type</th>
-                            <th class="px-5 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Base (SAR)</th>
-                            <th class="px-5 py-2.5 text-right text-xs font-semibold text-emerald-700 uppercase tracking-wide">🇸🇦 Saudi</th>
-                            <th class="px-5 py-2.5 text-right text-xs font-semibold text-blue-700 uppercase tracking-wide">🌍 Non-Saudi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for item in s.items.all %}
-                    <tr class="border-b border-slate-100 last:border-0 hover:bg-white/80 transition">
-                        <td class="pl-16 pr-5 py-3">
-                            <span class="font-medium text-slate-700">{{ item.fee_type.name }}</span>
-                            {% if item.fee_type.is_taxable %}
-                            <span class="ml-2 text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-md">+15% VAT</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-5 py-3 text-right font-medium text-slate-700">{{ item.amount }}</td>
-                        <td class="px-5 py-3 text-right font-semibold text-emerald-700">{{ item.amount }}</td>
-                        <td class="px-5 py-3 text-right">
-                            <span class="font-semibold text-blue-700">{{ item.expat_total }}</span>
-                            {% if item.fee_type.is_taxable %}
-                            <span class="block text-xs text-blue-400 font-normal">+{{ item.expat_vat }} VAT</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
+        {# ── New panel ── #}
+        <div data-tab-panel="new" class="hidden divide-y divide-slate-100">
+            {% for grade, types in grades_map.items %}{% with s=types.new %}{% if s %}
+            <div class="flex items-center gap-4 px-5 py-3.5">
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-slate-800 text-sm">{{ grade.name }}{% if s.name %} <span class="text-slate-400 font-normal text-xs">— {{ s.name }}</span>{% endif %}</p>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
+                        &middot; {{ s.academic_year }} &middot; {{ s.get_frequency_display }}
+                    </p>
+                </div>
+                <div class="shrink-0 flex gap-1.5">
+                    <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}" class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">✏️ Edit</a>
+                    <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}" class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">Assign →</a>
+                    <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}" onsubmit="return confirm('Delete this structure and ALL linked fee records? This cannot be undone.');" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">🗑 Delete</button>
+                    </form>
+                </div>
             </div>
-            {% else %}
-            <div class="border-t border-slate-100 px-16 py-4 text-xs text-slate-400 italic bg-slate-50/50">
-                No fee types added yet — click Edit to add amounts.
-            </div>
-            {% endif %}
+            {% endif %}{% endwith %}{% endfor %}
+            <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No New structures set for this division.</div>
         </div>
 
-    </div>
-    {% endfor %}
+        {# ── Other panel ── #}
+        <div data-tab-panel="other" class="hidden divide-y divide-slate-100">
+            {% for grade, types in grades_map.items %}{% with s=types.other %}{% if s %}
+            <div class="flex items-center gap-4 px-5 py-3.5">
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-slate-800 text-sm">{{ grade.name }}{% if s.name %} <span class="text-slate-400 font-normal text-xs">— {{ s.name }}</span>{% endif %}</p>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
+                        &middot; {{ s.academic_year }} &middot; {{ s.get_frequency_display }}
+                    </p>
+                </div>
+                <div class="shrink-0 flex gap-1.5">
+                    <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}" class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">✏️ Edit</a>
+                    <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}" class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">Assign →</a>
+                    <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}" onsubmit="return confirm('Delete this structure and ALL linked fee records? This cannot be undone.');" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">🗑 Delete</button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}{% endwith %}{% endfor %}
+            <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No Other structures set for this division.</div>
+        </div>
+
     </div>
 
 </div>
@@ -201,88 +191,6 @@
 </div>
 {% endif %}
 
-{# ── Fee Structure Bundles section ── #}
-<div class="mt-8 mb-2 flex items-center justify-between">
-    <div>
-        <h2 class="text-lg font-bold text-slate-700">Fee Structure Bundles</h2>
-        <p class="text-xs text-slate-500 mt-0.5">Structures created via the bulk division form — entrance exam, registration &amp; tuition in one place</p>
-    </div>
-    <a href="{% url 'fees:bundle_list' %}" class="text-xs text-primary hover:underline font-semibold">View all bundles →</a>
-</div>
-
-{% if bundles_by_division %}
-{% for division, bundles in bundles_by_division.items %}
-<div class="mb-6">
-    {# Division header #}
-    <div class="flex items-center gap-3 px-4 py-3 bg-slate-700 rounded-t-xl">
-        <span class="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white text-sm font-bold shrink-0">{{ division.name|slice:":1" }}</span>
-        <span class="text-white font-bold text-sm">{{ division }}</span>
-        <span class="ml-auto bg-white/15 text-white text-xs font-semibold px-2.5 py-0.5 rounded-full">{{ bundles|length }} grade{{ bundles|length|pluralize }}</span>
-    </div>
-    {# Bundle cards #}
-    <div class="border border-slate-200 rounded-b-xl bg-white shadow-sm divide-y divide-slate-100">
-    {% for b in bundles %}
-    <div class="px-5 py-4">
-        {# Row 1: grade + type badge + year + actions #}
-        <div class="flex items-start justify-between gap-3 flex-wrap">
-            <div class="flex items-center gap-2 flex-wrap min-w-0">
-                <span class="font-semibold text-slate-800 text-sm">{{ b.grade }}</span>
-                {% if b.structure_type == 'new' %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">✦ New</span>
-                {% else %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">↻ Regular</span>
-                {% endif %}
-                <span class="text-xs text-slate-400 font-medium">{{ b.academic_year }}</span>
-                <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">{{ b.installments_count }} instalment{{ b.installments_count|pluralize }}</span>
-            </div>
-            <div class="flex gap-1.5 shrink-0">
-                <a href="{% url 'fees:bundle_detail' b.pk %}" class="px-2.5 py-1 rounded bg-blue-50 text-blue-700 text-xs hover:bg-blue-100 font-medium">View</a>
-                <a href="{% url 'fees:bundle_edit' b.pk %}" class="px-2.5 py-1 rounded bg-amber-50 text-amber-700 text-xs hover:bg-amber-100 font-medium">Edit</a>
-            </div>
-        </div>
-        {# Row 2: financial figures grid #}
-        <div class="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-            <div class="bg-slate-50 rounded-lg px-3 py-2">
-                <p class="text-xs text-slate-400 mb-0.5">Entrance Exam</p>
-                <p class="text-sm font-semibold text-slate-700">SAR {{ b.entrance_exam_fee|floatformat:2 }}</p>
-            </div>
-            <div class="bg-slate-50 rounded-lg px-3 py-2">
-                <p class="text-xs text-slate-400 mb-0.5">Registration</p>
-                <p class="text-sm font-semibold text-slate-700">SAR {{ b.registration_fee|floatformat:2 }}</p>
-            </div>
-            <div class="bg-slate-50 rounded-lg px-3 py-2">
-                <p class="text-xs text-slate-400 mb-0.5">Gross Tuition</p>
-                <p class="text-sm font-semibold text-slate-700">SAR {{ b.gross_tuition_fee|floatformat:2 }}</p>
-            </div>
-            <div class="bg-{% if b.group_discount_pct > 0 %}green-50{% else %}slate-50{% endif %} rounded-lg px-3 py-2">
-                <p class="text-xs text-slate-400 mb-0.5">Group Discount</p>
-                {% if b.group_discount_pct > 0 %}
-                <p class="text-sm font-semibold text-green-700">{{ b.group_discount_pct }}% <span class="text-xs font-normal text-green-500">− SAR {{ b.group_discount_amount|floatformat:2 }}</span></p>
-                {% else %}
-                <p class="text-sm text-slate-300">—</p>
-                {% endif %}
-            </div>
-            <div class="bg-primary/5 rounded-lg px-3 py-2 col-span-2 sm:col-span-1">
-                <p class="text-xs text-primary/70 mb-0.5">Total Bundle</p>
-                <p class="text-sm font-bold text-primary">SAR {{ b.total_bundle|floatformat:2 }}</p>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-    </div>
-</div>
-{% endfor %}
-{% else %}
-<div class="bg-slate-50 border border-slate-200 rounded-xl px-6 py-8 text-center text-slate-400 mb-6">
-    <p class="font-medium text-slate-500 mb-1">No fee structure bundles yet</p>
-    <p class="text-xs mb-4">Use <strong>+ Add Structure</strong> above to create bulk fee structures for an entire division.</p>
-    <a href="{% url 'fees:fee_structure_add' %}"
-       class="inline-block px-4 py-2 bg-primary text-white rounded-lg text-xs font-semibold hover:bg-primary-light transition">
-        + Create Bundle Structure
-    </a>
-</div>
-{% endif %}
-
 {# Bulk assign CTA #}
 <div class="mt-4 flex justify-end">
     <a href="{% url 'fees:bulk_assign' %}"
@@ -292,12 +200,21 @@
 </div>
 
 <script>
-function toggleFees(row) {
-    const panel   = row.querySelector('.fees-panel');
-    const chevron = row.querySelector('.chevron');
-    const isOpen  = !panel.classList.contains('hidden');
-    panel.classList.toggle('hidden', isOpen);
-    chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+function switchTab(containerId, type) {
+    const container = document.getElementById(containerId);
+    container.querySelectorAll('[data-tab-panel]').forEach(p => p.classList.add('hidden'));
+    container.querySelector('[data-tab-panel="' + type + '"]').classList.remove('hidden');
+    container.querySelectorAll('[data-tab-btn]').forEach(btn => {
+        btn.className = 'px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-600 -mb-px transition-all';
+    });
+    const activeBtn = container.querySelector('[data-tab-btn="' + type + '"]');
+    activeBtn.className = 'px-6 py-3 text-sm font-semibold border-b-2 -mb-px transition-all ' + activeBtn.dataset.activeClasses;
 }
+
+document.querySelectorAll('[data-tab-panel]').forEach(panel => {
+    const rows = panel.querySelectorAll('.flex.items-center.gap-4');
+    const msg  = panel.querySelector('.tab-empty');
+    if (msg && rows.length > 0) msg.classList.add('hidden');
+});
 </script>
 {% endblock %}

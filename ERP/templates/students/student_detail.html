@@ -36,6 +36,13 @@
                         <span class="px-2.5 py-1 text-xs font-semibold bg-red-50 text-red-600 border border-red-200 rounded-full">Inactive</span>
                     {% endif %}
                     <span class="px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full">{{ student.get_enrollment_type_display }}</span>
+                    {% if student.fee_category == 'new' %}
+                    <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full">✦ New Fee</span>
+                    {% elif student.fee_category == 'regular' %}
+                    <span class="px-2.5 py-1 text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200 rounded-full">↻ Regular Fee</span>
+                    {% elif student.fee_category == 'other' %}
+                    <span class="px-2.5 py-1 text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200 rounded-full">◈ Other Fee</span>
+                    {% endif %}
                 </div>
             </div>
             <!-- Quick stats -->

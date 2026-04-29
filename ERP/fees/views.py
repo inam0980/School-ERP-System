@@ -19,14 +19,13 @@ from accounts.decorators import role_required
 from students.models import Student
 from core.models import AcademicYear, Division, Grade, Section
 from .models import (
-    FeeType, FeeStructure, FeeStructureItem, FeeStructureBundle, BundleInstallment,
+    FeeType, FeeStructure, FeeStructureItem,
     StudentFee, Payment, TaxInvoice, Salary,
     TuitionFeeConfig, TuitionInstallment,
     PaymentPlan, PaymentPlanInstallment,
 )
 from .forms import (
     FeeTypeForm, FeeStructureForm, FeeStructureBulkCreateForm,
-    FeeStructureBundleForm, BundleInstallmentForm,
     BulkAssignFeeForm,
     StudentFeeEditForm, PaymentForm, FeeReportFilterForm,
     SalaryForm, SalaryMonthFilterForm,
@@ -122,39 +121,17 @@ def fee_structure_list(request):
     if year_id:
         qs = qs.filter(academic_year_id=year_id)
 
-    # Group by division for display
+    # Group by division → grade → structure_type
     divisions_map = {}
     for s in qs:
         div = s.grade.division
-        divisions_map.setdefault(div, []).append(s)
-
-    # Also fetch bundles for the same year filter
-    bundle_qs = FeeStructureBundle.objects.select_related(
-        'academic_year', 'division', 'grade'
-    ).prefetch_related('installments')
-    if year_id:
-        bundle_qs = bundle_qs.filter(academic_year_id=year_id)
-
-    # Build a lookup: (grade_pk, year_pk) → structure_type so we can badge FeeStructure rows
-    bundle_type_map = {
-        (b.grade_id, b.academic_year_id): b.structure_type
-        for b in bundle_qs
-    }
-    # Annotate each structure with its type (from the matching bundle, or empty)
-    for structs in divisions_map.values():
-        for s in structs:
-            s.structure_type = bundle_type_map.get((s.grade_id, s.academic_year_id), '')
-
-    # Group bundles by division
-    bundles_by_division = {}
-    for b in bundle_qs:
-        bundles_by_division.setdefault(b.division, []).append(b)
+        grade = s.grade
+        divisions_map.setdefault(div, {}).setdefault(grade, {})[s.structure_type] = s
 
     return render(request, 'fees/fee_structure_list.html', {
-        'divisions_map':       divisions_map,
-        'bundles_by_division': bundles_by_division,
-        'years':               AcademicYear.objects.all(),
-        'active_year':         year_id,
+        'divisions_map': divisions_map,
+        'years':         AcademicYear.objects.all(),
+        'active_year':   year_id,
     })
 
 
@@ -221,22 +198,13 @@ def fee_structure_form(request, pk=None):
         due_date_raw        = request.POST.get('due_date', '').strip()
         structure_type      = request.POST.get('structure_type', 'regular').strip()
         structure_name_base = request.POST.get('structure_name', '').strip()
-        structure_code      = request.POST.get('structure_code', '').strip()
-        description         = request.POST.get('description', '').strip()
         global_discount_raw = request.POST.get('global_group_discount', '0').strip() or '0'
-        installments_raw    = request.POST.get('installments_count', '3').strip()
-        if structure_type not in ('regular', 'new'):
+        if structure_type not in ('regular', 'new', 'other'):
             structure_type = 'regular'
         try:
             global_discount = Decimal(global_discount_raw)
         except Exception:
             global_discount = Decimal('0')
-        try:
-            installments_count = int(installments_raw)
-            if installments_count not in (1, 2, 3, 4):
-                installments_count = 3
-        except Exception:
-            installments_count = 3
         errors = []
         if not academic_year_id:
             errors.append('Academic Year is required.')
@@ -261,6 +229,13 @@ def fee_structure_form(request, pk=None):
             if year and division and due_date:
                 grades = Grade.objects.filter(division=division).order_by('order', 'name')
                 created_count = 0
+
+                def _get_fee_type(category, name):
+                    ft = FeeType.objects.filter(category=category).first()
+                    if not ft:
+                        ft = FeeType.objects.create(name=name, category=category, is_mandatory=False)
+                    return ft
+
                 for grade in grades:
                     gross_raw = request.POST.get(f'gross_tuition_{grade.pk}', '').strip()
                     if not gross_raw:
@@ -269,35 +244,34 @@ def fee_structure_form(request, pk=None):
                         entrance     = Decimal(request.POST.get(f'entrance_exam_{grade.pk}', '0').strip() or '0')
                         registration = Decimal(request.POST.get(f'registration_{grade.pk}', '0').strip() or '0')
                         gross        = Decimal(gross_raw)
-                        # Per-grade discount overrides global if set, else use global
                         per_grade_raw = request.POST.get(f'group_discount_{grade.pk}', '').strip()
                         discount_pct  = Decimal(per_grade_raw) if per_grade_raw else global_discount
-                        down_raw     = request.POST.get(f'down_payment_{grade.pk}', '').strip()
-                        down_payment = Decimal(down_raw) if down_raw else Decimal('1.00')
-                        if down_payment <= 0:
-                            down_payment = Decimal('1.00')
-                        bundle_name = f'{structure_name_base} — {grade.name}'
-                        bundle, _ = FeeStructureBundle.objects.update_or_create(
+                        net_tuition   = (gross * (1 - discount_pct / 100)).quantize(Decimal('0.01'))
+                        bundle_name   = f'{structure_name_base} — {grade.name}'
+
+                        structure, _ = FeeStructure.objects.update_or_create(
                             academic_year=year,
-                            division=division,
                             grade=grade,
                             structure_type=structure_type,
-                            defaults={
-                                'name':               bundle_name,
-                                'code':               structure_code,
-                                'entrance_exam_fee':  entrance,
-                                'registration_fee':   registration,
-                                'gross_tuition_fee':  gross,
-                                'group_discount_pct': discount_pct,
-                                'min_down_payment':   down_payment,
-                                'installments_count': installments_count,
-                                'due_date':           due_date,
-                                'notes':              description,
-                                'created_by':         request.user,
-                            },
+                            defaults={'name': bundle_name, 'frequency': 'ANNUAL'},
                         )
-                        bundle.generate_installments()
-                        bundle.sync_to_fee_structure()
+                        if entrance > 0:
+                            ft_entrance = _get_fee_type(FeeType.ENTRANCE_EXAM, 'Entrance Exam Fee')
+                            FeeStructureItem.objects.update_or_create(
+                                structure=structure, fee_type=ft_entrance,
+                                defaults={'amount': entrance},
+                            )
+                        if registration > 0:
+                            ft_reg = _get_fee_type(FeeType.REGISTRATION, 'Registration Fee')
+                            FeeStructureItem.objects.update_or_create(
+                                structure=structure, fee_type=ft_reg,
+                                defaults={'amount': registration},
+                            )
+                        ft_tuition = _get_fee_type(FeeType.TUITION, 'Tuition Fee')
+                        FeeStructureItem.objects.update_or_create(
+                            structure=structure, fee_type=ft_tuition,
+                            defaults={'amount': net_tuition},
+                        )
                         created_count += 1
                     except Exception as exc:
                         messages.error(request, f'Error saving {grade.name}: {exc}')
@@ -305,10 +279,10 @@ def fee_structure_form(request, pk=None):
                 if created_count:
                     messages.success(
                         request,
-                        f'{created_count} fee structure bundle(s) created for '
+                        f'{created_count} fee structure(s) created for '
                         f'{division.name} — {year}.'
                     )
-                    return redirect('fees:bundle_list')
+                    return redirect('fees:fee_structure_list')
                 else:
                     messages.error(request, 'No grades saved. Enter Gross Tuition for at least one grade.')
 
@@ -342,258 +316,6 @@ def fee_structure_delete(request, pk):
     else:
         messages.success(request, "Fee structure deleted.")
     return redirect('fees:fee_structure_list')
-
-
-# ════════════════════════════════════════════════════════════════
-#  FEE STRUCTURE BUNDLE  (all-in-one: entrance + registration + tuition)
-# ════════════════════════════════════════════════════════════════
-
-@login_required
-@role_required(*_ACCOUNTANT)
-def bundle_list(request):
-    year_id = request.GET.get('year', '')
-    qs = (FeeStructureBundle.objects
-          .select_related('academic_year', 'division', 'grade', 'created_by')
-          .prefetch_related('installments'))
-    if year_id:
-        qs = qs.filter(academic_year_id=year_id)
-    return render(request, 'fees/bundle_list.html', {
-        'bundles':     qs,
-        'years':       AcademicYear.objects.all(),
-        'active_year': year_id,
-    })
-
-
-@login_required
-@role_required(*_ADMIN)
-def bundle_form(request, pk=None):
-    instance = get_object_or_404(FeeStructureBundle, pk=pk) if pk else None
-    form     = FeeStructureBundleForm(request.POST or None, instance=instance)
-
-    if form.is_valid():
-        bundle = form.save(commit=False)
-        if not instance:
-            bundle.created_by = request.user
-        bundle.save()
-        bundle.generate_installments()
-        bundle.sync_to_fee_structure()
-        messages.success(request, f"Bundle '{bundle.name}' saved — instalments auto-generated.")
-        return redirect('fees:bundle_detail', pk=bundle.pk)
-
-    return render(request, 'fees/bundle_form.html', {
-        'form':     form,
-        'instance': instance,
-        'title':    'Edit Fee Structure Bundle' if instance else 'Create Fee Structure Bundle',
-    })
-
-
-@login_required
-@role_required(*_ACCOUNTANT)
-def bundle_detail(request, pk):
-    bundle = get_object_or_404(
-        FeeStructureBundle.objects
-        .select_related('academic_year', 'division', 'grade', 'created_by')
-        .prefetch_related('installments'),
-        pk=pk,
-    )
-
-    # ── Save edited instalments ──────────────────────────────────
-    if request.method == 'POST' and 'save_installments' in request.POST:
-        errors = []
-        for inst in bundle.installments.all():
-            raw_amt   = request.POST.get(f'inst_amount_{inst.pk}', '').strip()
-            raw_due   = request.POST.get(f'inst_due_{inst.pk}', '').strip()
-            raw_label = request.POST.get(f'inst_label_{inst.pk}', inst.label).strip()
-            try:
-                amt = Decimal(raw_amt)
-                if amt <= 0:
-                    raise ValueError
-            except Exception:
-                errors.append(f'Instalment #{inst.installment_no}: invalid amount.')
-                continue
-            if inst.installment_no == 1 and amt < bundle.min_down_payment:
-                errors.append(
-                    f'Down payment must be at least SAR {bundle.min_down_payment:.2f}.'
-                )
-                continue
-            try:
-                due = date.fromisoformat(raw_due) if raw_due else inst.due_date
-            except Exception:
-                due = inst.due_date
-            inst.amount   = amt
-            inst.due_date = due
-            inst.label    = raw_label or inst.label
-            inst.save()
-
-        if errors:
-            for e in errors:
-                messages.error(request, e)
-        else:
-            messages.success(request, 'Instalments updated successfully.')
-        return redirect('fees:bundle_detail', pk=bundle.pk)
-
-    # ── Regenerate instalments (reset to equal splits) ───────────
-    if request.method == 'POST' and 'regenerate' in request.POST:
-        bundle.generate_installments()
-        messages.success(request, 'Instalments regenerated with equal splits.')
-        return redirect('fees:bundle_detail', pk=bundle.pk)
-
-    sections = Section.objects.filter(grade=bundle.grade).order_by('name')
-    return render(request, 'fees/bundle_detail.html', {
-        'bundle':   bundle,
-        'sections': sections,
-    })
-
-
-@login_required
-@role_required(*_ACCOUNTANT)
-@require_POST
-def bundle_assign(request, pk):
-    """
-    Assign a FeeStructureBundle to all active students in its Division+Grade
-    (optionally filtered to one Section).
-    Creates FeeStructure records per fee type and StudentFee records per student.
-    For tuition, creates a PaymentPlan with the bundle's instalments.
-    """
-    bundle     = get_object_or_404(FeeStructureBundle, pk=pk)
-    section_id = request.POST.get('section_id', '').strip()
-
-    students = Student.objects.filter(
-        grade=bundle.grade,
-        division=bundle.division,
-        is_active=True,
-    )
-    if section_id:
-        students = students.filter(section_id=section_id)
-
-    if not students.exists():
-        messages.warning(request, 'No active students found for this bundle\'s Division / Grade.')
-        return redirect('fees:bundle_detail', pk=bundle.pk)
-
-    # ── Get or create the three FeeType objects ──────────────────
-    ft_entrance, _ = FeeType.objects.get_or_create(
-        category=FeeType.ENTRANCE_EXAM,
-        defaults={'name': 'Grade Level Entrance Exam Fee', 'is_taxable': False},
-    )
-    ft_reg, _ = FeeType.objects.get_or_create(
-        category=FeeType.REGISTRATION,
-        defaults={'name': 'Registration Fee', 'is_taxable': False},
-    )
-    ft_tuition, _ = FeeType.objects.get_or_create(
-        category=FeeType.TUITION,
-        defaults={'name': 'Tuition Fee', 'is_taxable': True},
-    )
-
-    # ── Get or create one FeeStructure container + items ─────────
-    container, _ = FeeStructure.objects.get_or_create(
-        academic_year=bundle.academic_year,
-        grade=bundle.grade,
-        defaults={'name': bundle.name, 'frequency': 'ANNUAL'},
-    )
-
-    fsi_entrance = fsi_reg = None
-    if bundle.entrance_exam_fee > 0:
-        fsi_entrance, _ = FeeStructureItem.objects.get_or_create(
-            structure=container, fee_type=ft_entrance,
-            defaults={'amount': bundle.entrance_exam_fee},
-        )
-    if bundle.registration_fee > 0:
-        fsi_reg, _ = FeeStructureItem.objects.get_or_create(
-            structure=container, fee_type=ft_reg,
-            defaults={'amount': bundle.registration_fee},
-        )
-    fsi_tuition, _ = FeeStructureItem.objects.get_or_create(
-        structure=container, fee_type=ft_tuition,
-        defaults={'amount': bundle.gross_tuition_fee},
-    )
-
-    created = skipped = 0
-    installments = list(bundle.installments.order_by('installment_no'))
-
-    for student in students:
-        # 1 — Entrance exam fee (skip if zero)
-        if fsi_entrance:
-            sf, new = StudentFee.objects.get_or_create(
-                student=student, fee_structure=fsi_entrance,
-                defaults={
-                    'amount':      bundle.entrance_exam_fee,
-                    'discount':    Decimal('0'),
-                    'due_date':    bundle.due_date,
-                    'assigned_by': request.user,
-                },
-            )
-            if new:
-                sf.save()
-                created += 1
-            else:
-                skipped += 1
-
-        # 2 — Registration fee (skip if zero)
-        if fsi_reg:
-            sf, new = StudentFee.objects.get_or_create(
-                student=student, fee_structure=fsi_reg,
-                defaults={
-                    'amount':      bundle.registration_fee,
-                    'discount':    Decimal('0'),
-                    'due_date':    bundle.due_date,
-                    'assigned_by': request.user,
-                },
-            )
-            if new:
-                sf.save()
-                created += 1
-            else:
-                skipped += 1
-
-        # 3 — Tuition fee (with group discount + optional payment plan)
-        sf_tuition, new = StudentFee.objects.get_or_create(
-            student=student, fee_structure=fsi_tuition,
-            defaults={
-                'amount':        bundle.gross_tuition_fee,
-                'discount':      bundle.group_discount_amount,
-                'discount_note': f'Group discount {bundle.group_discount_pct}%',
-                'due_date':      bundle.due_date,
-                'assigned_by':   request.user,
-            },
-        )
-        if new:
-            sf_tuition.save()  # triggers net_amount calc
-            created += 1
-            # Create PaymentPlan with bundle instalments (if > 1 instalment)
-            if len(installments) > 1:
-                plan = PaymentPlan.objects.create(
-                    student_fee=sf_tuition,
-                    notes=f'Bundle: {bundle.name}',
-                    created_by=request.user,
-                )
-                for binst in installments:
-                    PaymentPlanInstallment.objects.create(
-                        plan=plan,
-                        installment_no=binst.installment_no,
-                        amount=binst.amount,
-                        due_date=binst.due_date,
-                    )
-        else:
-            skipped += 1
-
-    messages.success(
-        request,
-        f'Assignment done — {created} fee record(s) created, {skipped} already existed.'
-    )
-    return redirect('fees:bundle_detail', pk=bundle.pk)
-
-
-@login_required
-@role_required(*_ADMIN)
-@require_POST
-def bundle_delete(request, pk):
-    bundle = get_object_or_404(FeeStructureBundle, pk=pk)
-    name   = bundle.name
-    bundle.delete()
-    messages.success(request, f"Bundle '{name}' deleted.")
-    return redirect('fees:bundle_list')
-
-
 
 
 @login_required

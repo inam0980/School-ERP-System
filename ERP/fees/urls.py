@@ -21,14 +21,6 @@ urlpatterns = [
     path('structures/<int:pk>/delete/',   views.fee_structure_delete,  name='fee_structure_delete'),
     path('structures/<int:pk>/items/',    views.fee_structure_items_json, name='fee_structure_items'),
 
-    # Fee Structure Bundles (all-in-one: entrance + registration + tuition)
-    path('bundles/',                      views.bundle_list,           name='bundle_list'),
-    path('bundles/add/',                  views.bundle_form,           name='bundle_add'),
-    path('bundles/<int:pk>/',             views.bundle_detail,         name='bundle_detail'),
-    path('bundles/<int:pk>/edit/',        views.bundle_form,           name='bundle_edit'),
-    path('bundles/<int:pk>/delete/',      views.bundle_delete,         name='bundle_delete'),
-    path('bundles/<int:pk>/assign/',      views.bundle_assign,         name='bundle_assign'),
-
     # Bulk assign
     path('assign/',                       views.bulk_assign_fees,      name='bulk_assign'),
 

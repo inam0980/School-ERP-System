@@ -102,8 +102,21 @@ class FeeType(models.Model):
 
 class FeeStructure(models.Model):
     """Container: one fee schedule per grade in an academic year."""
-    name          = models.CharField(max_length=200, blank=True,
-                                     help_text='Optional label, e.g. "Grade 1 American 2026-27"')
+    TYPE_REGULAR = 'regular'
+    TYPE_NEW     = 'new'
+    TYPE_OTHER   = 'other'
+    STRUCTURE_TYPE_CHOICES = [
+        (TYPE_REGULAR, 'Regular'),
+        (TYPE_NEW,     'New'),
+        (TYPE_OTHER,   'Other'),
+    ]
+
+    name           = models.CharField(max_length=200, blank=True,
+                                      help_text='Optional label, e.g. "Grade 1 American 2026-27"')
+    structure_type = models.CharField(
+        max_length=20, choices=STRUCTURE_TYPE_CHOICES, default=TYPE_REGULAR,
+        verbose_name='Structure Type',
+        help_text='"Regular" for returning students, "New" for new admissions')
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.PROTECT,
                                       related_name='fee_structures',
                                       verbose_name='Academic Year')
@@ -119,8 +132,8 @@ class FeeStructure(models.Model):
     created_at    = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ['academic_year', 'grade']
-        ordering = ['academic_year', 'grade__division__name', 'grade__order', 'grade__name']
+        unique_together = ['academic_year', 'grade', 'structure_type']
+        ordering = ['academic_year', 'grade__division__name', 'grade__order', 'grade__name', 'structure_type']
 
     def __str__(self):
         label = f"{self.grade} — {self.name}" if self.name else f"{self.grade} — Fee Structure"
@@ -151,212 +164,6 @@ class FeeStructureItem(models.Model):
     @property
     def expat_total(self):
         return (self.amount + self.expat_vat).quantize(Decimal('0.01'))
-
-
-# ════════════════════════════════════════════════════════════════
-#  FEE STRUCTURE BUNDLE  (all-in-one: entrance + registration + tuition)
-# ════════════════════════════════════════════════════════════════
-
-class FeeStructureBundle(models.Model):
-    """
-    One-stop fee schedule for a Division + Grade in an academic year.
-    Captures Entrance Exam, Registration and Tuition (with group discount)
-    in a single form, plus installment / down-payment configuration.
-    When assigned it creates individual FeeStructure + StudentFee records.
-    """
-    TYPE_REGULAR = 'regular'
-    TYPE_NEW     = 'new'
-    STRUCTURE_TYPE_CHOICES = [
-        (TYPE_REGULAR, 'Regular'),
-        (TYPE_NEW,     'New'),
-    ]
-
-    name              = models.CharField(max_length=200,
-                                         verbose_name='Structure Name')
-    code              = models.CharField(
-        max_length=50, blank=True,
-        verbose_name='Structure Code',
-        help_text='Short code for this structure, e.g. AM-REG-2526')
-    structure_type    = models.CharField(
-        max_length=20, choices=STRUCTURE_TYPE_CHOICES, default=TYPE_REGULAR,
-        verbose_name='Structure Type',
-        help_text='"Regular" for returning students, "New" for new admissions')
-    academic_year     = models.ForeignKey(AcademicYear, on_delete=models.PROTECT,
-                                          related_name='fee_bundles')
-    division          = models.ForeignKey(Division, on_delete=models.PROTECT,
-                                          related_name='fee_bundles')
-    grade             = models.ForeignKey(Grade, on_delete=models.PROTECT,
-                                          related_name='fee_bundles')
-    due_date          = models.DateField(help_text='Default due date for tuition instalments')
-
-    # ── One-time fees ──────────────────────────────────────────────
-    entrance_exam_fee = models.DecimalField(
-        max_digits=10, decimal_places=2, default=Decimal('0.00'),
-        verbose_name='Grade Level Entrance Exam Fee (SAR)')
-    registration_fee  = models.DecimalField(
-        max_digits=10, decimal_places=2, default=Decimal('0.00'),
-        verbose_name='Registration Fee (SAR)')
-
-    # ── Tuition ────────────────────────────────────────────────────
-    gross_tuition_fee  = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        verbose_name='Gross Total Tuition Fee (SAR)')
-    group_discount_pct = models.DecimalField(
-        max_digits=5, decimal_places=2, default=Decimal('0.00'),
-        verbose_name='Group Discount (%)',
-        help_text='Discount % on gross tuition (e.g. 10 for 10%)')
-
-    # ── Installment config ─────────────────────────────────────────
-    INST_CHOICES = [
-        (1, 'Full Payment (no installments)'),
-        (2, '2 Installments'),
-        (3, '3 Installments'),
-        (4, '4 Installments'),
-    ]
-    installments_count = models.PositiveSmallIntegerField(
-        choices=INST_CHOICES, default=2,
-        verbose_name='Number of Instalments')
-    min_down_payment   = models.DecimalField(
-        max_digits=10, decimal_places=2, default=Decimal('1.00'),
-        verbose_name='Minimum Down Payment (SAR)',
-        help_text='Required first payment — must be greater than 0')
-
-    notes      = models.TextField(blank=True)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-                                   null=True, blank=True, related_name='bundles_created')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        unique_together = ['academic_year', 'division', 'grade', 'structure_type']
-        ordering = ['division__name', 'grade__order', 'grade__name', 'structure_type']
-        verbose_name = 'Fee Structure Bundle'
-
-    def __str__(self):
-        return f"{self.name} ({self.division} — {self.grade} — {self.academic_year})"
-
-    # ── Computed properties ───────────────────────────────────────
-
-    @property
-    def group_discount_amount(self):
-        return (self.gross_tuition_fee * self.group_discount_pct / 100).quantize(Decimal('0.01'))
-
-    @property
-    def net_tuition_fee(self):
-        return (self.gross_tuition_fee - self.group_discount_amount).quantize(Decimal('0.01'))
-
-    @property
-    def total_bundle(self):
-        return (self.entrance_exam_fee + self.registration_fee + self.net_tuition_fee).quantize(Decimal('0.01'))
-
-    # ── Validation ────────────────────────────────────────────────
-
-    def clean(self):
-        from django.core.exceptions import ValidationError
-        errors = {}
-        if self.min_down_payment is not None and self.min_down_payment <= 0:
-            errors['min_down_payment'] = 'Minimum down payment must be greater than 0.'
-        if (self.gross_tuition_fee is not None
-                and self.min_down_payment is not None
-                and self.min_down_payment > self.gross_tuition_fee):
-            errors['min_down_payment'] = (
-                f'Down payment (SAR {self.min_down_payment:.2f}) cannot exceed '
-                f'gross tuition fee (SAR {self.gross_tuition_fee:.2f}).'
-            )
-        if errors:
-            raise ValidationError(errors)
-
-    # ── Instalment generation ────────────────────────────────────
-
-    def generate_installments(self):
-        """
-        Delete existing BundleInstallment records and create fresh equal ones.
-        Instalment #1 = down payment (min_down_payment).
-        Remaining instalments share the rest of net_tuition_fee equally.
-        Leftover cents go to the last instalment.
-        """
-        self.installments.all().delete()
-        n    = self.installments_count
-        net  = self.net_tuition_fee
-        down = self.min_down_payment.quantize(Decimal('0.01'))
-
-        BundleInstallment.objects.create(
-            bundle=self, installment_no=1, label='Down Payment',
-            amount=down, due_date=self.due_date,
-        )
-
-        if n <= 1:
-            return
-
-        remaining = max(net - down, Decimal('0.00'))
-        splits    = n - 1
-        each      = (remaining / splits).quantize(Decimal('0.01'))
-        leftover  = (remaining - each * splits).quantize(Decimal('0.01'))
-
-        for i in range(2, n + 1):
-            amt = each + (leftover if i == n else Decimal('0.00'))
-            BundleInstallment.objects.create(
-                bundle=self, installment_no=i,
-                label=f'Instalment {i - 1}',
-                amount=amt, due_date=self.due_date,
-            )
-
-    def sync_to_fee_structure(self):
-        """
-        Create or update the linked FeeStructure + FeeStructureItems so this
-        bundle is visible on the bulk-assign page.
-        Fee amounts stored are the NET values (after group discount on tuition).
-        """
-        def _get_fee_type(category, name):
-            ft = FeeType.objects.filter(category=category).first()
-            if not ft:
-                ft = FeeType.objects.create(name=name, category=category, is_mandatory=False)
-            return ft
-
-        components = []
-        if self.entrance_exam_fee > 0:
-            components.append(
-                (_get_fee_type(FeeType.ENTRANCE_EXAM, 'Entrance Exam Fee'), self.entrance_exam_fee)
-            )
-        if self.registration_fee > 0:
-            components.append(
-                (_get_fee_type(FeeType.REGISTRATION, 'Registration Fee'), self.registration_fee)
-            )
-        components.append(
-            (_get_fee_type(FeeType.TUITION, 'Tuition Fee'), self.net_tuition_fee)
-        )
-
-        structure, _ = FeeStructure.objects.update_or_create(
-            academic_year=self.academic_year,
-            grade=self.grade,
-            defaults={
-                'name':      self.name,
-                'frequency': 'ANNUAL',
-            },
-        )
-        for fee_type, amount in components:
-            FeeStructureItem.objects.update_or_create(
-                structure=structure,
-                fee_type=fee_type,
-                defaults={'amount': amount},
-            )
-
-
-class BundleInstallment(models.Model):
-    """Editable instalment row belonging to a FeeStructureBundle."""
-    bundle         = models.ForeignKey(FeeStructureBundle, on_delete=models.CASCADE,
-                                       related_name='installments')
-    installment_no = models.PositiveSmallIntegerField()
-    label          = models.CharField(max_length=100)
-    amount         = models.DecimalField(max_digits=10, decimal_places=2)
-    due_date       = models.DateField()
-
-    class Meta:
-        ordering = ['installment_no']
-        unique_together = ['bundle', 'installment_no']
-
-    def __str__(self):
-        return f"#{self.installment_no} — SAR {self.amount:,.2f}"
 
 
 

@@ -28,6 +28,16 @@ class Student(models.Model):
         (RETURNING, 'Returning / عائد'),
     ]
 
+    # ── Fee category choices ──────────────────────────────────────────
+    FEE_CAT_NEW     = 'new'
+    FEE_CAT_REGULAR = 'regular'
+    FEE_CAT_OTHER   = 'other'
+    FEE_CATEGORY_CHOICES = [
+        (FEE_CAT_NEW,     'New'),
+        (FEE_CAT_REGULAR, 'Regular'),
+        (FEE_CAT_OTHER,   'Other'),
+    ]
+
     # ── ID type choices ───────────────────────────────────────────────
     NATIONAL_ID_TYPE = 'NATIONAL_ID'
     IQAMA            = 'IQAMA'
@@ -118,6 +128,11 @@ class Student(models.Model):
 
     # ── Status & Admission ────────────────────────────────────────────
     enrollment_type = models.CharField(max_length=15, choices=ENROLLMENT_TYPES, default=NEW, verbose_name="Enrollment Type / نوع القيد")
+    fee_category    = models.CharField(
+        max_length=10, choices=FEE_CATEGORY_CHOICES, default=FEE_CAT_REGULAR,
+        verbose_name="Fee Category",
+        help_text="Determines which fee structure applies to this student"
+    )
     admission_date  = models.DateField(verbose_name="Admission Date / تاريخ القبول")
     is_active       = models.BooleanField(default=True, verbose_name="Active / نشط")
     previous_school = models.CharField(max_length=200, blank=True, verbose_name="Previous School / المدرسة السابقة")
