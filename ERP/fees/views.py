@@ -32,6 +32,7 @@ from .forms import (
     DefaultersFilterForm,
     TuitionFeeConfigForm, TuitionInstallmentFormSet, TuitionConfigFilterForm,
 )
+from .pdf_exports import fee_structure_export_group_pdf
 
 _ADMIN       = ('SUPER_ADMIN', 'ADMIN')
 _ACCOUNTANT  = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT')
@@ -128,11 +129,175 @@ def fee_structure_list(request):
         grade = s.grade
         divisions_map.setdefault(div, {}).setdefault(grade, {})[s.structure_type] = s
 
+    # Build a lookup: (division_pk, structure_type) → first academic_year_pk found
+    # Used by the template to render per-type Export CSV links
+    div_type_year = {}
+    for s in qs:
+        key = (s.grade.division_id, s.structure_type)
+        if key not in div_type_year:
+            div_type_year[key] = s.academic_year_id
+
     return render(request, 'fees/fee_structure_list.html', {
-        'divisions_map': divisions_map,
-        'years':         AcademicYear.objects.all(),
-        'active_year':   year_id,
+        'divisions_map':  divisions_map,
+        'years':          AcademicYear.objects.all(),
+        'active_year':    year_id,
+        'div_type_year':  div_type_year,
     })
+
+
+@login_required
+@role_required(*_STAFF_VIEW)
+def fee_structure_export_group_csv(request):
+    """
+    Export all grades for a specific division / academic year / structure type
+    as a CSV that mirrors the bulk-create table layout shown in the UI.
+
+    GET params: division=<pk>  year=<pk>  type=<regular|new|other>
+    """
+    division_id    = request.GET.get('division', '').strip()
+    year_id        = request.GET.get('year', '').strip()
+    structure_type = request.GET.get('type', '').strip().lower()
+
+    # Validate required params
+    if not (division_id and structure_type):
+        return HttpResponse('Missing required parameters: division, type', status=400)
+
+    try:
+        division = Division.objects.get(pk=division_id)
+    except Division.DoesNotExist:
+        return HttpResponse('Division not found', status=404)
+
+    year = None
+    if year_id:
+        try:
+            year = AcademicYear.objects.get(pk=year_id)
+        except AcademicYear.DoesNotExist:
+            return HttpResponse('Academic Year not found', status=404)
+
+    # Fetch all structures for this division/type (optionally filtered by year)
+    structure_filter = dict(
+        grade__division=division,
+        structure_type=structure_type,
+    )
+    if year:
+        structure_filter['academic_year'] = year
+
+    structures = (
+        FeeStructure.objects
+        .filter(**structure_filter)
+        .select_related('grade', 'academic_year', 'grade__division')
+        .prefetch_related('items__fee_type')
+        .order_by('grade__order', 'grade__name')
+    )
+
+    if not structures.exists():
+        return HttpResponse('No fee structures found for the given parameters.', status=404)
+
+    # Collect all distinct fee types present across these structures (ordered)
+    fee_types_map = {}  # pk → FeeType
+    for s in structures:
+        for item in s.items.all():
+            fee_types_map[item.fee_type_id] = item.fee_type
+    # Sort fee types by category then name
+    ordered_fee_types = sorted(fee_types_map.values(), key=lambda ft: (ft.category, ft.name))
+
+    # Build filename
+    safe_div  = division.name.replace(' ', '_')
+    safe_year = str(year).replace(' ', '_').replace('/', '-') if year else 'all_years'
+    filename  = f"fee_structure_{safe_div}_{safe_year}_{structure_type}.csv"
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    writer = csv.writer(response)
+
+    # ── Meta header rows ──────────────────────────────────────────
+    writer.writerow(['Fee Structure Export'])
+    writer.writerow(['Division', division.name])
+    writer.writerow(['Academic Year', str(year) if year else 'All Years'])
+    writer.writerow(['Structure Type', structure_type.capitalize()])
+    writer.writerow([])
+
+    # ── Column header row ─────────────────────────────────────────
+    header = ['Grade', 'Structure Name']
+    for ft in ordered_fee_types:
+        header.append(f'{ft.name} (SAR)')
+    for ft in ordered_fee_types:
+        if ft.is_taxable:
+            header.append(f'{ft.name} + VAT 15% (SAR)')
+    header.append('Total Before VAT (SAR)')
+    header.append('Total With VAT (SAR)')
+    writer.writerow(header)
+
+    # ── Data rows – one per grade ─────────────────────────────────
+    VAT_RATE = Decimal('0.15')
+    for s in structures:
+        items_by_type = {item.fee_type_id: item.amount for item in s.items.all()}
+        row = [s.grade.name, s.name or '']
+
+        total_before_vat = Decimal('0.00')
+        total_with_vat   = Decimal('0.00')
+
+        # Base amounts
+        for ft in ordered_fee_types:
+            amt = items_by_type.get(ft.pk, Decimal('0.00'))
+            row.append(str(amt))
+            total_before_vat += amt
+            if ft.is_taxable:
+                total_with_vat += (amt * (1 + VAT_RATE)).quantize(Decimal('0.01'))
+            else:
+                total_with_vat += amt
+
+        # VAT amounts (only for taxable fee types)
+        for ft in ordered_fee_types:
+            if ft.is_taxable:
+                amt = items_by_type.get(ft.pk, Decimal('0.00'))
+                row.append(str((amt * (1 + VAT_RATE)).quantize(Decimal('0.01'))))
+
+        row.append(str(total_before_vat.quantize(Decimal('0.01'))))
+        row.append(str(total_with_vat.quantize(Decimal('0.01'))))
+        writer.writerow(row)
+
+    return response
+
+
+@login_required
+@role_required(*_STAFF_VIEW)
+def fee_structure_export_csv(request):
+    """Export all fee structure items to a CSV file, optionally filtered by academic year."""
+    year_id = request.GET.get('year')
+    qs = FeeStructureItem.objects.select_related(
+        'structure__academic_year', 'structure__grade__division', 'fee_type'
+    ).order_by(
+        'structure__grade__division__name',
+        'structure__grade__order',
+        'structure__grade__name',
+        'structure__structure_type',
+        'fee_type__name',
+    )
+    if year_id:
+        qs = qs.filter(structure__academic_year_id=year_id)
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="fee_structures.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Division', 'Grade', 'Structure Type', 'Name', 'Academic Year', 'Frequency', 'Fee Type', 'Amount'])
+
+    for item in qs:
+        s = item.structure
+        writer.writerow([
+            s.grade.division.name,
+            s.grade.name,
+            s.get_structure_type_display(),
+            s.name or '',
+            str(s.academic_year),
+            s.get_frequency_display(),
+            item.fee_type.name,
+            str(item.amount),
+        ])
+
+    return response
 
 
 @login_required
@@ -967,6 +1132,7 @@ def combined_receipt(request):
         .exclude(status='WAIVED')
         .exclude(pk__in=paid_fee_pks)
         .select_related('fee_structure__fee_type',
+                        'fee_structure__structure__academic_year',
                         'fee_structure__structure__grade__division')
         .order_by('due_date')
     )

@@ -15,8 +15,11 @@ urlpatterns = [
     path('fee-types/<int:pk>/delete/',    views.fee_type_delete,       name='fee_type_delete'),
 
     # Fee Structures (individual)
-    path('structures/',                   views.fee_structure_list,    name='fee_structure_list'),
-    path('structures/add/',               views.fee_structure_form,    name='fee_structure_add'),
+    path('structures/',                   views.fee_structure_list,             name='fee_structure_list'),
+    path('structures/export-csv/',        views.fee_structure_export_csv,       name='fee_structure_export_csv'),
+    path('structures/export-group-csv/', views.fee_structure_export_group_csv,  name='fee_structure_export_group_csv'),
+    path('structures/export-group-pdf/', views.fee_structure_export_group_pdf, name='fee_structure_export_group_pdf'),
+    path('structures/add/',               views.fee_structure_form,             name='fee_structure_add'),
     path('structures/<int:pk>/edit/',     views.fee_structure_form,    name='fee_structure_edit'),
     path('structures/<int:pk>/delete/',   views.fee_structure_delete,  name='fee_structure_delete'),
     path('structures/<int:pk>/items/',    views.fee_structure_items_json, name='fee_structure_items'),

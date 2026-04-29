@@ -42,6 +42,13 @@
     <a href="{% url 'fees:fee_structure_list' %}"
        class="text-sm text-slate-400 hover:text-slate-600 self-center">✕ Clear</a>
     {% endif %}
+    <a href="{% url 'fees:fee_structure_export_csv' %}{% if active_year %}?year={{ active_year }}{% endif %}"
+       class="ml-auto px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/>
+        </svg>
+        Export CSV
+    </a>
 </form>
 
 {# ── Flash messages ── #}
@@ -123,6 +130,19 @@
                 </div>
             </div>
             {% endif %}{% endwith %}{% endfor %}
+            {# Export CSV strip for Regular #}
+            <div class="px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex justify-end">
+                <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=regular{% if active_year %}&year={{ active_year }}{% endif %}"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+                    Export CSV
+                </a>
+                <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=regular{% if active_year %}&year={{ active_year }}{% endif %}"
+                   class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
+                    Export PDF
+                </a>
+            </div>
             <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No Regular structures set for this division.</div>
         </div>
 
@@ -147,6 +167,19 @@
                 </div>
             </div>
             {% endif %}{% endwith %}{% endfor %}
+            {# Export CSV strip for New #}
+            <div class="px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex justify-end">
+                <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=new{% if active_year %}&year={{ active_year }}{% endif %}"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+                    Export CSV
+                </a>
+                <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=new{% if active_year %}&year={{ active_year }}{% endif %}"
+                   class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
+                    Export PDF
+                </a>
+            </div>
             <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No New structures set for this division.</div>
         </div>
 
@@ -171,6 +204,19 @@
                 </div>
             </div>
             {% endif %}{% endwith %}{% endfor %}
+            {# Export CSV strip for Other #}
+            <div class="px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex justify-end">
+                <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=other{% if active_year %}&year={{ active_year }}{% endif %}"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+                    Export CSV
+                </a>
+                <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=other{% if active_year %}&year={{ active_year }}{% endif %}"
+                   class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
+                    Export PDF
+                </a>
+            </div>
             <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No Other structures set for this division.</div>
         </div>
 
