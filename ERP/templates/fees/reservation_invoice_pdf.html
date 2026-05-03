@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Reservation/Entrance Invoice PDF — Al-Kawthar{% endblock %}
+
+{% block content %}
+<div style="max-width:700px;margin:0 auto;padding:40px 30px 30px 30px;font-family:'DejaVu Sans',Arial,sans-serif;background:#fff;border:1px solid #e5e7eb;">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;">
+        <div>
+            <h1 style="font-size:2rem;font-weight:bold;color:#1e293b;margin:0;">Reservation / Entrance Invoice</h1>
+            <div style="font-size:1rem;color:#64748b;">فاتورة حجز / اختبار قبول · ZATCA Simplified Tax Invoice</div>
+        </div>
+        {% if logo_url %}
+        <img src="{{ logo_url }}" alt="Logo" style="height:60px;">
+        {% endif %}
+    </div>
+
+    <!-- Student Info -->
+    <table style="width:100%;margin-bottom:24px;font-size:1rem;">
+        <tr>
+            <td><strong>Student Name:</strong></td>
+            <td>{{ student.full_name }}</td>
+            <td><strong>Student ID:</strong></td>
+            <td>{{ student.student_id }}</td>
+        </tr>
+        <tr>
+            <td><strong>Arabic Name:</strong></td>
+            <td>{{ student.arabic_name }}</td>
+            <td><strong>Grade:</strong></td>
+            <td>{{ student.grade }}{% if student.section %} – {{ student.section }}{% endif %}</td>
+        </tr>
+    </table>
+
+    <!-- Invoice Table -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:32px;">
+        <thead>
+            <tr style="background:#f1f5f9;color:#334155;">
+                <th style="padding:8px 6px;border:1px solid #e5e7eb;text-align:left;">#</th>
+                <th style="padding:8px 6px;border:1px solid #e5e7eb;text-align:left;">Fee Type</th>
+                <th style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;">Gross</th>
+                <th style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;">Discount</th>
+                <th style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;">Net</th>
+                <th style="padding:8px 6px;border:1px solid #e5e7eb;text-align:center;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sf in res_fees %}
+            <tr>
+                <td style="padding:8px 6px;border:1px solid #e5e7eb;">{{ forloop.counter }}</td>
+                <td style="padding:8px 6px;border:1px solid #e5e7eb;">
+                    {{ sf.fee_structure.fee_type.name }}<br>
+                    <span style="font-size:0.9em;color:#64748b;">{{ sf.fee_structure.fee_type.get_category_display }}</span>
+                </td>
+                <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;">{{ sf.amount|floatformat:2 }}</td>
+                <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;">{{ sf.discount|floatformat:2 }}</td>
+                <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;font-weight:bold;">{{ sf.net_amount|floatformat:2 }}</td>
+                <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:center;">
+                    {{ sf.get_status_display }}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" style="padding:16px 6px;text-align:center;color:#64748b;">No reservation or entrance exam fees found for this student.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Notes -->
+    {% if notes %}
+    <div style="margin-bottom:24px;">
+        <strong>Notes:</strong>
+        <div style="margin-top:4px;color:#334155;">{{ notes }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <div style="font-size:0.95rem;color:#64748b;text-align:right;margin-top:40px;">
+        Generated on: {{ generated_on|date:"Y-m-d H:i" }}<br>
+        Printed by: {{ user.get_full_name }}
+    </div>
+</div>
+{% endblock %}

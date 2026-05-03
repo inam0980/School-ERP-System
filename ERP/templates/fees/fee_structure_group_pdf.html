@@ -1,70 +1,299 @@
-{% extends "base.html" %}
-{% load fee_pdf_filters %}
-{% block title %}Fee Structure PDF Export{% endblock %}
-{% block content %}
-<style>
-body { font-family: 'DejaVu Sans', Arial, sans-serif; }
-table { border-collapse: collapse; width: 100%; font-size: 11px; }
-th, td { border: 1px solid #888; padding: 4px 6px; }
-th { background: #f0f0f0; }
-.section-title { font-size: 15px; font-weight: bold; margin-top: 18px; margin-bottom: 6px; }
-.meta-table td { border: none; padding: 2px 6px; }
-</style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Alkawtharis Tuition Fee Structure</title>
+  <style>
+    @page {
+      size: A3 landscape;
+      margin: 7mm 7mm 7mm 7mm;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 7pt;
+      color: #111;
+    }
 
-<div style="margin-bottom: 18px;">
-  <span class="section-title">Fee Structure Group Export</span>
-  <table class="meta-table">
-    <tr><td><b>Division:</b></td><td>{{ division.name }}</td></tr>
-    <tr><td><b>Academic Year:</b></td><td>{{ year }}</td></tr>
-    <tr><td><b>Structure Type:</b></td><td>{{ structure_type|capfirst }}</td></tr>
-    <tr><td><b>Exported:</b></td><td>{{ now }}</td></tr>
+    /* ── HEADER ─────────────────────────────────────────────── */
+    .header-wrap {
+      display: table;
+      width: 100%;
+      border-bottom: 1.5px solid #333;
+      padding-bottom: 4px;
+      margin-bottom: 4px;
+    }
+    .header-logo {
+      display: table-cell;
+      width: 55px;
+      vertical-align: middle;
+    }
+    .header-logo img {
+      width: 50px;
+      height: 50px;
+    }
+    .header-title {
+      display: table-cell;
+      vertical-align: middle;
+      text-align: center;
+    }
+    .header-title h1 {
+      font-size: 14pt;
+      font-weight: bold;
+      color: #1a1a1a;
+      letter-spacing: 0.02em;
+    }
+    .header-meta {
+      display: table-cell;
+      width: 120px;
+      vertical-align: middle;
+      text-align: right;
+      font-size: 6.5pt;
+      color: #333;
+      line-height: 1.5;
+    }
+    .header-meta strong { color: #111; }
+    .posted-badge {
+      display: inline-block;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 6pt;
+      font-weight: bold;
+      padding: 1px 6px;
+      letter-spacing: 0.1em;
+      margin-top: 2px;
+    }
+
+    /* ── INFO GRID ───────────────────────────────────────────── */
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 4px;
+    }
+    .info-table td {
+      border: 1px solid #aaa;
+      padding: 2px 4px;
+      font-size: 6.5pt;
+    }
+    .info-table .lbl {
+      background: #f2f2f2;
+      font-weight: bold;
+      color: #333;
+      white-space: nowrap;
+      width: 90px;
+    }
+    .info-table .val {
+      color: #111;
+      min-width: 60px;
+    }
+
+    /* ── SECTION HEADERS ────────────────────────────────────── */
+    .section-header {
+      background: #1a3a5c;
+      color: #fff;
+      font-size: 7.5pt;
+      font-weight: bold;
+      text-align: center;
+      padding: 3px 6px;
+      margin-top: 5px;
+      margin-bottom: 0;
+    }
+
+    /* ── DATA TABLE ─────────────────────────────────────────── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 3px;
+    }
+    .data-table th {
+      background: #dce6f1;
+      border: 1px solid #aaa;
+      padding: 2px 3px;
+      font-size: 6pt;
+      font-weight: bold;
+      text-align: center;
+      color: #111;
+      white-space: nowrap;
+      line-height: 1.2;
+    }
+    .data-table td {
+      border: 1px solid #aaa;
+      padding: 1.5px 3px;
+      font-size: 6.5pt;
+      text-align: center;
+      color: #111;
+      line-height: 1.2;
+    }
+    .data-table .grade-col {
+      text-align: left;
+      font-weight: bold;
+      background: #f9f9f9;
+    }
+    .data-table tr:nth-child(even) td {
+      background: #f5f9ff;
+    }
+    .data-table tr:nth-child(even) td.grade-col {
+      background: #eef3fa;
+    }
+    /* highlight the "net tuition" column */
+    .data-table .highlight {
+      color: #8B0000;
+      font-weight: bold;
+    }
+
+    /* ── FOOTNOTE ────────────────────────────────────────────── */
+    .footnote {
+      font-size: 7pt;
+      color: #555;
+      font-style: italic;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ══ HEADER ══════════════════════════════════════════════════ -->
+  <div class="header-wrap">
+    <div class="header-logo">
+      {% if logo_src %}
+        <img src="{{ logo_src }}" alt="School Logo">
+      {% endif %}
+    </div>
+    <div class="header-title">
+      <h1>Alkawtharis Tuition Fee Structure</h1>
+    </div>
+    <div class="header-meta">
+      <div>Page :&nbsp;&nbsp;1&nbsp;&nbsp;of&nbsp;&nbsp;1</div>
+      <div>Report Date : {{ now }}</div>
+      <div><span class="posted-badge">POSTED</span></div>
+    </div>
+  </div>
+
+  <!-- ══ INFO GRID ════════════════════════════════════════════════ -->
+  <table class="info-table">
+    <tr>
+      <td class="lbl">Academic Year</td>
+      <td class="val">{{ year }}</td>
+      <td class="lbl">Description</td>
+      <td class="val" colspan="3">{{ description }}</td>
+      <td class="lbl">Structure Type</td>
+      <td class="val">{{ structure_type }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Division</td>
+      <td class="val">{{ division }}</td>
+      <td class="lbl">Group Discount</td>
+      <td class="val">{{ group_discount }}</td>
+      <td class="lbl">Group Discount&nbsp;%</td>
+      <td class="val">{% if group_discount == 'YES' %}{{ group_disc_pct }}{% else %}—{% endif %}</td>
+      <td class="lbl">Number of Payments</td>
+      <td class="val">{{ num_payments }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Entrance Exam Fee</td>
+      <td class="val">{{ entrance_exam|floatformat:2 }}</td>
+      <td class="lbl">Registration Fee</td>
+      <td class="val">{{ registration_fee|floatformat:2 }}</td>
+      <td class="lbl">Reservation Fee (Down Payment)</td>
+      <td class="val">{{ reservation_fee|floatformat:2 }}</td>
+      <td class="lbl">Divide Reservation</td>
+      <td class="val">NO</td>
+    </tr>
+    <tr>
+      <td class="lbl">VAT Percent&nbsp;%</td>
+      <td class="val">{{ vat_pct }}</td>
+      <td class="lbl">Tuition Fee Include Books</td>
+      <td class="val">{{ includes_books }}</td>
+      <td class="lbl">Divide Reservation</td>
+      <td class="val">NO</td>
+      <td class="lbl">&nbsp;</td>
+      <td class="val">&nbsp;</td>
+    </tr>
   </table>
-</div>
 
-<table>
-  <thead>
-    <tr>
-      <th>Grade</th>
-      <th>Structure Name</th>
-      <th>Frequency</th>
-      <th>Group Discount %</th>
-      <th>VAT %</th>
-      <th>Due Date</th>
-      <th>Structure Code</th>
-      <th>Description / Notes</th>
-      {% for ft in fee_types %}
-        <th>{{ ft.name }}</th>
-      {% endfor %}
-      {% for ft in fee_types %}
-        {% if ft.is_taxable %}<th>{{ ft.name }} + VAT</th>{% endif %}
-      {% endfor %}
-      <th>Total Before VAT</th>
-      <th>Total With VAT</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for s in structures %}
-    <tr>
-      <td>{{ s.grade.name }}</td>
-      <td>{{ s.name }}</td>
-      <td>{{ s.get_frequency_display }}</td>
-      <td>{{ s.group_discount|default:"-" }}</td>
-      <td>{{ s.vat_pct|default:"-" }}</td>
-      <td>{{ s.due_date|default:"-" }}</td>
-      <td>{{ s.structure_code|default:"-" }}</td>
-      <td>{{ s.description|default:"-" }}</td>
-      {% for ft in fee_types %}
-        <td>{{ s.items_by_type|get_item:ft.pk|default:"0.00" }}</td>
-      {% endfor %}
-      {% for ft in fee_types %}
-        {% if ft.is_taxable %}
-          <td>{{ s.items_by_type|get_item:ft.pk|add_vat:s.vat_pct|default:"0.00" }}</td>
+  <!-- ══ TABLE 1: SAUDI (No VAT) ══════════════════════════════════ -->
+  <div class="section-header">Amount Without VAT For Saudi Student</div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:80px; text-align:left;">Grade Level</th>
+        <th>Entrance Exam<br>Fee</th>
+        <th>Registration<br>Fee</th>
+        <th>Gross Total<br>Tuition</th>
+        <th>Group<br>Discount</th>
+        <th>Tuition Net<br>of Disc.</th>
+        <th>Reservation /<br>Down Payment</th>
+        <th>1st<br>Installment</th>
+        <th>2nd<br>Installment</th>
+        {% if max_num_payments >= 3 %}
+        <th>3rd<br>Installment</th>
         {% endif %}
+        <th>Net Tuition</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="grade-col">{{ r.grade }}</td>
+        <td>{{ r.entrance_exam|floatformat:2 }}</td>
+        <td>{{ r.registration|floatformat:2 }}</td>
+        <td>{{ r.gross_tuition|floatformat:2 }}</td>
+        <td>{% if r.group_disc_amt %}{{ r.group_disc_amt|floatformat:2 }}{% else %}—{% endif %}</td>
+        <td class="highlight">{{ r.tuition_net|floatformat:2 }}</td>
+        <td>{{ r.reservation|floatformat:2 }}</td>
+        <td>{{ r.first_inst|floatformat:2 }}</td>
+        <td>{{ r.second_inst|floatformat:2 }}</td>
+        {% if max_num_payments >= 3 %}
+        <td>{{ r.third_inst|floatformat:2 }}</td>
+        {% endif %}
+        <td><strong>{{ r.saudi_net|floatformat:2 }}</strong></td>
+      </tr>
       {% endfor %}
-      <td>{{ s.total_before_vat }}</td>
-      <td>{{ s.total_with_vat }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endblock %}
+    </tbody>
+  </table>
+
+  <!-- ══ TABLE 2: NON-SAUDI (With VAT) ════════════════════════════ -->
+  <div class="section-header">Amount With VAT For Non Saudi Student</div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:80px; text-align:left;">Grade Level</th>
+        <th>Entrance Exam<br>Fee</th>
+        <th>Registration<br>Fee</th>
+        <th>Gross Total<br>Tuition</th>
+        <th>Group<br>Discount</th>
+        <th>Tuition Net<br>of Disc.</th>
+        <th>Reservation /<br>Down Payment</th>
+        <th>1st<br>Installment</th>
+        <th>2nd<br>Installment</th>
+        {% if max_num_payments >= 3 %}
+        <th>3rd<br>Installment</th>
+        {% endif %}
+        <th>Net Tuition</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="grade-col">{{ r.grade }}</td>
+        <td>{{ r.entrance_exam|floatformat:2 }}</td>
+        <td>{{ r.registration|floatformat:2 }}</td>
+        <td>{{ r.gross_tuition|floatformat:2 }}</td>
+        <td>{% if r.group_disc_amt %}{{ r.group_disc_amt|floatformat:2 }}{% else %}—{% endif %}</td>
+        <td class="highlight">{{ r.tuition_net|floatformat:2 }}</td>
+        <td>{{ r.reservation|floatformat:2 }}</td>
+        <td>{{ r.first_inst|floatformat:2 }}</td>
+        <td>{{ r.second_inst|floatformat:2 }}</td>
+        {% if max_num_payments >= 3 %}
+        <td>{{ r.third_inst|floatformat:2 }}</td>
+        {% endif %}
+        <td><strong>{{ r.non_saudi_net|floatformat:2 }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p class="footnote">* Please note that the entrance exam and registration fee applied for new students only *</p>
+
+</body>
+</html>
