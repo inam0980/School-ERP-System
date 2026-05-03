@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}Students — Al-Kawthar{% endblock %}
+{% block page_title %}Students / الطلاب{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-8 pb-12">
+
+    <!-- Header -->
+    <div class="text-center pt-4">
+        <h1 class="text-3xl font-bold text-primary">Students / الطلاب</h1>
+        <p class="text-slate-500 text-sm mt-1">Select a category to manage</p>
+    </div>
+
+    <!-- Two Option Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+        <!-- 1. Regular Students -->
+        <a href="{% url 'students:regular_list' %}"
+           class="group flex flex-col items-center justify-center gap-4 bg-white border-2 border-primary/20
+                  rounded-2xl p-10 shadow-sm hover:shadow-lg hover:border-primary transition-all text-center"
+           id="students-regular-card">
+            <div class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
+                <svg class="w-10 h-10 text-primary group-hover:text-white transition-colors" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M17 20h5v-2a4 4 0 00-5-3.87M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857
+                             M7 20H2v-2a4 4 0 015-3.87M7 20v-2c0-.656.126-1.283.356-1.857
+                             m0 0A5.002 5.002 0 0112 11a5 5 0 014.644 7.143"/>
+                </svg>
+            </div>
+            <div>
+                <p class="font-bold text-primary text-xl leading-tight">Regular Students</p>
+                <p class="text-slate-500 text-sm mt-1">الطلاب المسجلين</p>
+                <p class="text-slate-400 text-xs mt-2">Enrolled students — full profiles, academics & fees</p>
+            </div>
+            {% if regular_count %}
+            <span class="inline-block bg-primary/10 text-primary text-xs font-bold px-3 py-1 rounded-full">
+                {{ regular_count }} student{{ regular_count|pluralize }}
+            </span>
+            {% endif %}
+        </a>
+
+        <!-- 2. External Exam Candidates / Pending Admissions -->
+        <a href="{% url 'students:external_list' %}"
+           class="group flex flex-col items-center justify-center gap-4 bg-white border-2 border-indigo-200
+                  rounded-2xl p-10 shadow-sm hover:shadow-lg hover:border-indigo-500 transition-all text-center"
+           id="students-external-card">
+            <div class="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-500 transition-all">
+                <svg class="w-10 h-10 text-indigo-500 group-hover:text-white transition-colors" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="font-bold text-indigo-700 text-xl leading-tight">Pending Admissions / Entrance Exam</p>
+                <p class="text-slate-500 text-sm mt-1">طلبات القبول قيد الانتظار</p>
+                <p class="text-slate-400 text-xs mt-2">New registrations pending approval and exam candidates</p>
+            </div>
+            {% if external_count %}
+            <span class="inline-block bg-indigo-50 text-indigo-600 text-xs font-bold px-3 py-1 rounded-full">
+                {{ external_count }} applicant{{ external_count|pluralize }}
+            </span>
+            {% endif %}
+        </a>
+
+    </div>
+</div>
+{% endblock %}

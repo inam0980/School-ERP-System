@@ -21,11 +21,11 @@ class Student(models.Model):
 
     NEW       = 'NEW'
     TRANSFER  = 'TRANSFER'
-    RETURNING = 'RETURNING'
+    REGULAR   = 'REGULAR'
     ENROLLMENT_TYPES = [
         (NEW,       'New Student / طالب جديد'),
         (TRANSFER,  'Transfer / منقول'),
-        (RETURNING, 'Returning / عائد'),
+        (REGULAR,   'Regular (Continuing) / مستمر'),
     ]
 
     # ── Fee category choices ──────────────────────────────────────────

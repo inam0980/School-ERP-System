@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import AcademicYear, Division, Grade, Section, Subject
+from .models import AcademicYear, Division, Grade, Section, Subject, Board
 
 User = get_user_model()
 
@@ -77,3 +77,14 @@ class SubjectForm(TailwindMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.apply_tailwind()
+
+
+class BoardForm(TailwindMixin, forms.ModelForm):
+    class Meta:
+        model  = Board
+        fields = ['name', 'short_code', 'is_active']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.apply_tailwind()
+

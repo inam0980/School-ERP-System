@@ -105,3 +105,22 @@ class Subject(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.grade})"
+
+
+class Board(models.Model):
+    """External examination board (e.g. CBSE, IGCSE, SAT, etc.)."""
+    name       = models.CharField(max_length=100, unique=True,
+                                  help_text="e.g. CBSE, IGCSE, SAT, British Board")
+    short_code = models.CharField(max_length=20, blank=True,
+                                  help_text="Short abbreviation, e.g. CBSE")
+    is_active  = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Exam Board'
+        verbose_name_plural = 'Exam Boards'
+
+    def __str__(self):
+        return self.name
+

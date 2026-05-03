@@ -23,6 +23,7 @@ from .models import (
     StudentFee, Payment, TaxInvoice, Salary,
     TuitionFeeConfig, TuitionInstallment,
     PaymentPlan, PaymentPlanInstallment,
+    ExternalCandidate, ExternalCandidatePayment,
 )
 from .forms import (
     FeeTypeForm, FeeStructureForm, FeeStructureBulkCreateForm,
@@ -1941,104 +1942,104 @@ def tax_invoice_menu(request):
 
 
 # ════════════════════════════════════════════════════════════════
-#  OPTION 2 — INVOICE (RESERVATION / ENTRANCE)
+#  OPTION 2 — EXTERNAL EXAM FEE COLLECTION
 # ════════════════════════════════════════════════════════════════
 
 @login_required
 @role_required(*_ACCOUNTANT)
 def reservation_invoice(request):
     """
-    Generate a ZATCA simplified tax invoice specifically for
-    Reservation and/or Entrance Exam fees of a selected student.
-    Unlike the regular generate_invoice, this covers *all* paid fees
-    of those two categories that are not yet invoiced, OR it can
-    generate for a manually entered amount (e.g. pre-payment invoice).
+    Collect fees from external (non-enrolled) exam candidates.
+    Registration is done via Students → External Candidates.
+    This page: search → select → collect payment.
     """
-    query    = request.GET.get('q', '').strip()
-    students = []
-    student  = None
-    res_fees = []
+    query      = request.GET.get('q', '').strip()
+    candidates = []
+    candidate  = None
+    payments   = []
 
+    # ── Search existing candidates ────────────────────────────────
     if query:
-        students = Student.objects.filter(
+        candidates = ExternalCandidate.objects.filter(
             Q(full_name__icontains=query) |
-            Q(student_id__icontains=query) |
-            Q(arabic_name__icontains=query),
-            is_active=True,
-        ).select_related('grade', 'section', 'division')[:30]
+            Q(candidate_id__icontains=query) |
+            Q(arabic_name__icontains=query) |
+            Q(phone__icontains=query) |
+            Q(id_number__icontains=query),
+        ).select_related('grade_applying')[:30]
 
-    student_pk = request.GET.get('student_id') or request.POST.get('student_id')
-    if student_pk:
-        students = []
-        student  = get_object_or_404(
-            Student.objects.select_related('grade', 'section', 'division'),
-            pk=student_pk,
+    # ── Select existing candidate ─────────────────────────────────
+    candidate_pk = request.GET.get('candidate_id') or request.POST.get('candidate_id')
+    if candidate_pk:
+        candidates = []
+        candidate  = get_object_or_404(
+            ExternalCandidate.objects.select_related('grade_applying'),
+            pk=candidate_pk,
         )
-        # Reservation & Entrance fees (paid + pending)
-        res_fees = list(
-            StudentFee.objects.filter(
-                student=student,
-                fee_structure__fee_type__category__in=[
-                    FeeType.RESERVATION, FeeType.ENTRANCE_EXAM, FeeType.ADMISSION,
-                    FeeType.REGISTRATION,
-                ],
-            )
-            .select_related('fee_structure__fee_type')
-            .order_by('fee_structure__fee_type__category', 'due_date')
+        payments = list(
+            ExternalCandidatePayment.objects.filter(
+                candidate=candidate,
+            ).order_by('-payment_date', '-id')[:20]
         )
 
-    if request.method == 'POST' and student:
-        selected_pks = request.POST.getlist('selected_fees')
-        notes        = request.POST.get('notes', '').strip()
-        if not selected_pks:
-            messages.error(request, "Select at least one fee line to invoice.")
+    # ── POST: Collect fee payment ─────────────────────────────────
+    if request.method == 'POST' and request.POST.get('action') == 'collect_fee' and candidate:
+        fee_desc    = request.POST.get('fee_description', '').strip()
+        amount_str  = request.POST.get('amount', '').strip()
+        vat_rate_str = request.POST.get('vat_rate', '0').strip()
+        pay_method  = request.POST.get('payment_method', 'CASH')
+        pay_date    = request.POST.get('payment_date', '')
+        txn_ref     = request.POST.get('transaction_ref', '').strip()
+        pay_notes   = request.POST.get('pay_notes', '').strip()
+
+        errors = []
+        if not fee_desc:
+            errors.append("Fee description is required.")
+        try:
+            amount = Decimal(amount_str)
+            if amount <= 0:
+                raise ValueError
+        except Exception:
+            errors.append("Enter a valid amount greater than 0.")
+            amount = Decimal('0')
+        try:
+            vat_rate = Decimal(vat_rate_str)
+        except Exception:
+            vat_rate = Decimal('0')
+        try:
+            payment_date = date.fromisoformat(pay_date)
+        except Exception:
+            payment_date = timezone.localdate()
+
+        if errors:
+            for e in errors:
+                messages.error(request, e)
         else:
-            subtotal   = Decimal('0')
-            tax_total  = Decimal('0')
-            line_items = []
-            for pk_str in selected_pks:
-                try:
-                    sf = StudentFee.objects.select_related(
-                        'fee_structure__fee_type').get(pk=pk_str, student=student)
-                except StudentFee.DoesNotExist:
-                    continue
-                base = sf.amount - sf.discount
-                if base < Decimal('0'):
-                    base = Decimal('0')
-                rate = sf.fee_structure.fee_type.vat_rate_for(student.is_saudi)
-                tax  = (base * rate).quantize(Decimal('0.01'))
-                subtotal  += base
-                tax_total += tax
-                line_items.append({
-                    'description':    sf.fee_structure.fee_type.name,
-                    'qty':            1,
-                    'gross_amount':   float(sf.amount),
-                    'discount':       float(sf.discount),
-                    'net_before_vat': float(base),
-                    'vat_rate':       int(rate * 100),
-                    'vat':            float(tax),
-                    'total':          float(base + tax),
-                })
-
-            invoice = TaxInvoice.objects.create(
-                student         = student,
-                subtotal        = subtotal,
-                tax_amount      = tax_total,
-                total           = subtotal + tax_total,
-                status          = TaxInvoice.ISSUED,
-                invoice_type    = TaxInvoice.INVOICE_TYPE_STANDARD,
-                notes           = notes or 'Reservation / Entrance Fees Invoice',
-                created_by      = request.user,
-                line_items_json = line_items,
+            payment = ExternalCandidatePayment(
+                candidate       = candidate,
+                fee_description = fee_desc,
+                amount          = amount,
+                vat_rate        = vat_rate,
+                payment_method  = pay_method,
+                payment_date    = payment_date,
+                transaction_ref = txn_ref,
+                notes           = pay_notes,
+                collected_by    = request.user,
             )
-            messages.success(request, f"Invoice {invoice.invoice_number} generated.")
-            return redirect('fees:invoice_print', pk=invoice.pk)
+            payment.save()  # auto-calculates vat_amount and total
 
-    return render(request, 'fees/reservation_invoice.html', {
-        'query':    query,
-        'students': students,
-        'student':  student,
-        'res_fees': res_fees,
+            messages.success(
+                request,
+                f"Payment {payment.receipt_number} collected — "
+                f"SAR {payment.total:,.2f} from {candidate.full_name}."
+            )
+            return redirect(f"{request.path}?candidate_id={candidate.pk}")
+
+    return render(request, 'fees/external_candidate_fee.html', {
+        'query':      query,
+        'candidates': candidates,
+        'candidate':  candidate,
+        'payments':   payments,
     })
 
 

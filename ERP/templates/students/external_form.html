@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block title %}{% if candidate %}Edit Candidate{% else %}Register External Candidate{% endif %} — Al-Kawthar{% endblock %}
+{% block page_title %}{% if candidate %}Edit Candidate{% else %}Register External Candidate{% endif %}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6 pb-12">
+
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+        <a href="{% url 'students:external_list' %}"
+           class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition" title="Back">
+            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-primary">
+                {% if candidate %}Edit: {{ candidate.full_name }}{% else %}Register External Candidate{% endif %}
+            </h1>
+            <p class="text-sm text-slate-500 mt-0.5">
+                {% if candidate %}تعديل بيانات المرشح{% else %}تسجيل مرشح خارجي جديد{% endif %}
+            </p>
+        </div>
+    </div>
+
+    {% if messages %}
+    {% for msg in messages %}
+    <div class="px-4 py-3 rounded-xl text-sm
+        {% if msg.tags == 'error' %}bg-red-50 border border-red-200 text-red-700
+        {% elif msg.tags == 'success' %}bg-green-50 border border-green-200 text-green-700
+        {% else %}bg-blue-50 border border-blue-200 text-blue-700{% endif %}">
+        {{ msg }}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Form -->
+    <form method="post" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        {% csrf_token %}
+
+        <div class="px-6 py-4 bg-indigo-50 border-b border-indigo-100">
+            <h2 class="font-bold text-indigo-800 text-lg">Candidate Details / بيانات المرشح</h2>
+        </div>
+
+        <div class="p-6 space-y-5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <!-- Full Name -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                        Full Name (English) <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text" name="full_name" required
+                           value="{{ candidate.full_name|default:'' }}"
+                           placeholder="e.g. Ahmed Mohammed Ali"
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
+                           id="ext-fullname">
+                </div>
+                <!-- Arabic Name -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">الاسم (عربي)</label>
+                    <input type="text" name="arabic_name" dir="rtl"
+                           value="{{ candidate.arabic_name|default:'' }}"
+                           placeholder="الاسم الكامل"
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
+                           id="ext-arabic">
+                </div>
+                <!-- Phone -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Phone / رقم الجوال</label>
+                    <input type="text" name="phone"
+                           value="{{ candidate.phone|default:'' }}"
+                           placeholder="05xxxxxxxx"
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
+                           id="ext-phone">
+                </div>
+                <!-- Nationality -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nationality / الجنسية</label>
+                    <input type="text" name="nationality"
+                           value="{{ candidate.nationality|default:'' }}"
+                           placeholder="e.g. Saudi, Egyptian, Pakistani …"
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
+                           id="ext-nationality">
+                </div>
+                <!-- ID Number -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">ID / Iqama / Passport</label>
+                    <input type="text" name="id_number"
+                           value="{{ candidate.id_number|default:'' }}"
+                           placeholder="National ID, Iqama, or Passport number"
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
+                           id="ext-idnumber">
+                </div>
+                <!-- Division -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                        Division / القسم <span class="text-red-500">*</span>
+                    </label>
+                    <select name="division"
+                            class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none bg-white"
+                            id="ext-division">
+                        <option value="">— Select Division / القسم —</option>
+                        {% for d in divisions %}
+                        <option value="{{ d.pk }}" {% if candidate and candidate.division_id == d.pk %}selected{% endif %}>{{ d }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <!-- Grade Applying For -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Grade Applying For / الصف</label>
+                    <select name="grade_applying"
+                            class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none bg-white"
+                            id="ext-grade">
+                        <option value="">— Select Grade —</option>
+                        {% for g in grades %}
+                        <option value="{{ g.pk }}" {% if candidate and candidate.grade_applying_id == g.pk %}selected{% endif %}>{{ g }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <!-- Notes -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Notes / ملاحظات</label>
+                <textarea name="notes" rows="3"
+                          placeholder="Any relevant notes about this candidate …"
+                          class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
+                          id="ext-notes">{{ candidate.notes|default:'' }}</textarea>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+            <button type="submit" id="ext-submit"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                </svg>
+                {% if candidate %}Save Changes{% else %}Register Candidate{% endif %}
+            </button>
+            <a href="{% url 'students:external_list' %}"
+               class="border border-slate-300 text-slate-600 px-5 py-2.5 rounded-lg text-sm hover:bg-slate-50 transition">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

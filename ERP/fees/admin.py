@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     FeeType, FeeStructure, FeeStructureItem, StudentFee, Payment, TaxInvoice, Salary,
     TuitionFeeConfig, TuitionInstallment,
+    ExternalCandidate, ExternalCandidatePayment,
 )
 
 
@@ -136,3 +137,35 @@ class TuitionInstallmentAdmin(admin.ModelAdmin):
     list_display  = ('config', 'installment_type', 'amount', 'due_date')
     list_filter   = ('installment_type', 'config__academic_year', 'config__division')
     search_fields = ('config__grade__name',)
+
+
+# ════════════════════════════════════════════════════════════════
+#  EXTERNAL CANDIDATE
+# ════════════════════════════════════════════════════════════════
+
+class ExternalCandidatePaymentInline(admin.TabularInline):
+    model  = ExternalCandidatePayment
+    extra  = 0
+    fields = ('fee_description', 'amount', 'vat_amount', 'total', 'payment_method',
+              'payment_date', 'receipt_number')
+    readonly_fields = ('receipt_number', 'vat_amount', 'total')
+
+
+@admin.register(ExternalCandidate)
+class ExternalCandidateAdmin(admin.ModelAdmin):
+    list_display  = ('candidate_id', 'full_name', 'arabic_name', 'phone',
+                     'board', 'grade_applying', 'is_active', 'created_at')
+    list_filter   = ('is_active', 'board', 'grade_applying')
+    search_fields = ('full_name', 'arabic_name', 'candidate_id', 'phone', 'id_number')
+    readonly_fields = ('candidate_id',)
+    inlines       = [ExternalCandidatePaymentInline]
+
+
+@admin.register(ExternalCandidatePayment)
+class ExternalCandidatePaymentAdmin(admin.ModelAdmin):
+    list_display  = ('receipt_number', 'candidate', 'fee_description', 'total',
+                     'payment_method', 'payment_date')
+    list_filter   = ('payment_method', 'payment_date')
+    search_fields = ('receipt_number', 'candidate__full_name', 'candidate__candidate_id')
+    readonly_fields = ('receipt_number', 'vat_amount', 'total')
+

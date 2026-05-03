@@ -652,3 +652,124 @@ class TuitionInstallment(models.Model):
     def __str__(self):
         return (f"{self.config} — {self.get_installment_type_display()} "
                 f"— SAR {self.amount:,.2f}")
+
+
+# ════════════════════════════════════════════════════════════════
+#  EXTERNAL CANDIDATE  (non-enrolled students taking board exams)
+# ════════════════════════════════════════════════════════════════
+
+def _candidate_id():
+    ts  = timezone.now().strftime('%Y%m%d')
+    uid = str(uuid.uuid4().int)[:5]
+    return f"EXT-{ts}-{uid}"
+
+
+class ExternalCandidate(models.Model):
+    """Lightweight record for pending admissions and external exam candidates."""
+
+    STATUS_PENDING = 'PENDING'
+    STATUS_APPROVED = 'APPROVED'
+    STATUS_REJECTED = 'REJECTED'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending / قيد الانتظار'),
+        (STATUS_APPROVED, 'Approved (Enrolled) / معتمد'),
+        (STATUS_REJECTED, 'Rejected / مرفوض'),
+    ]
+
+    candidate_id    = models.CharField(
+        max_length=30, unique=True, default=_candidate_id, editable=False,
+        verbose_name='Candidate ID')
+    full_name       = models.CharField(max_length=200, verbose_name='Full Name (English)')
+    arabic_name     = models.CharField(max_length=200, blank=True, verbose_name='الاسم (عربي)')
+    phone           = models.CharField(max_length=20, blank=True, verbose_name='Phone / رقم الجوال')
+    nationality     = models.CharField(max_length=100, blank=True, verbose_name='Nationality / الجنسية')
+    id_number       = models.CharField(
+        max_length=50, blank=True, verbose_name='ID / Iqama / Passport',
+        help_text='National ID, Iqama, or Passport number')
+    grade_applying  = models.ForeignKey(
+        Grade, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='external_candidates', verbose_name='Grade Applying For / الصف')
+    division        = models.ForeignKey(
+        'core.Division', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='external_candidates',
+        verbose_name='Division / القسم',
+        help_text='School division (American, British, French, Home Study)')
+    board           = models.ForeignKey(
+        'core.Board', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='external_candidates',
+        verbose_name='Board / Entrance Exam',
+        help_text='Which board entrance exam is the candidate taking?')
+    notes           = models.TextField(blank=True)
+    status          = models.CharField(max_length=15, choices=STATUS_CHOICES, default=STATUS_PENDING, verbose_name='Admission Status')
+    enrolled_student = models.OneToOneField(
+        Student, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='admission_application',
+        help_text='Linked student record if approved and enrolled'
+    )
+    is_active       = models.BooleanField(default=True)
+    created_at      = models.DateTimeField(auto_now_add=True)
+    created_by      = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='external_candidates_created')
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'External Candidate / مرشح خارجي'
+        verbose_name_plural = 'External Candidates / مرشحون خارجيون'
+
+    def __str__(self):
+        return f"[{self.candidate_id}] {self.full_name}"
+
+
+def _ext_receipt_number():
+    return "EXT-" + str(uuid.uuid4().int)[:8].upper()
+
+
+class ExternalCandidatePayment(models.Model):
+    """Payment record for an external candidate's exam or other fees."""
+
+    CREDIT_CARD = 'CREDIT_CARD'
+    BANK        = 'BANK'
+    CASH        = 'CASH'
+
+    PAYMENT_METHODS = [
+        (CASH,        'Cash / نقدي'),
+        (CREDIT_CARD, 'Credit Card / بطاقة ائتمانية'),
+        (BANK,        'Bank Transfer / تحويل بنكي'),
+    ]
+
+    candidate       = models.ForeignKey(
+        ExternalCandidate, on_delete=models.CASCADE, related_name='payments')
+    fee_description = models.CharField(max_length=200, verbose_name='Fee Description')
+    amount          = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Amount (SAR)')
+    vat_rate        = models.DecimalField(
+        max_digits=5, decimal_places=2, default=Decimal('0.00'),
+        verbose_name='VAT Rate (%)')
+    vat_amount      = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    total           = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    payment_method  = models.CharField(max_length=15, choices=PAYMENT_METHODS, default=CASH)
+    payment_date    = models.DateField(default=timezone.localdate)
+    receipt_number  = models.CharField(
+        max_length=30, unique=True, default=_ext_receipt_number, editable=False)
+    transaction_ref = models.CharField(max_length=100, blank=True, help_text='Bank ref / cheque no.')
+    notes           = models.TextField(blank=True)
+    invoice         = models.ForeignKey(
+        TaxInvoice, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='external_payments',
+        help_text='ZATCA Tax Invoice generated for this payment')
+    collected_by    = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ext_payments_collected')
+    created_at      = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-payment_date', '-id']
+        verbose_name = 'External Candidate Payment'
+
+    def __str__(self):
+        return f"{self.receipt_number} — {self.candidate.full_name} — SAR {self.total}"
+
+    def save(self, *args, **kwargs):
+        self.vat_amount = (self.amount * self.vat_rate / 100).quantize(Decimal('0.01'))
+        self.total = self.amount + self.vat_amount
+        super().save(*args, **kwargs)

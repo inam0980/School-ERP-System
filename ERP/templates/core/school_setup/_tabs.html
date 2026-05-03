@@ -25,5 +25,10 @@
               {% if 'subject' in n %}bg-[#1e3a5f] text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
         Subjects
     </a>
+    <a href="{% url 'core:board_list' %}"
+       class="px-4 py-2 rounded-lg text-sm font-medium transition
+              {% if 'board' in n %}bg-[#1e3a5f] text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+        Boards
+    </a>
 </div>
 {% endwith %}
