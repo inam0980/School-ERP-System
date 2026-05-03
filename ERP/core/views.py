@@ -2,11 +2,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Q
+from django.db.models import Q, ProtectedError
 
 from accounts.decorators import role_required
-from .models import AcademicYear, Division, Grade, Section, Subject
-from .forms import AcademicYearForm, DivisionForm, GradeForm, SectionForm, SubjectForm
+from .models import AcademicYear, Division, Grade, Section, Subject, Board
+from .forms import AcademicYearForm, DivisionForm, GradeForm, SectionForm, SubjectForm, BoardForm
 
 _ADMIN = ('SUPER_ADMIN', 'ADMIN')
 
@@ -81,8 +81,11 @@ def academic_year_edit(request, pk):
 def academic_year_delete(request, pk):
     obj = get_object_or_404(AcademicYear, pk=pk)
     if request.method == 'POST':
-        obj.delete()
-        messages.success(request, "Academic Year deleted.")
+        try:
+            obj.delete()
+            messages.success(request, "Academic Year deleted.")
+        except ProtectedError:
+            messages.error(request, f"Cannot delete '{obj}' because it is currently in use. Please remove or reassign linked records first.")
         return redirect('core:academic_year_list')
     return render(request, 'core/school_setup/confirm_delete.html', {
         'obj': obj, 'back_url': 'core:academic_year_list',
@@ -130,8 +133,11 @@ def division_edit(request, pk):
 def division_delete(request, pk):
     obj = get_object_or_404(Division, pk=pk)
     if request.method == 'POST':
-        obj.delete()
-        messages.success(request, "Division deleted.")
+        try:
+            obj.delete()
+            messages.success(request, "Division deleted.")
+        except ProtectedError:
+            messages.error(request, f"Cannot delete '{obj}' because it is currently in use (e.g. linked to Grades, Fee Structures, or Students). Please remove or reassign those records first.")
         return redirect('core:division_list')
     return render(request, 'core/school_setup/confirm_delete.html', {
         'obj': obj, 'back_url': 'core:division_list',
@@ -188,8 +194,11 @@ def grade_edit(request, pk):
 def grade_delete(request, pk):
     obj = get_object_or_404(Grade, pk=pk)
     if request.method == 'POST':
-        obj.delete()
-        messages.success(request, "Grade deleted.")
+        try:
+            obj.delete()
+            messages.success(request, "Grade deleted.")
+        except ProtectedError:
+            messages.error(request, f"Cannot delete '{obj.name}' because it is currently in use. Please remove or reassign linked records first.")
         return redirect('core:grade_list')
     return render(request, 'core/school_setup/confirm_delete.html', {
         'obj': obj, 'back_url': 'core:grade_list',
@@ -244,8 +253,11 @@ def section_edit(request, pk):
 def section_delete(request, pk):
     obj = get_object_or_404(Section, pk=pk)
     if request.method == 'POST':
-        obj.delete()
-        messages.success(request, "Section deleted.")
+        try:
+            obj.delete()
+            messages.success(request, "Section deleted.")
+        except ProtectedError:
+            messages.error(request, f"Cannot delete '{obj}' because it is currently in use. Please remove or reassign linked records first.")
         return redirect('core:section_list')
     return render(request, 'core/school_setup/confirm_delete.html', {
         'obj': obj, 'back_url': 'core:section_list',
@@ -302,11 +314,66 @@ def subject_edit(request, pk):
 def subject_delete(request, pk):
     obj = get_object_or_404(Subject, pk=pk)
     if request.method == 'POST':
-        obj.delete()
-        messages.success(request, "Subject deleted.")
+        try:
+            obj.delete()
+            messages.success(request, "Subject deleted.")
+        except ProtectedError:
+            messages.error(request, f"Cannot delete '{obj.name}' because it is currently in use. Please remove or reassign linked records first.")
         return redirect('core:subject_list')
     return render(request, 'core/school_setup/confirm_delete.html', {
         'obj': obj, 'back_url': 'core:subject_list',
+    })
+
+
+# ────────────────────────── EXAM BOARDS ──────────────────────────
+
+@login_required
+@role_required(*_ADMIN)
+def board_list(request):
+    boards = Board.objects.all()
+    return render(request, 'core/school_setup/boards.html', {'boards': boards})
+
+
+@login_required
+@role_required(*_ADMIN)
+def board_add(request):
+    form = BoardForm(request.POST or None)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Exam Board added.")
+        return redirect('core:board_list')
+    return render(request, 'core/school_setup/form.html', {
+        'form': form, 'title': 'Add Exam Board', 'back_url': 'core:board_list',
+    })
+
+
+@login_required
+@role_required(*_ADMIN)
+def board_edit(request, pk):
+    obj  = get_object_or_404(Board, pk=pk)
+    form = BoardForm(request.POST or None, instance=obj)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Exam Board updated.")
+        return redirect('core:board_list')
+    return render(request, 'core/school_setup/form.html', {
+        'form': form, 'title': f'Edit: {obj}', 'back_url': 'core:board_list',
+    })
+
+
+@login_required
+@role_required(*_ADMIN)
+def board_delete(request, pk):
+    obj = get_object_or_404(Board, pk=pk)
+    if request.method == 'POST':
+        try:
+            obj.delete()
+            messages.success(request, "Exam Board deleted.")
+        except ProtectedError:
+            messages.error(request, f"Cannot delete '{obj}' because it is currently in use. Please remove or reassign linked records first.")
+        return redirect('core:board_list')
+    return render(request, 'core/school_setup/confirm_delete.html', {
+        'obj': obj, 'back_url': 'core:board_list',
     })
 
 

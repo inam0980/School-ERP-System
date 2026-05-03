@@ -4,18 +4,34 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
-from django.db.models import Q
+from django.db.models import Q, Sum, Count
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import role_required
 from .models import Student, StudentDocument, Sibling, AuthorizedPickup
 from .forms import StudentForm, DocumentUploadForm, StudentFilterForm, SiblingForm, AuthorizedPickupForm
+from fees.models import ExternalCandidate, ExternalCandidatePayment
+from core.models import Grade, Division, Board
 
 _ADMIN   = ('SUPER_ADMIN', 'ADMIN')
 _STAFF   = ('SUPER_ADMIN', 'ADMIN', 'TEACHER', 'ACCOUNTANT', 'STAFF')
 
 
-# ────────────────────────── LIST ──────────────────────────
+# ────────────────────────── STUDENT HUB ──────────────────────────
+
+@login_required
+@role_required(*_STAFF)
+def student_hub(request):
+    """Landing page: choose Regular Students or External Candidates."""
+    regular_count  = Student.objects.count()
+    external_count = ExternalCandidate.objects.count()
+    return render(request, 'students/student_hub.html', {
+        'regular_count':  regular_count,
+        'external_count': external_count,
+    })
+
+
+# ────────────────────────── REGULAR STUDENT LIST ──────────────────────────
 
 @login_required
 @role_required(*_STAFF)
@@ -191,13 +207,40 @@ def _save_pickups_from_post(post, student):
 @login_required
 @role_required(*_ADMIN)
 def student_add(request):
-    form = StudentForm(request.POST or None, request.FILES or None)
+    candidate_id = request.GET.get('candidate_id')
+    candidate = None
+    initial = {}
+
+    if candidate_id:
+        from fees.models import ExternalCandidate
+        candidate = get_object_or_404(ExternalCandidate, pk=candidate_id)
+        if candidate.status == ExternalCandidate.STATUS_APPROVED and candidate.enrolled_student:
+            messages.warning(request, "This candidate is already approved and enrolled.")
+            return redirect('students:detail', pk=candidate.enrolled_student.pk)
+
+        initial = {
+            'full_name': candidate.full_name,
+            'arabic_name': candidate.arabic_name,
+            'guardian_phone': candidate.phone,
+            'nationality': candidate.nationality,
+            'national_id': candidate.id_number,
+            'grade': candidate.grade_applying,
+            'enrollment_type': Student.NEW,
+        }
+
+    form = StudentForm(request.POST or None, request.FILES or None, initial=initial)
     if form.is_valid():
         student = form.save(commit=False)
         student.created_by = request.user
         student.save()
         _save_siblings_from_post(request.POST, student)
         _save_pickups_from_post(request.POST, student)
+
+        if candidate:
+            candidate.status = ExternalCandidate.STATUS_APPROVED
+            candidate.enrolled_student = student
+            candidate.save()
+
         messages.success(request, f"Student {student.full_name} added (ID: {student.student_id}). Please upload identity documents (National ID / Iqama / Passport) below.")
         return redirect('students:detail', pk=student.pk)
     return render(request, 'students/student_form.html', {'form': form, 'title': 'Add Student / إضافة طالب'})
@@ -501,3 +544,165 @@ def download_import_template(request):
     except ImportError:
         messages.error(request, "openpyxl is not installed. Run: pip install openpyxl")
         return redirect('students:import')
+
+
+# ────────────────────────── EXTERNAL CANDIDATE LIST ──────────────────────────
+
+@login_required
+@role_required(*_STAFF)
+def external_list(request):
+    """List all external exam candidates with search."""
+    query = request.GET.get('q', '').strip()
+    qs = ExternalCandidate.objects.select_related('grade_applying', 'board').annotate(
+        payment_count=Count('payments'),
+    )
+
+    if query:
+        qs = qs.filter(
+            Q(full_name__icontains=query) |
+            Q(candidate_id__icontains=query) |
+            Q(arabic_name__icontains=query) |
+            Q(phone__icontains=query) |
+            Q(id_number__icontains=query)
+        )
+
+    return render(request, 'students/external_list.html', {
+        'candidates': qs,
+        'total':      qs.count(),
+        'query':      query,
+    })
+
+
+# ────────────────────────── EXTERNAL CANDIDATE ADD ──────────────────────────
+
+@login_required
+@role_required(*_STAFF)
+def external_add(request):
+    """Register a new external candidate."""
+    grades    = Grade.objects.select_related('division').order_by('division__name', 'order', 'name')
+    divisions = Division.objects.filter(is_active=True).order_by('name')
+
+    if request.method == 'POST':
+        full_name    = request.POST.get('full_name', '').strip()
+        arabic_name  = request.POST.get('arabic_name', '').strip()
+        phone        = request.POST.get('phone', '').strip()
+        nationality  = request.POST.get('nationality', '').strip()
+        id_number    = request.POST.get('id_number', '').strip()
+        grade_pk     = request.POST.get('grade_applying', '')
+        division_pk  = request.POST.get('division', '')
+        notes        = request.POST.get('notes', '').strip()
+
+        if not full_name:
+            messages.error(request, "Full name is required.")
+        else:
+            grade_obj = None
+            if grade_pk:
+                try:
+                    grade_obj = Grade.objects.get(pk=grade_pk)
+                except Grade.DoesNotExist:
+                    pass
+            division_obj = None
+            if division_pk:
+                try:
+                    division_obj = Division.objects.get(pk=division_pk)
+                except Division.DoesNotExist:
+                    pass
+
+            candidate = ExternalCandidate.objects.create(
+                full_name      = full_name,
+                arabic_name    = arabic_name,
+                phone          = phone,
+                nationality    = nationality,
+                id_number      = id_number,
+                grade_applying = grade_obj,
+                division       = division_obj,
+                notes          = notes,
+                created_by     = request.user,
+            )
+            messages.success(request, f"Candidate {candidate.candidate_id} — {candidate.full_name} registered successfully.")
+            return redirect('students:external_detail', pk=candidate.pk)
+
+    return render(request, 'students/external_form.html', {
+        'grades':    grades,
+        'divisions': divisions,
+        'candidate': None,
+    })
+
+
+# ────────────────────────── EXTERNAL CANDIDATE EDIT ──────────────────────────
+
+@login_required
+@role_required(*_STAFF)
+def external_edit(request, pk):
+    """Edit an existing external candidate."""
+    candidate = get_object_or_404(ExternalCandidate, pk=pk)
+    grades    = Grade.objects.select_related('division').order_by('division__name', 'order', 'name')
+    divisions = Division.objects.filter(is_active=True).order_by('name')
+
+    if request.method == 'POST':
+        full_name    = request.POST.get('full_name', '').strip()
+        arabic_name  = request.POST.get('arabic_name', '').strip()
+        phone        = request.POST.get('phone', '').strip()
+        nationality  = request.POST.get('nationality', '').strip()
+        id_number    = request.POST.get('id_number', '').strip()
+        grade_pk     = request.POST.get('grade_applying', '')
+        division_pk  = request.POST.get('division', '')
+        notes        = request.POST.get('notes', '').strip()
+
+        if not full_name:
+            messages.error(request, "Full name is required.")
+        else:
+            grade_obj = None
+            if grade_pk:
+                try:
+                    grade_obj = Grade.objects.get(pk=grade_pk)
+                except Grade.DoesNotExist:
+                    pass
+            division_obj = None
+            if division_pk:
+                try:
+                    division_obj = Division.objects.get(pk=division_pk)
+                except Division.DoesNotExist:
+                    pass
+
+            candidate.full_name      = full_name
+            candidate.arabic_name    = arabic_name
+            candidate.phone          = phone
+            candidate.nationality    = nationality
+            candidate.id_number      = id_number
+            candidate.grade_applying = grade_obj
+            candidate.division       = division_obj
+            candidate.notes          = notes
+            candidate.save()
+            messages.success(request, f"Candidate {candidate.full_name} updated.")
+            return redirect('students:external_detail', pk=candidate.pk)
+
+    return render(request, 'students/external_form.html', {
+        'grades':    grades,
+        'divisions': divisions,
+        'candidate': candidate,
+    })
+
+
+# ────────────────────────── EXTERNAL CANDIDATE DETAIL ──────────────────────────
+
+@login_required
+@role_required(*_STAFF)
+def external_detail(request, pk):
+    """View details and payment history of an external candidate."""
+    candidate = get_object_or_404(
+        ExternalCandidate.objects.select_related('grade_applying', 'board'),
+        pk=pk,
+    )
+    payments = ExternalCandidatePayment.objects.filter(
+        candidate=candidate,
+    ).order_by('-payment_date', '-id')
+
+    total_paid = payments.aggregate(s=Sum('total'))['s'] or 0
+
+    return render(request, 'students/external_detail.html', {
+        'candidate':  candidate,
+        'payments':   payments,
+        'total_paid': total_paid,
+    })
+

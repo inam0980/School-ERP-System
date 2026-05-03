@@ -7,9 +7,17 @@
 
     <!-- Header row -->
     <div class="flex items-center justify-between flex-wrap gap-3">
-        <div>
-            <h2 class="text-xl font-bold text-slate-800">Students / الطلاب</h2>
-            <p class="text-xs text-slate-400 mt-0.5">{{ total }} student(s) found</p>
+        <div class="flex items-center gap-3">
+            <a href="{% url 'students:hub' %}"
+               class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition" title="Back to Hub">
+                <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+            </a>
+            <div>
+                <h2 class="text-xl font-bold text-slate-800">Regular Students / الطلاب المسجلين</h2>
+                <p class="text-xs text-slate-400 mt-0.5">{{ total }} student(s) found</p>
+            </div>
         </div>
         <div class="flex gap-2 flex-wrap">
             <a href="{% url 'students:export_csv' %}?{{ request.GET.urlencode }}"

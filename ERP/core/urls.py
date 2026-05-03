@@ -37,6 +37,12 @@ urlpatterns = [
     path('school-setup/subjects/<int:pk>/edit/',   views.subject_edit,   name='subject_edit'),
     path('school-setup/subjects/<int:pk>/delete/', views.subject_delete, name='subject_delete'),
 
+    # ── Exam Boards ─────────────────────────────────────────────
+    path('school-setup/boards/',                 views.board_list,   name='board_list'),
+    path('school-setup/boards/add/',             views.board_add,    name='board_add'),
+    path('school-setup/boards/<int:pk>/edit/',   views.board_edit,   name='board_edit'),
+    path('school-setup/boards/<int:pk>/delete/', views.board_delete, name='board_delete'),
+
     # ── API endpoints ───────────────────────────────────────────
     path('api/grades/',   views.api_grades,   name='api_grades'),
     path('api/sections/', views.api_sections, name='api_sections'),
