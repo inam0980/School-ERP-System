@@ -28,12 +28,6 @@ class Division(models.Model):
     FRENCH     = 'FRENCH'
     HOME_STUDY = 'HOME_STUDY'
 
-    NAME_CHOICES = [
-        (AMERICAN,   'American'),
-        (BRITISH,    'British'),
-        (FRENCH,     'French'),
-        (HOME_STUDY, 'Home Study'),
-    ]
     CURRICULUM_CHOICES = [
         (AMERICAN,   'American Common Core'),
         (BRITISH,    'British National Curriculum'),
@@ -41,7 +35,7 @@ class Division(models.Model):
         (HOME_STUDY, 'Home Study Programme'),
     ]
 
-    name            = models.CharField(max_length=20, choices=NAME_CHOICES, unique=True)
+    name            = models.CharField(max_length=100, unique=True)
     curriculum_type = models.CharField(max_length=20, choices=CURRICULUM_CHOICES)
     is_active       = models.BooleanField(default=True)
     created_at      = models.DateTimeField(auto_now_add=True)
@@ -50,7 +44,7 @@ class Division(models.Model):
         ordering = ['name']
 
     def __str__(self):
-        return self.get_name_display()
+        return self.name
 
 
 class Grade(models.Model):
