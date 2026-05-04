@@ -14,7 +14,7 @@
         </a>
         <div>
             <h1 class="text-2xl font-bold text-primary">External Exam Fee Collection</h1>
-            <p class="text-sm text-slate-500 mt-0.5">رسوم اختبار القبول الخارجي · Search candidate & collect fees</p>
+            <p class="text-sm text-slate-500 mt-0.5">رسوم اختبار القبول الخارجي · Search candidate &amp; collect fees</p>
         </div>
     </div>
 
@@ -92,7 +92,22 @@
     <!-- Candidate Banner -->
     <div class="bg-indigo-50 border border-indigo-200 rounded-xl px-5 py-4 flex items-center justify-between flex-wrap gap-3">
         <div>
-            <p class="font-bold text-indigo-900 text-lg">{{ candidate.full_name }}{% if candidate.arabic_name %} · {{ candidate.arabic_name }}{% endif %}</p>
+            <div class="flex items-center gap-3 flex-wrap">
+                <p class="font-bold text-indigo-900 text-lg">{{ candidate.full_name }}{% if candidate.arabic_name %} · {{ candidate.arabic_name }}{% endif %}</p>
+                {% if candidate.is_saudi == True %}
+                <span class="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-800 border border-green-300">
+                    🇸🇦 Saudi — 0% VAT
+                </span>
+                {% elif candidate.is_saudi == False %}
+                <span class="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-orange-100 text-orange-800 border border-orange-300">
+                    🌍 Non-Saudi — 15% VAT
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-300">
+                    ⚠ Citizenship not set
+                </span>
+                {% endif %}
+            </div>
             <p class="text-xs text-indigo-600 mt-0.5">
                 {{ candidate.candidate_id }}
                 {% if candidate.grade_applying %} · {{ candidate.grade_applying }}{% endif %}
@@ -109,6 +124,28 @@
         </div>
     </div>
 
+    <!-- Print Invoice button shown after successful collection -->
+    {% if just_collected_pids %}
+    <div class="bg-green-50 border border-green-200 rounded-xl px-5 py-4 flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+            <svg class="w-6 h-6 text-green-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div>
+                <p class="font-semibold text-green-800 text-sm">Payment collected successfully!</p>
+                <p class="text-xs text-green-600 mt-0.5">Click Print Invoice to generate the ZATCA tax invoice.</p>
+            </div>
+        </div>
+        <a href="{% url 'fees:ext_receipt_print' %}?pids={{ just_collected_pids }}"
+           class="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+            </svg>
+            Print Invoice
+        </a>
+    </div>
+    {% endif %}
+
     <!-- Payment History -->
     {% if payments %}
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -123,7 +160,8 @@
                 <div class="col-span-2 text-right">Amount</div>
                 <div class="col-span-1 text-right">VAT</div>
                 <div class="col-span-2 text-right">Total</div>
-                <div class="col-span-2 text-center">Date</div>
+                <div class="col-span-1 text-center">Date</div>
+                <div class="col-span-1 text-center">Invoice</div>
             </div>
             {% for p in payments %}
             <div class="grid grid-cols-12 px-5 py-3 items-center text-sm hover:bg-slate-50 transition">
@@ -132,53 +170,139 @@
                 <div class="col-span-2 text-right text-slate-600">{{ p.amount|floatformat:2 }}</div>
                 <div class="col-span-1 text-right text-slate-400">{{ p.vat_amount|floatformat:2 }}</div>
                 <div class="col-span-2 text-right font-semibold text-slate-800">{{ p.total|floatformat:2 }}</div>
-                <div class="col-span-2 text-center text-slate-500 text-xs">{{ p.payment_date|date:"Y-m-d" }}</div>
+                <div class="col-span-1 text-center text-slate-500 text-xs">{{ p.payment_date|date:"Y-m-d" }}</div>
+                <div class="col-span-1 text-center">
+                    <a href="{% url 'fees:ext_receipt_print' %}?pids={{ p.pk }}"
+                       class="text-indigo-500 hover:text-indigo-700 text-xs" title="Print Invoice">🖨️</a>
+                </div>
             </div>
             {% endfor %}
         </div>
     </div>
     {% endif %}
 
-    <!-- Collect Fee Form -->
-    <form method="post" class="bg-white rounded-xl border-2 border-primary/20 shadow-sm overflow-hidden">
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!--  COLLECT FEE FORM (multi-line)                           -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <form method="post" id="ext-fee-form" class="bg-white rounded-xl border-2 border-primary/20 shadow-sm overflow-hidden">
         {% csrf_token %}
         <input type="hidden" name="action" value="collect_fee">
         <input type="hidden" name="candidate_id" value="{{ candidate.pk }}">
 
+        <!-- hidden field so JS can read VAT default -->
+        <input type="hidden" id="default-vat-rate" value="{% if candidate.is_saudi == True %}0{% elif candidate.is_saudi == False %}15{% else %}0{% endif %}">
+
         <div class="px-5 py-4 bg-primary/5 border-b border-primary/10">
-            <h2 class="font-bold text-primary text-lg">Collect Fee / تحصيل الرسوم</h2>
-            <p class="text-sm text-slate-500 mt-0.5">Enter fee details and collect payment</p>
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                    <h2 class="font-bold text-primary text-lg">Collect Fee / تحصيل الرسوم</h2>
+                    <p class="text-sm text-slate-500 mt-0.5">Standard fees are auto-filled from the fee schedule. Add extra fees as needed.</p>
+                </div>
+                {% if candidate.is_saudi == True %}
+                <div class="text-xs font-semibold px-3 py-1.5 rounded-full bg-green-100 text-green-800 border border-green-300">
+                    🇸🇦 Saudi — VAT: 0%
+                </div>
+                {% elif candidate.is_saudi == False %}
+                <div class="text-xs font-semibold px-3 py-1.5 rounded-full bg-orange-100 text-orange-800 border border-orange-300">
+                    🌍 Non-Saudi — VAT: 15% on taxable fees
+                </div>
+                {% endif %}
+            </div>
         </div>
 
-        <div class="p-5 space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <!-- Fee Description -->
-                <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-slate-700 mb-1">
-                        Fee Description <span class="text-red-500">*</span>
-                    </label>
-                    <input type="text" name="fee_description" required
-                           placeholder="e.g. Entrance Exam Fee, Board Exam Fee …"
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
-                           id="ext-fee-desc">
+        <div class="p-5 space-y-5">
+
+            <!-- ── Fee Lines Table ──────────────────────────────── -->
+            <div>
+                <div class="grid grid-cols-12 gap-2 mb-1 text-xs font-semibold text-slate-500 uppercase tracking-wide px-1">
+                    <div class="col-span-5">Description</div>
+                    <div class="col-span-3 text-right">Amount (SAR)</div>
+                    <div class="col-span-2 text-right">VAT %</div>
+                    <div class="col-span-2 text-right">Total</div>
                 </div>
-                <!-- Amount -->
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">
-                        Amount (SAR) <span class="text-red-500">*</span>
-                    </label>
-                    <input type="number" name="amount" required step="0.01" min="0.01"
-                           placeholder="e.g. 500.00"
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
-                           id="ext-fee-amount">
+
+                <div id="fee-lines-container" class="space-y-2">
+
+                    <!-- ROW 1 — Entrance Exam Fee (standard) -->
+                    <div class="fee-line grid grid-cols-12 gap-2 items-center bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2" data-standard="true">
+                        <div class="col-span-5">
+                            <input type="text" name="fee_description[]"
+                                   value="Entrance Exam Fee"
+                                   class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none bg-white">
+                        </div>
+                        <div class="col-span-3">
+                            <input type="number" name="amount[]" step="0.01" min="0"
+                                   value="{{ entrance_exam_default }}"
+                                   class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm text-right focus:ring-2 focus:ring-primary/40 focus:outline-none fee-amount"
+                                   oninput="recalcRow(this)">
+                        </div>
+                        <div class="col-span-2">
+                            <input type="number" name="vat_rate[]" step="0.01" min="0" max="100"
+                                   value="{% if candidate.is_saudi == True %}0{% elif candidate.is_saudi == False %}15{% else %}0{% endif %}"
+                                   class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm text-right focus:ring-2 focus:ring-primary/40 focus:outline-none fee-vat"
+                                   oninput="recalcRow(this)">
+                        </div>
+                        <div class="col-span-2 text-right text-sm font-semibold text-indigo-700 fee-total-display px-1">
+                            {{ entrance_exam_default|floatformat:2 }}
+                        </div>
+                    </div>
+
+                    <!-- ROW 2 — Registration Fee (standard) -->
+                    <div class="fee-line grid grid-cols-12 gap-2 items-center bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2" data-standard="true">
+                        <div class="col-span-5">
+                            <input type="text" name="fee_description[]"
+                                   value="Registration Fee"
+                                   class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none bg-white">
+                        </div>
+                        <div class="col-span-3">
+                            <input type="number" name="amount[]" step="0.01" min="0"
+                                   value="{{ registration_default }}"
+                                   class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm text-right focus:ring-2 focus:ring-primary/40 focus:outline-none fee-amount"
+                                   oninput="recalcRow(this)">
+                        </div>
+                        <div class="col-span-2">
+                            <input type="number" name="vat_rate[]" step="0.01" min="0" max="100"
+                                   value="{% if candidate.is_saudi == True %}0{% elif candidate.is_saudi == False %}15{% else %}0{% endif %}"
+                                   class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm text-right focus:ring-2 focus:ring-primary/40 focus:outline-none fee-vat"
+                                   oninput="recalcRow(this)">
+                        </div>
+                        <div class="col-span-2 text-right text-sm font-semibold text-indigo-700 fee-total-display px-1">
+                            {{ registration_default|floatformat:2 }}
+                        </div>
+                    </div>
+
+                </div><!-- /fee-lines-container -->
+
+                <!-- Add Other Fee button -->
+                <button type="button" id="ext-add-fee-row"
+                        class="mt-3 inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Other Fee
+                </button>
+
+                <!-- Grand Total row -->
+                <div class="mt-4 flex justify-end">
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg px-5 py-3 text-sm space-y-1 min-w-[220px]">
+                        <div class="flex justify-between text-slate-500">
+                            <span>Subtotal</span>
+                            <span id="grand-subtotal">0.00</span>
+                        </div>
+                        <div class="flex justify-between text-orange-600">
+                            <span>VAT</span>
+                            <span id="grand-vat">0.00</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-slate-800 border-t border-slate-200 pt-1 mt-1">
+                            <span>Grand Total (SAR)</span>
+                            <span id="grand-total">0.00</span>
+                        </div>
+                    </div>
                 </div>
-                <!-- VAT Rate -->
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">VAT Rate (%)</label>
-                    <input type="number" name="vat_rate" step="0.01" min="0" max="100" value="0"
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
-                           id="ext-fee-vat">
-                </div>
+            </div>
+
+            <!-- ── Payment Details ──────────────────────────────── -->
+            <div class="border-t border-slate-100 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <!-- Payment Method -->
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Payment Method</label>
@@ -207,7 +331,7 @@
                            id="ext-fee-ref">
                 </div>
                 <!-- Notes -->
-                <div class="sm:col-span-2">
+                <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Notes / ملاحظات</label>
                     <textarea name="pay_notes" rows="2"
                               placeholder="Optional notes …"
@@ -217,21 +341,89 @@
             </div>
         </div>
 
-        <div class="px-5 py-4 bg-slate-50 border-t border-slate-100 flex gap-3">
+        <div class="px-5 py-4 bg-slate-50 border-t border-slate-100">
             <button type="submit" id="ext-fee-submit"
                     class="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition inline-flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
                 </svg>
-                Collect Payment
+                Collect
             </button>
-            <a href="{% url 'fees:reservation_invoice' %}"
-               class="border border-slate-300 text-slate-600 px-5 py-2.5 rounded-lg text-sm hover:bg-slate-50 transition">
-                Cancel
-            </a>
         </div>
     </form>
     {% endif %}
 
 </div>
+
+<script>
+// ── Fee row template ────────────────────────────────────────────
+const DEFAULT_VAT = parseFloat(document.getElementById('default-vat-rate')?.value || '0');
+
+function newFeeRow() {
+    const row = document.createElement('div');
+    row.className = 'fee-line grid grid-cols-12 gap-2 items-center border border-slate-200 rounded-lg px-3 py-2';
+    row.innerHTML = `
+        <div class="col-span-5">
+            <input type="text" name="fee_description[]" placeholder="e.g. Transport Fee, Book Fee …"
+                   class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none">
+        </div>
+        <div class="col-span-3">
+            <input type="number" name="amount[]" step="0.01" min="0" placeholder="0.00"
+                   class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm text-right focus:ring-2 focus:ring-primary/40 focus:outline-none fee-amount"
+                   oninput="recalcRow(this)">
+        </div>
+        <div class="col-span-2">
+            <input type="number" name="vat_rate[]" step="0.01" min="0" max="100" value="${DEFAULT_VAT}"
+                   class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm text-right focus:ring-2 focus:ring-primary/40 focus:outline-none fee-vat"
+                   oninput="recalcRow(this)">
+        </div>
+        <div class="col-span-1 text-right text-sm font-semibold text-slate-700 fee-total-display px-1">0.00</div>
+        <div class="col-span-1 text-right">
+            <button type="button" onclick="removeRow(this)"
+                    class="text-red-400 hover:text-red-600 transition text-lg leading-none">×</button>
+        </div>
+    `;
+    return row;
+}
+
+function removeRow(btn) {
+    btn.closest('.fee-line').remove();
+    recalcGrand();
+}
+
+function recalcRow(input) {
+    const row   = input.closest('.fee-line');
+    const amt   = parseFloat(row.querySelector('.fee-amount').value) || 0;
+    const vat   = parseFloat(row.querySelector('.fee-vat').value)    || 0;
+    const total = amt + (amt * vat / 100);
+    row.querySelector('.fee-total-display').textContent = total.toFixed(2);
+    recalcGrand();
+}
+
+function recalcGrand() {
+    let subtotal = 0, vatTotal = 0;
+    document.querySelectorAll('.fee-line').forEach(row => {
+        const amt = parseFloat(row.querySelector('.fee-amount')?.value) || 0;
+        const vat = parseFloat(row.querySelector('.fee-vat')?.value)    || 0;
+        const vatAmt = amt * vat / 100;
+        subtotal += amt;
+        vatTotal += vatAmt;
+    });
+    document.getElementById('grand-subtotal').textContent = subtotal.toFixed(2);
+    document.getElementById('grand-vat').textContent      = vatTotal.toFixed(2);
+    document.getElementById('grand-total').textContent    = (subtotal + vatTotal).toFixed(2);
+}
+
+// Add row button
+document.getElementById('ext-add-fee-row')?.addEventListener('click', () => {
+    document.getElementById('fee-lines-container').appendChild(newFeeRow());
+});
+
+// On page load: update every existing row's total display (reflects pre-filled VAT),
+// then recalculate the grand total summary.
+document.querySelectorAll('.fee-line').forEach(row => {
+    const amtInput = row.querySelector('.fee-amount');
+    if (amtInput) recalcRow(amtInput);
+});
+</script>
 {% endblock %}

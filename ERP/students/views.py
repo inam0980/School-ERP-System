@@ -591,6 +591,8 @@ def external_add(request):
         grade_pk     = request.POST.get('grade_applying', '')
         division_pk  = request.POST.get('division', '')
         notes        = request.POST.get('notes', '').strip()
+        is_saudi_val = request.POST.get('is_saudi', '')
+        is_saudi     = True if is_saudi_val == 'saudi' else (False if is_saudi_val == 'non_saudi' else None)
 
         if not full_name:
             messages.error(request, "Full name is required.")
@@ -617,6 +619,7 @@ def external_add(request):
                 grade_applying = grade_obj,
                 division       = division_obj,
                 notes          = notes,
+                is_saudi       = is_saudi,
                 created_by     = request.user,
             )
             messages.success(request, f"Candidate {candidate.candidate_id} — {candidate.full_name} registered successfully.")
@@ -648,6 +651,8 @@ def external_edit(request, pk):
         grade_pk     = request.POST.get('grade_applying', '')
         division_pk  = request.POST.get('division', '')
         notes        = request.POST.get('notes', '').strip()
+        is_saudi_val = request.POST.get('is_saudi', '')
+        is_saudi     = True if is_saudi_val == 'saudi' else (False if is_saudi_val == 'non_saudi' else None)
 
         if not full_name:
             messages.error(request, "Full name is required.")
@@ -673,6 +678,7 @@ def external_edit(request, pk):
             candidate.grade_applying = grade_obj
             candidate.division       = division_obj
             candidate.notes          = notes
+            candidate.is_saudi       = is_saudi
             candidate.save()
             messages.success(request, f"Candidate {candidate.full_name} updated.")
             return redirect('students:external_detail', pk=candidate.pk)
