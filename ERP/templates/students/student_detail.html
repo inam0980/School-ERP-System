@@ -77,6 +77,96 @@
         {% endif %}
     </div>
 
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!--  FEE SUMMARY (visible to accountants & admins)          -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    {% if user.role in 'SUPER_ADMIN,ADMIN,ACCOUNTANT' %}
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+            <span class="text-sm font-semibold text-slate-600">Fee Summary / ملخص الرسوم</span>
+            <a href="{% url 'fees:student_ledger' student.pk %}"
+               class="text-xs text-indigo-600 hover:underline font-medium">View full ledger →</a>
+        </div>
+
+        <!-- Totals row -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
+            <div class="px-5 py-4 text-center">
+                <p class="text-xs text-slate-400 mb-1">Total Charged</p>
+                <p class="text-lg font-bold text-slate-800">{{ total_charged|floatformat:2 }}</p>
+                <p class="text-xs text-slate-400">SAR</p>
+            </div>
+            <div class="px-5 py-4 text-center">
+                <p class="text-xs text-slate-400 mb-1">Total Paid</p>
+                <p class="text-lg font-bold text-emerald-600">{{ total_paid|floatformat:2 }}</p>
+                <p class="text-xs text-slate-400">SAR</p>
+            </div>
+            <div class="px-5 py-4 text-center">
+                <p class="text-xs text-slate-400 mb-1">Balance Due</p>
+                <p class="text-lg font-bold {% if balance_due > 0 %}text-red-600{% else %}text-emerald-600{% endif %}">
+                    {{ balance_due|floatformat:2 }}
+                </p>
+                <p class="text-xs text-slate-400">SAR</p>
+            </div>
+            <div class="px-5 py-4 text-center">
+                <p class="text-xs text-slate-400 mb-1">Overdue</p>
+                <p class="text-lg font-bold {% if overdue_count %}text-orange-600{% else %}text-slate-400{% endif %}">
+                    {{ overdue_count }}
+                </p>
+                <p class="text-xs text-slate-400">fee(s)</p>
+            </div>
+        </div>
+
+        <!-- Fee lines table -->
+        {% if fees %}
+        <div class="border-t border-slate-100 overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead class="bg-slate-50 text-slate-500 uppercase tracking-wide">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Fee Type</th>
+                        <th class="px-4 py-2 text-right">Amount (SAR)</th>
+                        <th class="px-4 py-2 text-right">Paid (SAR)</th>
+                        <th class="px-4 py-2 text-right">Balance</th>
+                        <th class="px-4 py-2 text-center">Due Date</th>
+                        <th class="px-4 py-2 text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for fee in fees %}
+                    <tr class="hover:bg-slate-50">
+                        <td class="px-4 py-2 text-slate-700 font-medium">{{ fee.fee_structure.fee_type.name }}</td>
+                        <td class="px-4 py-2 text-right text-slate-600">{{ fee.net_amount|floatformat:2 }}</td>
+                        <td class="px-4 py-2 text-right text-emerald-600">{{ fee.amount_paid|floatformat:2 }}</td>
+                        <td class="px-4 py-2 text-right font-semibold
+                            {% if fee.balance > 0 %}text-red-600{% else %}text-slate-400{% endif %}">
+                            {{ fee.balance|floatformat:2 }}
+                        </td>
+                        <td class="px-4 py-2 text-center text-slate-500">{{ fee.due_date|date:"Y-m-d" }}</td>
+                        <td class="px-4 py-2 text-center">
+                            {% if fee.status == 'PAID' %}
+                            <span class="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-semibold">Paid</span>
+                            {% elif fee.status == 'OVERDUE' %}
+                            <span class="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full font-semibold">Overdue</span>
+                            {% elif fee.status == 'PARTIAL' %}
+                            <span class="px-2 py-0.5 bg-orange-50 text-orange-600 border border-orange-200 rounded-full font-semibold">Partial</span>
+                            {% elif fee.status == 'WAIVED' %}
+                            <span class="px-2 py-0.5 bg-slate-100 text-slate-500 border border-slate-200 rounded-full font-semibold">Waived</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full font-semibold">Unpaid</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-5 py-6 text-center text-sm text-slate-400">
+            No fees assigned to this student yet.
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
         <!-- Personal Info Card -->
