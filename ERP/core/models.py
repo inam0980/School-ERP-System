@@ -46,36 +46,6 @@ class Division(models.Model):
     def __str__(self):
         return self.name
 
-    def save(self, *args, **kwargs):
-        is_new = self.pk is None
-        super().save(*args, **kwargs)
-        if is_new:
-            self._create_default_grades()
-
-    def _create_default_grades(self):
-        grades = [
-            ('Nursery', 0),
-            ('KG 1', 1),
-            ('KG 2', 2),
-            ('Grade 1', 3),
-            ('Grade 2', 4),
-            ('Grade 3', 5),
-            ('Grade 4', 6),
-            ('Grade 5', 7),
-            ('Grade 6', 8),
-            ('Grade 7', 9),
-            ('Grade 8', 10),
-            ('Grade 9', 11),
-            ('Grade 10', 12),
-            ('Grade 11', 13),
-            ('Grade 12', 14),
-        ]
-        for grade_name, order in grades:
-            Grade.objects.get_or_create(
-                name=grade_name,
-                division=self,
-                defaults={'order': order}
-            )
 
 
 class Grade(models.Model):

@@ -101,16 +101,45 @@ def division_list(request):
     return render(request, 'core/school_setup/divisions.html', {'divisions': divisions})
 
 
+_DEFAULT_GRADES = [
+    ('Nursery',    'Nursery'),
+    ('Pre-Kinder', 'Pre-Kinder'),
+    ('Kinder 1',   'Kinder 1'),
+    ('Kinder 2',   'Kinder 2'),
+    ('Reception',  'Reception'),
+    ('Grade 1',    'Grade 1'),
+    ('Grade 2',    'Grade 2'),
+    ('Grade 3',    'Grade 3'),
+    ('Grade 4',    'Grade 4'),
+    ('Grade 5',    'Grade 5'),
+    ('Grade 6',    'Grade 6'),
+    ('Grade 7',    'Grade 7'),
+    ('Grade 8',    'Grade 8'),
+    ('Grade 9',    'Grade 9'),
+    ('Grade 10',   'Grade 10'),
+    ('Grade 11',   'Grade 11'),
+    ('Grade 12',   'Grade 12'),
+]
+
 @login_required
 @role_required(*_ADMIN)
 def division_add(request):
     form = DivisionForm(request.POST or None)
     if form.is_valid():
-        form.save()
-        messages.success(request, "Division added.")
+        division = form.save()
+        selected_grades = request.POST.getlist('grades')
+        for order, (grade_name, _) in enumerate(_DEFAULT_GRADES):
+            if grade_name in selected_grades:
+                grade, _ = Grade.objects.get_or_create(
+                    name=grade_name, division=division,
+                    defaults={'order': order}
+                )
+                for section_name in ['A', 'B', 'C']:
+                    Section.objects.get_or_create(name=section_name, grade=grade, defaults={'capacity': 30})
+        messages.success(request, "Division added with selected grades and sections A, B, C.")
         return redirect('core:division_list')
-    return render(request, 'core/school_setup/form.html', {
-        'form': form, 'title': 'Add Division', 'back_url': 'core:division_list',
+    return render(request, 'core/school_setup/division_form.html', {
+        'form': form, 'title': 'Add Division', 'grades': _DEFAULT_GRADES, 'is_edit': False,
     })
 
 
@@ -123,8 +152,8 @@ def division_edit(request, pk):
         form.save()
         messages.success(request, "Division updated.")
         return redirect('core:division_list')
-    return render(request, 'core/school_setup/form.html', {
-        'form': form, 'title': f'Edit: {obj}', 'back_url': 'core:division_list',
+    return render(request, 'core/school_setup/division_form.html', {
+        'form': form, 'title': f'Edit: {obj}', 'is_edit': True,
     })
 
 
