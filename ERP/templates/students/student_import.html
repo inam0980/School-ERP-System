@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Import Students{% endblock %}
+{% block title %}Import Students — CSV{% endblock %}
 {% block page_title %}Import Students / استيراد بيانات الطلاب{% endblock %}
 
 {% block content %}
@@ -10,36 +10,47 @@
         Back to Students
     </a>
 
-    <!-- Flash messages -->
     {% if messages %}
     <div class="space-y-2">
         {% for msg in messages %}
-        <div class="flex items-center gap-2 px-4 py-3 rounded-lg text-sm
+        <div class="flex items-start gap-2 px-4 py-3 rounded-lg text-sm
             {% if msg.tags == 'success' %}bg-emerald-50 text-emerald-700 border border-emerald-200
             {% elif msg.tags == 'error' %}bg-red-50 text-red-600 border border-red-200
-            {% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
+            {% else %}bg-amber-50 text-amber-700 border border-amber-200{% endif %}">
             {{ msg }}
         </div>
         {% endfor %}
     </div>
     {% endif %}
 
+    <!-- How it works -->
+    <div class="bg-blue-50 border border-blue-200 rounded-xl px-5 py-4 text-sm text-blue-800 space-y-1">
+        <p class="font-semibold">How it works / كيف يعمل</p>
+        <ul class="list-disc list-inside space-y-0.5 text-xs text-blue-700 mt-1">
+            <li>Export the student list as CSV from the Students page.</li>
+            <li>Edit the file if needed — do <strong>not</strong> rename any column headers.</li>
+            <li>Upload the same CSV file here.</li>
+            <li>If <strong>Student ID</strong> matches an existing record → the student is <strong>updated</strong>.</li>
+            <li>If <strong>Student ID</strong> is blank or not found → a <strong>new</strong> student is created.</li>
+        </ul>
+    </div>
+
     <!-- Upload Card -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="px-6 py-3.5 bg-[#1e3a5f] text-white">
-            <h3 class="text-sm font-semibold">Upload Excel File / رفع ملف Excel</h3>
+            <h3 class="text-sm font-semibold">Upload CSV File / رفع ملف CSV</h3>
         </div>
         <div class="p-6">
             <form method="POST" enctype="multipart/form-data" class="space-y-4">
                 {% csrf_token %}
                 <div class="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center hover:border-[#1e3a5f]/40 transition cursor-pointer"
-                     onclick="document.getElementById('excelFile').click()">
+                     onclick="document.getElementById('csvFile').click()">
                     <svg class="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
-                    <p class="text-sm text-slate-500">Click to select an Excel file (.xlsx)</p>
+                    <p class="text-sm text-slate-500">Click to select a CSV file (.csv)</p>
                     <p id="fileName" class="text-xs text-slate-400 mt-1">No file selected</p>
-                    <input type="file" id="excelFile" name="excel_file" accept=".xlsx" class="hidden"
+                    <input type="file" id="csvFile" name="csv_file" accept=".csv" class="hidden"
                            onchange="document.getElementById('fileName').textContent = this.files[0]?.name || 'No file selected'">
                 </div>
                 <button type="submit"
@@ -51,54 +62,73 @@
         </div>
     </div>
 
-    <!-- Download Template -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex items-center justify-between gap-4">
-        <div>
-            <p class="text-sm font-semibold text-slate-700">Download Template / تحميل النموذج</p>
-            <p class="text-xs text-slate-400 mt-0.5">Download the required Excel format before uploading.</p>
+    <!-- Download Template & Export link -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex items-center justify-between gap-4">
+            <div>
+                <p class="text-sm font-semibold text-slate-700">Download Blank Template</p>
+                <p class="text-xs text-slate-400 mt-0.5">CSV with headers + one example row.</p>
+            </div>
+            <a href="{% url 'students:import_template' %}"
+               class="flex-shrink-0 px-4 py-2 border border-[#1e3a5f] text-[#1e3a5f] text-sm font-medium rounded-lg hover:bg-[#1e3a5f]/5 flex items-center gap-1.5 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Download
+            </a>
         </div>
-        <a href="{% url 'students:import_template' %}"
-           class="flex-shrink-0 px-4 py-2 border border-[#1e3a5f] text-[#1e3a5f] text-sm font-medium rounded-lg hover:bg-[#1e3a5f]/5 flex items-center gap-1.5 transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            Download
-        </a>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex items-center justify-between gap-4">
+            <div>
+                <p class="text-sm font-semibold text-slate-700">Export Current Students</p>
+                <p class="text-xs text-slate-400 mt-0.5">Export → edit → re-import to update.</p>
+            </div>
+            <a href="{{ export_url }}"
+               class="flex-shrink-0 px-4 py-2 border border-emerald-600 text-emerald-700 text-sm font-medium rounded-lg hover:bg-emerald-50 flex items-center gap-1.5 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Export CSV
+            </a>
+        </div>
     </div>
 
-    <!-- Format Reference -->
+    <!-- Column Reference -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="px-5 py-3 bg-slate-50 border-b border-slate-100 text-sm font-semibold text-slate-600">
-            Required Columns (Row 1 = Headers, Row 2+ = Data)
+            CSV Column Reference (exact header names from export)
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
                 <thead>
                     <tr class="bg-slate-50 border-b border-slate-100">
-                        <th class="px-3 py-2 text-left font-medium text-slate-500">#</th>
-                        <th class="px-3 py-2 text-left font-medium text-slate-500">Column Name</th>
+                        <th class="px-3 py-2 text-left font-medium text-slate-500">Column Header</th>
                         <th class="px-3 py-2 text-left font-medium text-slate-500">Required</th>
-                        <th class="px-3 py-2 text-left font-medium text-slate-500">Example</th>
+                        <th class="px-3 py-2 text-left font-medium text-slate-500">Notes</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
-                    {% for col in columns %}
-                    <tr>
-                        <td class="px-3 py-2 text-slate-400">{{ forloop.counter }}</td>
-                        <td class="px-3 py-2 font-mono text-slate-700">{{ col.name }}</td>
-                        <td class="px-3 py-2">
-                            {% if col.required %}
-                                <span class="text-red-500 font-medium">Yes</span>
-                            {% else %}
-                                <span class="text-slate-400">No</span>
-                            {% endif %}
-                        </td>
-                        <td class="px-3 py-2 text-slate-500">{{ col.example }}</td>
-                    </tr>
-                    {% endfor %}
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Student ID</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500">Leave blank to create new; match to update existing</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Full Name</td><td class="px-3 py-2 text-red-500 font-medium">Yes</td><td class="px-3 py-2 text-slate-500">English full name</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Arabic Name</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500">الاسم بالعربي</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Gender</td><td class="px-3 py-2 text-red-500 font-medium">Yes</td><td class="px-3 py-2 text-slate-500">Male / ذكر &nbsp;or&nbsp; Female / أنثى</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Date of Birth</td><td class="px-3 py-2 text-red-500 font-medium">Yes</td><td class="px-3 py-2 text-slate-500">YYYY-MM-DD</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Nationality</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500">e.g. Saudi Arabian</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">ID Type</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500">National ID / هوية وطنية &nbsp;|&nbsp; Iqama / إقامة &nbsp;|&nbsp; Passport / جواز السفر</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">National ID</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500">ID / Iqama / Passport number</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Division</td><td class="px-3 py-2 text-red-500 font-medium">Yes</td><td class="px-3 py-2 text-slate-500">Must match an existing division name exactly</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Grade</td><td class="px-3 py-2 text-red-500 font-medium">Yes</td><td class="px-3 py-2 text-slate-500">Must match an existing grade in the division</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Section</td><td class="px-3 py-2 text-red-500 font-medium">Yes</td><td class="px-3 py-2 text-slate-500">Must match an existing section in the grade</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Academic Year</td><td class="px-3 py-2 text-red-500 font-medium">Yes</td><td class="px-3 py-2 text-slate-500">Must match an existing academic year name</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Roll No.</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500">Optional roll number</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Enrollment Type</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500">New Student / طالب جديد &nbsp;|&nbsp; Transfer / منقول &nbsp;|&nbsp; Regular (Continuing) / مستمر</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Admission Date</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500">YYYY-MM-DD, defaults to today if blank</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Active</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500">Yes or No</td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Father Name</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500"></td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Mother Name</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500"></td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Guardian Phone</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500"></td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Guardian Email</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500"></td></tr>
+                    <tr><td class="px-3 py-2 font-mono text-slate-700">Address</td><td class="px-3 py-2 text-slate-400">No</td><td class="px-3 py-2 text-slate-500"></td></tr>
                 </tbody>
             </table>
         </div>
         <div class="px-5 py-3 bg-amber-50 border-t border-amber-100 text-xs text-amber-700">
-            <strong>Note:</strong> Division, Grade, and Section must match existing records exactly. Academic Year must also exist and be active. Date format: YYYY-MM-DD.
+            <strong>Tip:</strong> The easiest way to get a valid file is to export students first, then edit and re-upload the same file.
         </div>
     </div>
 
