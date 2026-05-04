@@ -23,11 +23,24 @@
 {% if results %}
 <div class="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-5">
     <h3 class="font-semibold text-blue-800 mb-2">Assignment Result — {{ results.structure }}</h3>
-    <div class="flex gap-6 mb-4">
+    <div class="flex flex-wrap gap-4 mb-3">
         <p class="text-sm text-blue-700">✅ <strong>{{ results.created }}</strong> fee records created</p>
         <p class="text-sm text-blue-600">⚠️ <strong>{{ results.skipped }}</strong> already existed (skipped)</p>
         <p class="text-sm text-slate-600">👤 <strong>{{ results.students|length }}</strong> students assigned</p>
+        {% if results.cat_skipped_count %}
+        <p class="text-sm text-orange-600">🚫 <strong>{{ results.cat_skipped_count }}</strong> student(s) skipped — fee category mismatch</p>
+        {% endif %}
+        {% if results.one_time_skipped %}
+        <p class="text-sm text-slate-500">🔒 <strong>{{ results.one_time_skipped }}</strong> one-time fee item(s) not reassigned (Entrance / Registration)</p>
+        {% endif %}
     </div>
+    {% if results.one_time_items and results.structure_type != 'new' %}
+    <div class="mb-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+        <strong>Note:</strong> The following one-time fees exist in this structure for reporting/management purposes but were <strong>not</strong> assigned to students:
+        {% for item in results.one_time_items %}<span class="font-semibold">{{ item.fee_type.name }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}.
+        These are only charged once at first admission (New students).
+    </div>
+    {% endif %}
     {% if results.students %}
     <div class="overflow-x-auto">
         <table class="w-full text-sm border border-blue-200 rounded-lg overflow-hidden">
@@ -165,9 +178,14 @@
     </div>
     {% endif %}
 
-    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
-        <strong>Note:</strong> Assigns one fee record per fee type per active student in the selected grade (or section if chosen).
-        Already-existing records are safely skipped.
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700 space-y-1.5">
+        <p><strong>Fee Category Rules:</strong></p>
+        <ul class="list-disc list-inside space-y-1 text-xs">
+            <li><strong>New</strong> structure → assigns to <strong>New</strong> students only. Includes Entrance Exam Fee + Registration Fee + Tuition.</li>
+            <li><strong>Regular</strong> structure → assigns to <strong>Regular</strong> students only. Entrance Exam &amp; Registration fees are <strong>never reassigned</strong>.</li>
+            <li><strong>Other</strong> structure → assigns to <strong>Other</strong> category students only.</li>
+        </ul>
+        <p class="text-xs mt-1">Students with a different fee category in the same grade are automatically skipped.</p>
     </div>
 
     <button type="submit"
