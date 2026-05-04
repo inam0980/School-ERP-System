@@ -278,6 +278,19 @@ def student_detail(request, pk):
     balance_due   = total_charged - total_paid
     overdue_count = fees.filter(status=StudentFee.OVERDUE).count()
 
+    # ── Admission fees paid as external candidate ──────────────────
+    admission_payments = []
+    try:
+        candidate = student.admission_application
+        if candidate:
+            from fees.models import ExternalCandidatePayment
+            admission_payments = list(
+                ExternalCandidatePayment.objects.filter(candidate=candidate)
+                .order_by('payment_date')
+            )
+    except Exception:
+        pass
+
     return render(request, 'students/student_detail.html', {
         'student':       student,
         'doc_form':      doc_form,
@@ -287,11 +300,12 @@ def student_detail(request, pk):
         'pickup_form':   pickup_form,
         'pickups':       student.authorized_pickups.all(),
         # fee data
-        'fees':          fees,
-        'total_charged': total_charged,
-        'total_paid':    total_paid,
-        'balance_due':   balance_due,
-        'overdue_count': overdue_count,
+        'fees':               fees,
+        'total_charged':      total_charged,
+        'total_paid':         total_paid,
+        'balance_due':        balance_due,
+        'overdue_count':      overdue_count,
+        'admission_payments': admission_payments,
     })
 
 

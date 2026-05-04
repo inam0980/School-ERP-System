@@ -550,19 +550,44 @@ def bulk_assign_fees(request):
             messages.warning(request, 'This fee structure has no fee-type items yet.')
             return redirect('fees:fee_structure_list')
 
-        # Filter students by the structure's grade, optionally by section
+        # One-time admission fees — never re-assigned to existing (regular/other) students
+        ONE_TIME_CATS = {FeeType.ENTRANCE_EXAM, FeeType.REGISTRATION, FeeType.ADMISSION}
+
+        # Separate items: tuition-only vs one-time (for reporting)
+        one_time_items = [i for i in items if i.fee_type.category in ONE_TIME_CATS]
+
         section = form.cleaned_data.get('section')
+
+        # ── Strict category match: only assign to students whose
+        #    fee_category matches the structure's structure_type ──────
         students = Student.objects.filter(
-            grade=structure.grade, is_active=True
+            grade=structure.grade,
+            is_active=True,
+            fee_category=structure.structure_type,   # 'new' / 'regular' / 'other'
         )
         if section:
             students = students.filter(section=section)
 
-        created = skipped = 0
+        # Count students excluded due to category mismatch (for reporting)
+        all_students_qs = Student.objects.filter(grade=structure.grade, is_active=True)
+        if section:
+            all_students_qs = all_students_qs.filter(section=section)
+        cat_skipped_count = all_students_qs.exclude(
+            fee_category=structure.structure_type).count()
+
+        created = skipped = one_time_skipped = 0
         assigned_students = []
+
         for student in students:
             student_created = False
             for item in items:
+                # NEW students  → assign all items (including entrance/registration)
+                # REGULAR/OTHER → skip one-time fees; only assign tuition and other items
+                if structure.structure_type != FeeStructure.TYPE_NEW \
+                        and item.fee_type.category in ONE_TIME_CATS:
+                    one_time_skipped += 1
+                    continue
+
                 discount_amt = (item.amount * discount_pct / 100).quantize(Decimal('0.01'))
                 disc_note    = f'{discount_pct}% bulk discount' if discount_pct > 0 else ''
                 obj, created_flag = StudentFee.objects.get_or_create(
@@ -585,10 +610,21 @@ def bulk_assign_fees(request):
             if student_created and student not in assigned_students:
                 assigned_students.append(student)
 
-        results = {'created': created, 'skipped': skipped, 'students': assigned_students, 'structure': structure}
+        results = {
+            'created':           created,
+            'skipped':           skipped,
+            'one_time_skipped':  one_time_skipped,
+            'cat_skipped_count': cat_skipped_count,
+            'structure':         structure,
+            'students':          assigned_students,
+            'structure_type':    structure.structure_type,
+            'one_time_items':    one_time_items,
+        }
         messages.success(
             request,
             f"Done — {created} fee records created, {skipped} already existed."
+            + (f" {cat_skipped_count} student(s) skipped (wrong fee category)." if cat_skipped_count else "")
+            + (f" {one_time_skipped} one-time fee item(s) skipped for non-new students." if one_time_skipped else "")
         )
 
     # Load items for the currently selected structure (for JS preview)
