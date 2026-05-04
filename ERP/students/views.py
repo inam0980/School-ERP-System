@@ -252,20 +252,46 @@ def student_add(request):
 @login_required
 @role_required(*_STAFF)
 def student_detail(request, pk):
+    from decimal import Decimal
+    from django.db.models import Sum
+    from fees.models import StudentFee, Payment
+
     student = get_object_or_404(Student.objects.select_related(
         'division', 'grade', 'section', 'academic_year', 'created_by'
     ), pk=pk)
     doc_form     = DocumentUploadForm()
     sibling_form = SiblingForm()
     pickup_form  = AuthorizedPickupForm()
+
+    # ── Fee summary ────────────────────────────────────────────────
+    fees = (
+        StudentFee.objects
+        .filter(student=student)
+        .select_related('fee_structure__fee_type')
+        .order_by('due_date')
+    )
+    total_charged = fees.exclude(status=StudentFee.WAIVED).aggregate(
+        s=Sum('net_amount'))['s'] or Decimal('0.00')
+    total_paid = Payment.objects.filter(
+        student_fee__student=student).aggregate(
+        s=Sum('paid_amount'))['s'] or Decimal('0.00')
+    balance_due   = total_charged - total_paid
+    overdue_count = fees.filter(status=StudentFee.OVERDUE).count()
+
     return render(request, 'students/student_detail.html', {
-        'student':      student,
-        'doc_form':     doc_form,
-        'documents':    student.documents.all(),
-        'sibling_form': sibling_form,
-        'siblings':     student.siblings.all(),
-        'pickup_form':  pickup_form,
-        'pickups':      student.authorized_pickups.all(),
+        'student':       student,
+        'doc_form':      doc_form,
+        'documents':     student.documents.all(),
+        'sibling_form':  sibling_form,
+        'siblings':      student.siblings.all(),
+        'pickup_form':   pickup_form,
+        'pickups':       student.authorized_pickups.all(),
+        # fee data
+        'fees':          fees,
+        'total_charged': total_charged,
+        'total_paid':    total_paid,
+        'balance_due':   balance_due,
+        'overdue_count': overdue_count,
     })
 
 
