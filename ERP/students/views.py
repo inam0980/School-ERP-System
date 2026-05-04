@@ -1,6 +1,7 @@
 import csv
 import io
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
@@ -417,133 +418,198 @@ def student_id_card(request, pk):
     return render(request, 'students/id_card.html', {'student': student})
 
 
-# ────────────────────────── EXCEL IMPORT ──────────────────────────
+# ────────────────────────── CSV IMPORT ──────────────────────────
+
+# Reverse maps: CSV display value → model code
+_GENDER_MAP = {
+    'male / ذكر': 'M', 'male': 'M', 'm': 'M',
+    'female / أنثى': 'F', 'female': 'F', 'f': 'F',
+}
+_ID_TYPE_MAP = {
+    'national id / هوية وطنية': 'NATIONAL_ID',
+    'national id': 'NATIONAL_ID',
+    'iqama / إقامة': 'IQAMA',
+    'iqama': 'IQAMA',
+    'passport / جواز السفر': 'PASSPORT',
+    'passport': 'PASSPORT',
+}
+_ENROLLMENT_MAP = {
+    'new student / طالب جديد': 'NEW',
+    'new student': 'NEW',
+    'new': 'NEW',
+    'transfer / منقول': 'TRANSFER',
+    'transfer': 'TRANSFER',
+    'regular (continuing) / مستمر': 'REGULAR',
+    'regular (continuing)': 'REGULAR',
+    'regular': 'REGULAR',
+}
+
 
 @login_required
 @role_required(*_ADMIN)
 def student_import(request):
-    if request.method == 'POST' and request.FILES.get('excel_file'):
+    """
+    Import students from a CSV file that matches the export format exactly.
+    - If Student ID exists in the DB → UPDATE that student.
+    - If Student ID is blank or not found → CREATE a new student.
+    """
+    if request.method == 'POST' and request.FILES.get('csv_file'):
+        from core.models import AcademicYear, Division, Grade, Section
+        from datetime import date as _date
+
         try:
-            import openpyxl
-            from core.models import AcademicYear, Division, Grade, Section
-            from datetime import date
+            raw = request.FILES['csv_file'].read()
+            if raw.startswith(b'\xef\xbb\xbf'):
+                raw = raw[3:]          # strip UTF-8 BOM written by export
+            reader = csv.DictReader(io.StringIO(raw.decode('utf-8')))
 
-            wb   = openpyxl.load_workbook(request.FILES['excel_file'])
-            ws   = wb.active
-            rows = list(ws.iter_rows(min_row=2, values_only=True))
+            created = updated = skipped = 0
+            errors = []
 
-            created = 0
-            errors  = []
+            for i, raw_row in enumerate(reader, start=2):
+                # Strip whitespace from keys and values
+                row = {k.strip(): (v.strip() if v else '') for k, v in raw_row.items()}
 
-            for i, row in enumerate(rows, start=2):
-                if not row or not row[0]:
+                full_name = row.get('Full Name', '')
+                if not full_name:
+                    skipped += 1
                     continue
+
                 try:
-                    # Expected columns (1-indexed):
-                    # 1:full_name 2:arabic_name 3:dob(YYYY-MM-DD) 4:gender(M/F)
-                    # 5:nationality 6:division_name 7:grade_name 8:section_name
-                    # 9:academic_year_name 10:father_name 11:mother_name
-                    # 12:guardian_phone 13:guardian_email 14:admission_date
-                    full_name    = str(row[0]).strip()
-                    arabic_name  = str(row[1]).strip() if row[1] else ''
-                    dob          = row[2] if isinstance(row[2], date) else date.fromisoformat(str(row[2]))
-                    gender       = str(row[3]).strip().upper()
-                    nationality  = str(row[4]).strip() if row[4] else 'Saudi'
-                    div_name     = str(row[5]).strip().upper()
-                    grade_name   = str(row[6]).strip()
-                    section_name = str(row[7]).strip().upper()
-                    year_name    = str(row[8]).strip()
-                    father_name  = str(row[9]).strip() if row[9] else ''
-                    mother_name  = str(row[10]).strip() if row[10] else ''
-                    guardian_phone = str(row[11]).strip() if row[11] else ''
-                    guardian_email = str(row[12]).strip() if row[12] else ''
-                    adm_date     = row[13] if isinstance(row[13], date) else date.fromisoformat(str(row[13])) if row[13] else date.today()
+                    # ── Dates ─────────────────────────────────────────
+                    dob_raw = row.get('Date of Birth', '')
+                    try:
+                        dob = _date.fromisoformat(dob_raw)
+                    except ValueError:
+                        errors.append(f"Row {i} ({full_name}): invalid Date of Birth '{dob_raw}'.")
+                        continue
 
-                    division  = Division.objects.get(name=div_name)
-                    grade     = Grade.objects.get(name=grade_name, division=division)
-                    section   = Section.objects.get(name=section_name, grade=grade)
-                    acad_year = AcademicYear.objects.get(name=year_name)
+                    adm_raw = row.get('Admission Date', '')
+                    try:
+                        admission_date = _date.fromisoformat(adm_raw) if adm_raw else _date.today()
+                    except ValueError:
+                        admission_date = _date.today()
 
-                    Student.objects.create(
-                        full_name=full_name, arabic_name=arabic_name,
-                        dob=dob, gender=gender, nationality=nationality,
-                        division=division, grade=grade, section=section,
-                        academic_year=acad_year,
-                        father_name=father_name, mother_name=mother_name,
-                        guardian_phone=guardian_phone, guardian_email=guardian_email,
-                        admission_date=adm_date,
-                        created_by=request.user,
+                    # ── Coded fields ───────────────────────────────────
+                    gender          = _GENDER_MAP.get(row.get('Gender', '').lower(), 'M')
+                    id_type         = _ID_TYPE_MAP.get(row.get('ID Type', '').lower(), 'NATIONAL_ID')
+                    enrollment_type = _ENROLLMENT_MAP.get(row.get('Enrollment Type', '').lower(), 'NEW')
+                    is_active       = row.get('Active', 'Yes').lower() != 'no'
+
+                    # ── FK lookups ─────────────────────────────────────
+                    div_name     = row.get('Division', '')
+                    grade_name   = row.get('Grade', '')
+                    section_name = row.get('Section', '')
+                    year_name    = row.get('Academic Year', '')
+
+                    try:
+                        division = Division.objects.get(name__iexact=div_name)
+                    except Division.DoesNotExist:
+                        errors.append(f"Row {i} ({full_name}): Division '{div_name}' not found.")
+                        continue
+
+                    try:
+                        grade = Grade.objects.get(name__iexact=grade_name, division=division)
+                    except Grade.DoesNotExist:
+                        errors.append(f"Row {i} ({full_name}): Grade '{grade_name}' not found.")
+                        continue
+
+                    try:
+                        section = Section.objects.get(name__iexact=section_name, grade=grade)
+                    except Section.DoesNotExist:
+                        errors.append(f"Row {i} ({full_name}): Section '{section_name}' not found.")
+                        continue
+
+                    try:
+                        academic_year = AcademicYear.objects.get(name__iexact=year_name)
+                    except AcademicYear.DoesNotExist:
+                        errors.append(f"Row {i} ({full_name}): Academic Year '{year_name}' not found.")
+                        continue
+
+                    # ── Build field dict ───────────────────────────────
+                    fields = dict(
+                        full_name       = full_name,
+                        arabic_name     = row.get('Arabic Name', ''),
+                        gender          = gender,
+                        dob             = dob,
+                        nationality     = row.get('Nationality', 'Saudi'),
+                        id_type         = id_type,
+                        national_id     = row.get('National ID', ''),
+                        division        = division,
+                        grade           = grade,
+                        section         = section,
+                        academic_year   = academic_year,
+                        roll_number     = row.get('Roll No.', ''),
+                        enrollment_type = enrollment_type,
+                        admission_date  = admission_date,
+                        is_active       = is_active,
+                        father_name     = row.get('Father Name', ''),
+                        mother_name     = row.get('Mother Name', ''),
+                        guardian_phone  = row.get('Guardian Phone', ''),
+                        guardian_email  = row.get('Guardian Email', ''),
+                        address         = row.get('Address', ''),
                     )
-                    created += 1
-                except Exception as e:
-                    errors.append(f"Row {i}: {e}")
 
+                    # ── Create or Update ───────────────────────────────
+                    student_id = row.get('Student ID', '')
+                    if student_id:
+                        n = Student.objects.filter(student_id=student_id).update(**fields)
+                        if n:
+                            updated += 1
+                        else:
+                            Student.objects.create(**fields, created_by=request.user)
+                            created += 1
+                    else:
+                        Student.objects.create(**fields, created_by=request.user)
+                        created += 1
+
+                except Exception as e:
+                    errors.append(f"Row {i} ({full_name}): {e}")
+
+            summary = f"{created} created, {updated} updated"
+            if skipped:
+                summary += f", {skipped} skipped (blank name)"
             if errors:
-                messages.warning(request, f"Imported {created} students. {len(errors)} rows had errors: " + " | ".join(errors[:5]))
+                messages.warning(request, f"Import done — {summary}. {len(errors)} error(s): " + " | ".join(errors[:5]))
             else:
-                messages.success(request, f"Successfully imported {created} students.")
+                messages.success(request, f"Import complete — {summary}.")
 
         except Exception as e:
             messages.error(request, f"Import failed: {e}")
 
         return redirect('students:list')
 
-    columns = [
-        {'name': 'full_name (EN)',                     'required': True,  'example': 'John Smith'},
-        {'name': 'arabic_name (AR)',                   'required': True,  'example': 'جون سميث'},
-        {'name': 'dob (YYYY-MM-DD)',                   'required': True,  'example': '2015-09-01'},
-        {'name': 'gender (M/F)',                       'required': True,  'example': 'M'},
-        {'name': 'nationality',                        'required': False, 'example': 'Saudi'},
-        {'name': 'division (AMERICAN/BRITISH/FRENCH)', 'required': True,  'example': 'AMERICAN'},
-        {'name': 'grade_name',                         'required': True,  'example': 'Grade 1'},
-        {'name': 'section_name (A/B/C)',               'required': True,  'example': 'A'},
-        {'name': 'academic_year',                      'required': True,  'example': '2024-25'},
-        {'name': 'father_name',                        'required': False, 'example': 'Robert Smith'},
-        {'name': 'mother_name',                        'required': False, 'example': 'Mary Smith'},
-        {'name': 'guardian_phone',                     'required': False, 'example': '+966501234567'},
-        {'name': 'guardian_email',                     'required': False, 'example': 'r.smith@email.com'},
-        {'name': 'admission_date (YYYY-MM-DD)',         'required': False, 'example': '2025-09-01'},
-    ]
-    return render(request, 'students/student_import.html', {'columns': columns})
+    return render(request, 'students/student_import.html', {
+        'export_url': reverse('students:export_csv'),
+    })
 
 
-# ────────────────────────── EXCEL TEMPLATE DOWNLOAD ──────────────────────────
+# ────────────────────────── CSV TEMPLATE DOWNLOAD ──────────────────────────
 
 @login_required
 @role_required(*_ADMIN)
 def download_import_template(request):
-    try:
-        import openpyxl
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Students"
-        headers = [
-            'full_name (EN)', 'arabic_name (AR)', 'dob (YYYY-MM-DD)', 'gender (M/F)',
-            'nationality', 'division (AMERICAN/BRITISH/FRENCH)', 'grade_name',
-            'section_name (A/B/C)', 'academic_year (e.g. 2024-25)',
-            'father_name', 'mother_name', 'guardian_phone', 'guardian_email',
-            'admission_date (YYYY-MM-DD)',
-        ]
-        ws.append(headers)
-        # Example row
-        ws.append([
-            'John Smith', 'جون سميث', '2015-09-01', 'M',
-            'American', 'AMERICAN', 'Grade 1', 'A', '2024-25',
-            'Robert Smith', 'Mary Smith', '+966501234567',
-            'r.smith@email.com', '2025-09-01',
-        ])
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
-        response = HttpResponse(
-            output.read(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = 'attachment; filename="student_import_template.xlsx"'
-        return response
-    except ImportError:
-        messages.error(request, "openpyxl is not installed. Run: pip install openpyxl")
-        return redirect('students:import')
+    """Download a blank CSV with the exact same headers as the student export."""
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="students_import_template.csv"'
+    response.write('﻿')   # BOM for Excel UTF-8 compatibility
+    writer = csv.writer(response)
+    writer.writerow([
+        'Student ID', 'Full Name', 'Arabic Name', 'Gender', 'Date of Birth',
+        'Nationality', 'ID Type', 'National ID', 'Division', 'Grade', 'Section',
+        'Academic Year', 'Roll No.', 'Enrollment Type', 'Admission Date', 'Active',
+        'Father Name', 'Mother Name', 'Guardian Phone', 'Guardian Email',
+        'Address',
+    ])
+    # One example row so the user can see the expected format
+    writer.writerow([
+        '', 'Ahmed Mohammed Ali', 'أحمد محمد علي', 'Male / ذكر', '2015-09-01',
+        'Saudi Arabian', 'National ID / هوية وطنية', '1234567890', 'American', 'Grade 1', 'A',
+        '2025-26', '', 'New Student / طالب جديد', '2025-09-01', 'Yes',
+        'Mohammed Ali', 'Fatima Ahmed', '+966501234567', 'parent@email.com',
+        'Riyadh, Saudi Arabia',
+    ])
+    return response
 
 
 # ────────────────────────── EXTERNAL CANDIDATE LIST ──────────────────────────
