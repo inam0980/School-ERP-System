@@ -18,21 +18,23 @@ def create_default_data(apps, schema_editor):
 
     # Define default grades
     grades_data = [
-        ('Nursery', 0),
-        ('KG 1', 1),
-        ('KG 2', 2),
-        ('Grade 1', 3),
-        ('Grade 2', 4),
-        ('Grade 3', 5),
-        ('Grade 4', 6),
-        ('Grade 5', 7),
-        ('Grade 6', 8),
-        ('Grade 7', 9),
-        ('Grade 8', 10),
-        ('Grade 9', 11),
-        ('Grade 10', 12),
-        ('Grade 11', 13),
-        ('Grade 12', 14),
+        ('Nursery',    0),
+        ('Pre-Kinder', 1),
+        ('Kinder 1',   2),
+        ('Kinder 2',   3),
+        ('Reception',  4),
+        ('Grade 1',    5),
+        ('Grade 2',    6),
+        ('Grade 3',    7),
+        ('Grade 4',    8),
+        ('Grade 5',    9),
+        ('Grade 6',    10),
+        ('Grade 7',    11),
+        ('Grade 8',    12),
+        ('Grade 9',    13),
+        ('Grade 10',   14),
+        ('Grade 11',   15),
+        ('Grade 12',   16),
     ]
 
     # Define default sections
