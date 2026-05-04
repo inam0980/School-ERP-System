@@ -1,0 +1,235 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>External Candidate Invoice — {{ candidate.candidate_id }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { font-size: 9pt; background: white; padding: 0; }
+            @page { size: A4; margin: 1cm 1.2cm; }
+        }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f1f5f9; }
+        th, td { border: 1px solid #cbd5e1; }
+    </style>
+</head>
+<body class="p-4">
+
+<!-- Actions bar (no-print) -->
+<div class="no-print flex gap-3 mb-4 max-w-4xl mx-auto flex-wrap">
+    <button onclick="window.print()"
+            class="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-700 transition">
+        🖨️ Print Invoice
+    </button>
+    <a href="{% url 'fees:reservation_invoice' %}?candidate_id={{ candidate.pk }}"
+       class="flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition">
+        ← Back to Fee Collection
+    </a>
+    <a href="{% url 'fees:reservation_invoice' %}"
+       class="flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition">
+        🔍 New Candidate
+    </a>
+</div>
+
+<div class="max-w-4xl mx-auto bg-white border border-slate-300 shadow-lg">
+
+    <!-- ══════════════════  SCHOOL HEADER  ═══════════════════════ -->
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;">
+        <tr>
+            <td class="px-4 py-3 align-top border border-slate-300" style="width:35%;direction:rtl;text-align:right;font-size:11px;line-height:1.7;">
+                <div style="font-size:14px;font-weight:bold;">مدارس الكوثر العالمية</div>
+                <div>جدة - طريق الملك عبد العزيز - حي المحمدية</div>
+                <div>الرقم الضريبي : 310706514800003</div>
+                <div>رقم السجل التجاري : 4030218023</div>
+                <div>جوال : 966506561717+ · 966506359280+</div>
+                <div>Info@alkawthar.edu.sa</div>
+                <div>www.alkawthar.edu.sa</div>
+            </td>
+            <td class="px-4 py-3 align-middle text-center border border-slate-300" style="width:30%;">
+                <img src="{% static 'images/logo.png' %}" alt="School Logo"
+                     style="max-width:120px;max-height:100px;object-fit:contain;display:block;margin:0 auto;">
+            </td>
+            <td class="px-4 py-3 align-top border border-slate-300" style="width:35%;font-size:11px;line-height:1.7;">
+                <div style="font-size:14px;font-weight:bold;">AL - KAWTHAR INTERNATIONAL SCHOOL</div>
+                <div>Jeddah, King Abdulaziz Road, Al Mohamamdiya</div>
+                <div>VAT Reg. 310706514800003</div>
+                <div>CR Number : 4030218023</div>
+                <div>Mobile : +966506359280 +966506561717</div>
+                <div>Info@alkawthar.edu.sa</div>
+                <div>www.alkawthar.edu.sa</div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ════════════════════  INVOICE TITLE  ════════════════════ -->
+    <div class="text-center py-3 border border-t-0 border-slate-300">
+        <div style="font-size:16px;font-weight:bold;">فاتورة ضريبية مبسطة</div>
+        <div style="font-size:15px;font-weight:bold;">Simplified Tax Invoice — External Candidate</div>
+    </div>
+
+    <!-- ══════════════════  CANDIDATE INFO  ══════════════════════ -->
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;border-top:none;font-size:11px;">
+        <tr>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="width:14%;direction:rtl;text-align:right;">
+                رقم الإيصال<br><span class="text-slate-500" style="direction:ltr;">Receipt No.</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono font-bold" style="width:22%;">{{ receipt_number }}</td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="width:12%;direction:rtl;text-align:right;">
+                رقم المرشح<br><span class="text-slate-500" style="direction:ltr;">Candidate ID</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono font-bold" style="width:20%;">{{ candidate.candidate_id }}</td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="width:11%;direction:rtl;text-align:right;">
+                الهوية / الجواز<br><span class="text-slate-500" style="direction:ltr;">ID / Passport</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono" style="width:21%;">{{ candidate.id_number|default:"—" }}</td>
+        </tr>
+        <tr>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                التاريخ<br><span class="text-slate-500" style="direction:ltr;">Date</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold">{{ payment_date|date:"d/m/Y" }}</td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                اسم المرشح<br><span class="text-slate-500" style="direction:ltr;">Candidate Name</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold uppercase">{{ candidate.full_name }}</td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                الجنسية<br><span class="text-slate-500" style="direction:ltr;">Nationality</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5">{{ candidate.nationality|default:"—" }}</td>
+        </tr>
+        <tr>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                طريقة الدفع<br><span class="text-slate-500" style="direction:ltr;">Payment Method</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold">{{ payment_method }}</td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                الاسم بالعربي<br><span class="text-slate-500" style="direction:ltr;">Arabic Name</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5" style="direction:rtl;">{{ candidate.arabic_name|default:"—" }}</td>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                الصف المتقدم له<br><span class="text-slate-500" style="direction:ltr;">Grade Applying</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-semibold">{{ candidate.grade_applying|default:"—" }}</td>
+        </tr>
+        {% if transaction_ref %}
+        <tr>
+            <td class="border border-slate-300 px-2 py-1.5 bg-slate-50" style="direction:rtl;text-align:right;">
+                المرجع البنكي<br><span class="text-slate-500" style="direction:ltr;">Bank / Ref</span>
+            </td>
+            <td class="border border-slate-300 px-2 py-1.5 font-mono" colspan="5">{{ transaction_ref }}</td>
+        </tr>
+        {% endif %}
+    </table>
+
+    <!-- ════════════════════  LINE ITEMS TABLE  ════════════════════ -->
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;border-top:none;font-size:10.5px;">
+        <thead>
+            <tr style="background:#1e3a5f;color:white;">
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:4%;">م<br>#</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:26%;">البيان<br>Description</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:6%;">الكمية<br>Qty</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:13%;">القيمة<br>Gross Amount</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:10%;">مبلغ الخصم<br>Discount</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:14%;">صافي القيمة قبل الضريبة<br>Net Amt Before VAT</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:8%;">معدل الضريبة %<br>VAT Rate (%)</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:11%;">مبلغ ضريبة القيمة المضافة<br>VAT Amount</th>
+                <th class="border border-slate-600 px-2 py-2 text-center" style="width:14%;">الإجمالي مع ضريبة القيمة المضافة<br>Total Amt with VAT</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in line_items %}
+            <tr style="background:{% cycle '#ffffff' '#f8fafc' %};">
+                <td class="border border-slate-300 px-2 py-2 text-center">{{ forloop.counter }}</td>
+                <td class="border border-slate-300 px-2 py-2">{{ item.description }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-center">{{ item.qty|default:1 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.gross_amount|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">0.00</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.net_before_vat|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-center font-semibold
+                    {% if item.vat_rate == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
+                    {{ item.vat_rate|default:0 }}
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right
+                    {% if item.vat_rate == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
+                    {{ item.vat|floatformat:2 }}
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right font-semibold">{{ item.total|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9" class="border border-slate-300 px-4 py-6 text-center text-slate-400 italic">No line items.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- ════════  QR + REMARKS + SUMMARY TOTALS  ════════ -->
+    <table class="w-full border-collapse" style="border:1px solid #94a3b8;border-top:none;font-size:10.5px;">
+        <tr>
+            <!-- QR Code -->
+            <td class="border border-slate-300 p-3 align-middle text-center" style="width:18%;">
+                <div class="flex items-center justify-center border border-slate-300 bg-slate-50 text-slate-400 text-xs mx-auto"
+                     style="width:90px;height:90px;">
+                    QR Code<br>(ZATCA)
+                </div>
+            </td>
+            <!-- Remarks -->
+            <td class="border border-slate-300 p-3 align-top" style="width:47%;">
+                <div class="text-slate-500 text-xs mb-1 font-semibold">Remarks / ملاحظات</div>
+                {% if notes %}
+                <div class="text-sm text-slate-700">{{ notes }}</div>
+                {% endif %}
+                {% if collected_by %}
+                <div class="text-xs text-slate-400 mt-3">Issued by: {{ collected_by.get_full_name|default:collected_by.username }}</div>
+                {% endif %}
+                <div class="text-xs text-slate-400 mt-1">External Candidate / مرشح خارجي</div>
+            </td>
+            <!-- Summary totals -->
+            <td class="border border-slate-300 p-0 align-top" style="width:35%;">
+                <table class="w-full border-collapse">
+                    <tr>
+                        <td class="border border-slate-300 px-3 py-2" style="direction:rtl;text-align:right;font-size:10px;line-height:1.4;">
+                            المبلغ قبل الضريبة القيمة المضافة<br>
+                            <span style="direction:ltr;display:block;text-align:left;color:#64748b;">Net Amount Before VAT</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-right font-semibold">
+                            {{ subtotal|floatformat:2 }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="border border-slate-300 px-3 py-2" style="direction:rtl;text-align:right;font-size:10px;line-height:1.4;">
+                            مبلغ ضريبة القيمة المضافة<br>
+                            <span style="direction:ltr;display:block;text-align:left;color:#64748b;">VAT Amount</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-right font-semibold
+                            {% if tax_amount == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
+                            {{ tax_amount|floatformat:2 }}
+                        </td>
+                    </tr>
+                    <tr style="background:#f8fafc;">
+                        <td class="border border-slate-300 px-3 py-2 font-bold" style="direction:rtl;text-align:right;font-size:10px;line-height:1.4;">
+                            الإجمالي يشمل ضريبة القيمة المضافة<br>
+                            <span style="direction:ltr;display:block;text-align:left;">Total Amount with VAT</span>
+                        </td>
+                        <td class="border border-slate-300 px-3 py-2 text-right font-bold text-base" style="color:#1e3a5f;">
+                            {{ grand_total|floatformat:2 }}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <!-- ════════  ZERO-RATING FOOTER  ════════ -->
+    <div class="border border-slate-300 border-t-0 px-4 py-2 text-center"
+         style="font-size:9.5px;direction:rtl;line-height:1.6;color:#374151;">
+        الخدمات الخاضعة لنسبة الضريبة الصفرية تحمل الدولة الضريبة المستحقة على الخدمات التعليمية الأهلية المقدمة إلى المواطنين.
+    </div>
+
+</div>
+
+</body>
+</html>

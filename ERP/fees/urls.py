@@ -75,6 +75,7 @@ urlpatterns = [
     # ── Simplified Tax Invoice Entry ──────────────────────────
     path('tax-invoice/',                          views.tax_invoice_menu,        name='tax_invoice_menu'),
     path('tax-invoice/reservation/',              views.reservation_invoice,     name='reservation_invoice'),
+    path('tax-invoice/ext-receipt/',              views.ext_receipt_print,       name='ext_receipt_print'),
     path('tax-invoice/credit-note/',              views.tax_credit_note,         name='tax_credit_note'),
     path('tax-invoice/invoice-credit-note/',      views.invoice_credit_note,     name='invoice_credit_note'),
 ]

@@ -706,6 +706,10 @@ class ExternalCandidate(models.Model):
         related_name='admission_application',
         help_text='Linked student record if approved and enrolled'
     )
+    is_saudi        = models.BooleanField(
+        null=True, blank=True,
+        verbose_name='Saudi National / مواطن سعودي',
+        help_text='True = Saudi (0% VAT), False/None = Non-Saudi (15% VAT on taxable fees)')
     is_active       = models.BooleanField(default=True)
     created_at      = models.DateTimeField(auto_now_add=True)
     created_by      = models.ForeignKey(

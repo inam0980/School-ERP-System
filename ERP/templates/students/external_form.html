@@ -42,7 +42,57 @@
             <h2 class="font-bold text-indigo-800 text-lg">Candidate Details / بيانات المرشح</h2>
         </div>
 
-        <div class="p-6 space-y-5">
+        <div class="p-6 space-y-6">
+
+            <!-- ══════════════════════════════════════════════════════ -->
+            <!--  CITIZENSHIP PICKER                                   -->
+            <!-- ══════════════════════════════════════════════════════ -->
+            <div>
+                <p class="text-sm font-semibold text-slate-700 mb-2">
+                    Citizenship / الجنسية <span class="text-red-500">*</span>
+                </p>
+                <p class="text-xs text-slate-400 mb-3">
+                    Select to auto-apply the correct VAT rate — Saudi nationals are exempt from VAT on school fees.
+                </p>
+                <input type="hidden" name="is_saudi" id="is_saudi_input"
+                       value="{% if candidate.is_saudi == True %}saudi{% elif candidate.is_saudi == False %}non_saudi{% else %}{% endif %}">
+
+                <div class="grid grid-cols-2 gap-4">
+                    <!-- Saudi card -->
+                    <div id="card-saudi"
+                         onclick="setCitizenship('saudi')"
+                         class="citizenship-card cursor-pointer rounded-xl border-2 p-4 text-center transition select-none
+                                {% if candidate.is_saudi == True %}border-green-500 bg-green-50{% else %}border-slate-200 hover:border-green-300 bg-white{% endif %}">
+                        <div class="text-3xl mb-1">🇸🇦</div>
+                        <div class="font-bold text-sm text-slate-800">Saudi National</div>
+                        <div class="text-xs text-slate-500 mt-0.5">مواطن سعودي</div>
+                        <div class="mt-2 inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                            0% VAT — Exempt
+                        </div>
+                    </div>
+                    <!-- Non-Saudi card -->
+                    <div id="card-non-saudi"
+                         onclick="setCitizenship('non_saudi')"
+                         class="citizenship-card cursor-pointer rounded-xl border-2 p-4 text-center transition select-none
+                                {% if candidate.is_saudi == False %}border-orange-500 bg-orange-50{% else %}border-slate-200 hover:border-orange-300 bg-white{% endif %}">
+                        <div class="text-3xl mb-1">🌍</div>
+                        <div class="font-bold text-sm text-slate-800">Non-Saudi / Expat</div>
+                        <div class="text-xs text-slate-500 mt-0.5">غير سعودي / مقيم</div>
+                        <div class="mt-2 inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                            15% VAT Applies
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Not-selected warning (shown if submitted without picking) -->
+                <p id="citizenship-required-msg" class="mt-2 text-xs text-red-500 hidden">
+                    Please select Saudi or Non-Saudi before saving.
+                </p>
+            </div>
+
+            <!-- ══════════════════════════════════════════════════════ -->
+            <!--  PERSONAL DETAILS                                     -->
+            <!-- ══════════════════════════════════════════════════════ -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <!-- Full Name -->
                 <div>
@@ -76,20 +126,20 @@
                 <!-- Nationality -->
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Nationality / الجنسية</label>
-                    <input type="text" name="nationality"
+                    <input type="text" name="nationality" id="ext-nationality"
                            value="{{ candidate.nationality|default:'' }}"
-                           placeholder="e.g. Saudi, Egyptian, Pakistani …"
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
-                           id="ext-nationality">
+                           placeholder="e.g. Saudi Arabian, Egyptian, Pakistani …"
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none">
                 </div>
                 <!-- ID Number -->
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">ID / Iqama / Passport</label>
-                    <input type="text" name="id_number"
+                    <label class="block text-sm font-medium text-slate-700 mb-1" id="id-number-label">
+                        ID / Iqama / Passport
+                    </label>
+                    <input type="text" name="id_number" id="ext-idnumber"
                            value="{{ candidate.id_number|default:'' }}"
                            placeholder="National ID, Iqama, or Passport number"
-                           class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none"
-                           id="ext-idnumber">
+                           class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none">
                 </div>
                 <!-- Division -->
                 <div>
@@ -118,6 +168,7 @@
                     </select>
                 </div>
             </div>
+
             <!-- Notes -->
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Notes / ملاحظات</label>
@@ -143,4 +194,46 @@
         </div>
     </form>
 </div>
+
+<script>
+function setCitizenship(val) {
+    document.getElementById('is_saudi_input').value = val;
+
+    const saudi    = document.getElementById('card-saudi');
+    const nonSaudi = document.getElementById('card-non-saudi');
+    const natField = document.getElementById('ext-nationality');
+    const idLabel  = document.getElementById('id-number-label');
+
+    saudi.className    = saudi.className.replace(/border-(slate|green|orange)-\S+/g, '').replace(/bg-(white|green|orange)-\S+/g, '');
+    nonSaudi.className = nonSaudi.className.replace(/border-(slate|green|orange)-\S+/g, '').replace(/bg-(white|green|orange)-\S+/g, '');
+
+    if (val === 'saudi') {
+        saudi.classList.add('border-green-500', 'bg-green-50');
+        nonSaudi.classList.add('border-slate-200', 'bg-white');
+        if (!natField.value) natField.value = 'Saudi Arabian';
+        idLabel.textContent = 'National ID / رقم الهوية';
+    } else {
+        nonSaudi.classList.add('border-orange-500', 'bg-orange-50');
+        saudi.classList.add('border-slate-200', 'bg-white');
+        if (natField.value === 'Saudi Arabian') natField.value = '';
+        idLabel.textContent = 'Iqama / Passport / إقامة أو جواز سفر';
+    }
+    document.getElementById('citizenship-required-msg').classList.add('hidden');
+}
+
+// Warn if submitted without picking citizenship
+document.querySelector('form').addEventListener('submit', function(e) {
+    const val = document.getElementById('is_saudi_input').value;
+    if (!val) {
+        document.getElementById('citizenship-required-msg').classList.remove('hidden');
+        e.preventDefault();
+    }
+});
+
+// On page load: apply visual state for edit mode
+(function() {
+    const val = document.getElementById('is_saudi_input').value;
+    if (val) setCitizenship(val);
+})();
+</script>
 {% endblock %}

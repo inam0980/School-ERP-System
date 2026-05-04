@@ -1982,64 +1982,164 @@ def reservation_invoice(request):
             ).order_by('-payment_date', '-id')[:20]
         )
 
-    # ── POST: Collect fee payment ─────────────────────────────────
+    # ── POST: Collect multi-line fee payments ────────────────────
     if request.method == 'POST' and request.POST.get('action') == 'collect_fee' and candidate:
-        fee_desc    = request.POST.get('fee_description', '').strip()
-        amount_str  = request.POST.get('amount', '').strip()
-        vat_rate_str = request.POST.get('vat_rate', '0').strip()
-        pay_method  = request.POST.get('payment_method', 'CASH')
-        pay_date    = request.POST.get('payment_date', '')
-        txn_ref     = request.POST.get('transaction_ref', '').strip()
-        pay_notes   = request.POST.get('pay_notes', '').strip()
+        pay_method = request.POST.get('payment_method', 'CASH')
+        pay_date   = request.POST.get('payment_date', '')
+        txn_ref    = request.POST.get('transaction_ref', '').strip()
+        pay_notes  = request.POST.get('pay_notes', '').strip()
 
-        errors = []
-        if not fee_desc:
-            errors.append("Fee description is required.")
-        try:
-            amount = Decimal(amount_str)
-            if amount <= 0:
-                raise ValueError
-        except Exception:
-            errors.append("Enter a valid amount greater than 0.")
-            amount = Decimal('0')
-        try:
-            vat_rate = Decimal(vat_rate_str)
-        except Exception:
-            vat_rate = Decimal('0')
         try:
             payment_date = date.fromisoformat(pay_date)
         except Exception:
             payment_date = timezone.localdate()
 
+        fee_descriptions = request.POST.getlist('fee_description[]')
+        fee_amounts      = request.POST.getlist('amount[]')
+        fee_vat_rates    = request.POST.getlist('vat_rate[]')
+
+        errors    = []
+        line_data = []
+        for i, desc in enumerate(fee_descriptions):
+            desc = desc.strip()
+            if not desc:
+                continue
+            try:
+                amt = Decimal(fee_amounts[i].strip())
+                if amt <= 0:
+                    raise ValueError
+            except Exception:
+                errors.append(f"Row {i+1}: enter a valid amount greater than 0.")
+                continue
+            try:
+                vat_r = Decimal(fee_vat_rates[i].strip() if i < len(fee_vat_rates) else '0')
+            except Exception:
+                vat_r = Decimal('0')
+            line_data.append({'desc': desc, 'amount': amt, 'vat_rate': vat_r})
+
+        if not line_data and not errors:
+            errors.append("Add at least one fee line.")
+
         if errors:
             for e in errors:
                 messages.error(request, e)
         else:
-            payment = ExternalCandidatePayment(
-                candidate       = candidate,
-                fee_description = fee_desc,
-                amount          = amount,
-                vat_rate        = vat_rate,
-                payment_method  = pay_method,
-                payment_date    = payment_date,
-                transaction_ref = txn_ref,
-                notes           = pay_notes,
-                collected_by    = request.user,
-            )
-            payment.save()  # auto-calculates vat_amount and total
+            saved_payments = []
+            with transaction.atomic():
+                for ld in line_data:
+                    p = ExternalCandidatePayment(
+                        candidate       = candidate,
+                        fee_description = ld['desc'],
+                        amount          = ld['amount'],
+                        vat_rate        = ld['vat_rate'],
+                        payment_method  = pay_method,
+                        payment_date    = payment_date,
+                        transaction_ref = txn_ref,
+                        notes           = pay_notes,
+                        collected_by    = request.user,
+                    )
+                    p.save()
+                    saved_payments.append(p)
 
+            grand_total = sum(p.total for p in saved_payments)
             messages.success(
                 request,
-                f"Payment {payment.receipt_number} collected — "
-                f"SAR {payment.total:,.2f} from {candidate.full_name}."
+                f"{len(saved_payments)} fee line(s) collected — "
+                f"SAR {grand_total:,.2f} from {candidate.full_name}."
             )
-            return redirect(f"{request.path}?candidate_id={candidate.pk}")
+            pids = ','.join(str(p.pk) for p in saved_payments)
+            return redirect(f"{request.path}?candidate_id={candidate.pk}&pids={pids}")
+
+    # ── Pre-fill standard amounts from FeeType ──────────
+    entrance_exam_default = Decimal('0.00')
+    registration_default  = Decimal('0.00')
+    
+    ft_entrance = FeeType.objects.filter(category=FeeType.ENTRANCE_EXAM).first()
+    if ft_entrance and ft_entrance.default_amount:
+        entrance_exam_default = ft_entrance.default_amount
+        
+    ft_reg = FeeType.objects.filter(category=FeeType.REGISTRATION).first()
+    if ft_reg and ft_reg.default_amount:
+        registration_default = ft_reg.default_amount
+
+    just_collected_pids = request.GET.get('pids', '')
 
     return render(request, 'fees/external_candidate_fee.html', {
-        'query':      query,
-        'candidates': candidates,
-        'candidate':  candidate,
-        'payments':   payments,
+        'query':                  query,
+        'candidates':             candidates,
+        'candidate':              candidate,
+        'payments':               payments,
+        'entrance_exam_default':  entrance_exam_default,
+        'registration_default':   registration_default,
+        'just_collected_pids':    just_collected_pids,
+    })
+
+
+
+# ════════════════════════════════════════════════════════════════
+#  EXTERNAL CANDIDATE — INVOICE / RECEIPT PRINT
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def ext_receipt_print(request):
+    """
+    Print an invoice for one or more ExternalCandidatePayment records.
+    ?pids=1,2,3  → show invoice covering those payment IDs.
+    Also accessible from payment history: ?pids=<single_id>
+    """
+    pids_raw = request.GET.get('pids', '').strip()
+    pids     = [int(p) for p in pids_raw.split(',') if p.strip().isdigit()]
+
+    if not pids:
+        messages.error(request, "No payment IDs provided.")
+        return redirect('fees:reservation_invoice')
+
+    payments = list(
+        ExternalCandidatePayment.objects.filter(pk__in=pids)
+        .select_related('candidate', 'candidate__grade_applying', 'collected_by')
+        .order_by('id')
+    )
+    if not payments:
+        messages.error(request, "Payments not found.")
+        return redirect('fees:reservation_invoice')
+
+    candidate = payments[0].candidate
+
+    # Build line_items list matching the invoice_print.html format
+    line_items = []
+    subtotal   = Decimal('0')
+    tax_total  = Decimal('0')
+    for p in payments:
+        vat_rate_pct = int(p.vat_rate) if p.vat_rate == int(p.vat_rate) else float(p.vat_rate)
+        line_items.append({
+            'description':    p.fee_description,
+            'qty':            1,
+            'gross_amount':   float(p.amount),
+            'discount':       0.0,
+            'net_before_vat': float(p.amount),
+            'vat_rate':       vat_rate_pct,
+            'vat':            float(p.vat_amount),
+            'total':          float(p.total),
+        })
+        subtotal  += p.amount
+        tax_total += p.vat_amount
+
+    grand_total = subtotal + tax_total
+
+    return render(request, 'fees/ext_candidate_invoice_print.html', {
+        'payments':    payments,
+        'candidate':   candidate,
+        'line_items':  line_items,
+        'subtotal':    subtotal,
+        'tax_amount':  tax_total,
+        'grand_total': grand_total,
+        'payment_date': payments[0].payment_date,
+        'payment_method': payments[0].get_payment_method_display(),
+        'receipt_number': payments[0].receipt_number if len(payments) == 1 else payments[0].receipt_number + '…',
+        'transaction_ref': payments[0].transaction_ref,
+        'collected_by': payments[0].collected_by,
+        'notes':       payments[0].notes,
     })
 
 
