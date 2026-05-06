@@ -1,7 +1,7 @@
 from django import forms
 from django.utils import timezone
 from decimal import Decimal
-from core.models import AcademicYear, Division, Grade, Section
+from core.models import AcademicYear, Division, Grade, Section, StudyMode
 from .models import (
     FeeType, FeeStructure, FeeStructureItem,
     StudentFee, Payment, TaxInvoice, Salary,
@@ -39,10 +39,11 @@ class FeeTypeForm(forms.ModelForm):
 class FeeStructureForm(forms.ModelForm):
     class Meta:
         model  = FeeStructure
-        fields = ['name', 'structure_type', 'academic_year', 'grade', 'frequency']
+        fields = ['name', 'structure_type', 'study_mode', 'academic_year', 'grade', 'frequency']
         widgets = {
             'name':           forms.TextInput(attrs={'class': _INPUT, 'placeholder': 'Optional label, e.g. "Grade 1 American 2026–27"'}),
             'structure_type': forms.Select(attrs={'class': _SELECT}),
+            'study_mode':     forms.Select(attrs={'class': _SELECT}),
             'academic_year':  forms.Select(attrs={'class': _SELECT}),
             'grade':          forms.Select(attrs={'class': _SELECT}),
             'frequency':      forms.Select(attrs={'class': _SELECT}),
@@ -52,6 +53,9 @@ class FeeStructureForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['academic_year'].queryset = AcademicYear.objects.all()
         self.fields['grade'].queryset = Grade.objects.select_related('division').order_by('division__name', 'order', 'name')
+        self.fields['study_mode'].queryset    = StudyMode.objects.filter(is_active=True)
+        self.fields['study_mode'].required    = False
+        self.fields['study_mode'].empty_label = '— All Study Modes (any) —'
 
 
 class FeeStructureBulkCreateForm(forms.Form):

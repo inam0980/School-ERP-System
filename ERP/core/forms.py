@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import AcademicYear, Division, Grade, Section, Subject, Board
+from .models import AcademicYear, Division, Grade, Section, Subject, Board, StudyMode
 
 User = get_user_model()
 
@@ -83,6 +83,20 @@ class BoardForm(TailwindMixin, forms.ModelForm):
     class Meta:
         model  = Board
         fields = ['name', 'short_code', 'is_active']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.apply_tailwind()
+
+
+class StudyModeForm(TailwindMixin, forms.ModelForm):
+    class Meta:
+        model  = StudyMode
+        fields = ['name', 'arabic_name', 'description', 'order', 'is_active']
+        widgets = {
+            'arabic_name': forms.TextInput(attrs={'dir': 'rtl', 'class': _INPUT}),
+            'description': forms.TextInput(attrs={'class': _INPUT}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -30,5 +30,10 @@
               {% if 'board' in n %}bg-[#1e3a5f] text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
         Boards
     </a>
+    <a href="{% url 'core:study_mode_list' %}"
+       class="px-4 py-2 rounded-lg text-sm font-medium transition
+              {% if 'study_mode' in n %}bg-[#1e3a5f] text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+        Study Modes
+    </a>
 </div>
 {% endwith %}

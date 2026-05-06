@@ -83,6 +83,20 @@
             </div>
 
             <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Study Mode <span class="text-slate-400">(optional)</span></label>
+                <select name="study_mode"
+                        class="border {% if form.study_mode.errors %}border-red-400{% else %}border-slate-300{% endif %}
+                               rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                    <option value="">— All Study Modes (any) —</option>
+                    {% for mode in form.fields.study_mode.queryset %}
+                    <option value="{{ mode.pk }}" {% if form.study_mode.value|stringformat:'s' == mode.pk|stringformat:'s' %}selected{% endif %}>{{ mode.name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs text-slate-400 mt-1">If selected, only students with this Study Mode will receive this fee structure.</p>
+                {% if form.study_mode.errors %}<p class="text-red-500 text-xs mt-1">{{ form.study_mode.errors.0 }}</p>{% endif %}
+            </div>
+
+            <div class="mb-4">
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Academic Year <span class="text-red-500">*</span></label>
                 <select name="academic_year"
                         class="border {% if form.academic_year.errors %}border-red-400{% else %}border-slate-300{% endif %}
@@ -368,8 +382,22 @@
                     class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
                 <option value="regular" {% if post_data.structure_type == 'regular' or not post_data.structure_type %}selected{% endif %}>↻ Regular</option>
                 <option value="new" {% if post_data.structure_type == 'new' %}selected{% endif %}>✦ New</option>
+                <option value="transfer" {% if post_data.structure_type == 'transfer' %}selected{% endif %}>⇄ Transfer</option>
                 <option value="other" {% if post_data.structure_type == 'other' %}selected{% endif %}>◈ Other</option>
             </select>
+        </div>
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">
+                Study Mode <span class="text-slate-400 font-normal">(optional)</span>
+            </label>
+            <select name="study_mode" id="create-study-mode"
+                    class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full bg-white focus:ring-2 focus:ring-primary/40 focus:outline-none">
+                <option value="">— All Study Modes —</option>
+                {% for mode in study_modes %}
+                <option value="{{ mode.pk }}" {% if post_data.study_mode == mode.pk|stringformat:'s' %}selected{% endif %}>{{ mode.name }}</option>
+                {% endfor %}
+            </select>
+            <p class="text-xs text-slate-400 mt-1">Limit this structure to students with a specific Study Mode.</p>
         </div>
         <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">

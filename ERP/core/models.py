@@ -102,6 +102,27 @@ class Subject(models.Model):
         return f"{self.name} ({self.grade})"
 
 
+class StudyMode(models.Model):
+    """Custom study modes (e.g. Home Study, Distance Study, etc.) configurable by admins.
+    Applied to Regular (continuing) students to categorise them by learning mode."""
+    name        = models.CharField(max_length=100, unique=True,
+                                   help_text="e.g. Home Study, Distance Study, Hybrid")
+    arabic_name = models.CharField(max_length=100, blank=True,
+                                   help_text="e.g. الدراسة المنزلية")
+    description = models.CharField(max_length=300, blank=True)
+    is_active   = models.BooleanField(default=True)
+    order       = models.PositiveSmallIntegerField(default=0, help_text="Display order")
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name = 'Study Mode'
+        verbose_name_plural = 'Study Modes'
+
+    def __str__(self):
+        return self.name
+
+
 class Board(models.Model):
     """External examination board (e.g. CBSE, IGCSE, SAT, etc.)."""
     name       = models.CharField(max_length=100, unique=True,

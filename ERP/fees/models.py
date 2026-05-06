@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
-from core.models import AcademicYear, Division, Grade, Section
+from core.models import AcademicYear, Division, Grade, Section, StudyMode
 from students.models import Student
 
 
@@ -102,13 +102,15 @@ class FeeType(models.Model):
 
 class FeeStructure(models.Model):
     """Container: one fee schedule per grade in an academic year."""
-    TYPE_REGULAR = 'regular'
-    TYPE_NEW     = 'new'
-    TYPE_OTHER   = 'other'
+    TYPE_REGULAR  = 'regular'
+    TYPE_NEW      = 'new'
+    TYPE_TRANSFER = 'transfer'
+    TYPE_OTHER    = 'other'
     STRUCTURE_TYPE_CHOICES = [
-        (TYPE_REGULAR, 'Regular'),
-        (TYPE_NEW,     'New'),
-        (TYPE_OTHER,   'Other'),
+        (TYPE_REGULAR,  'Regular'),
+        (TYPE_NEW,      'New'),
+        (TYPE_TRANSFER, 'Transfer'),
+        (TYPE_OTHER,    'Other'),
     ]
 
     name           = models.CharField(max_length=200, blank=True,
@@ -123,6 +125,12 @@ class FeeStructure(models.Model):
     grade         = models.ForeignKey(Grade, on_delete=models.PROTECT,
                                       related_name='fee_structures',
                                       verbose_name='Grade')
+    study_mode    = models.ForeignKey(
+        StudyMode, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='fee_structures',
+        verbose_name='Study Mode',
+        help_text='Optional. If set, only students with this Study Mode get this fee structure.'
+    )
     frequency     = models.CharField(max_length=20, choices=[
         ('ONCE',    'One-time'),
         ('MONTHLY', 'Monthly'),
@@ -132,7 +140,7 @@ class FeeStructure(models.Model):
     created_at    = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ['academic_year', 'grade', 'structure_type']
+        unique_together = ['academic_year', 'grade', 'structure_type', 'study_mode']
         ordering = ['academic_year', 'grade__division__name', 'grade__order', 'grade__name', 'structure_type']
 
     def __str__(self):
