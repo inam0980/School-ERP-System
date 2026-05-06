@@ -73,247 +73,154 @@
         <div class="flex-1 min-w-0">
             <h2 class="text-white font-bold text-base leading-snug">{{ division }} Division</h2>
             <p class="text-white/65 text-xs mt-0.5">
-                {{ bundles|length }} structure bundle{{ bundles|length|pluralize }}
+                {{ bundles.total_count }} structure bundle{{ bundles.total_count|pluralize }}
             </p>
         </div>
         <span class="shrink-0 bg-white/15 text-white text-xs font-semibold px-3 py-1 rounded-full">
-            {{ bundles|length }}
+            {{ bundles.total_count }}
         </span>
     </div>
 
-    {# ── Bundle cards (one collapsible card per fee-structure bundle) ── #}
-    <div class="space-y-3">
-        {% for bundle in bundles %}
-        {% with type=bundle.structure_type %}
-        <details class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group">
-            <summary class="flex items-center gap-4 px-5 py-4 cursor-pointer select-none hover:bg-slate-50/60 transition list-none">
-                {# Type badge #}
-                <span class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold
-                    {% if type == 'regular' %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}
-                    {% if type == 'new' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% endif %}
-                    {% if type == 'transfer' %}bg-amber-50 text-amber-700 border border-amber-200{% endif %}
-                    {% if type == 'other' %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
-                    {% if type == 'regular' %}↻ Regular{% endif %}
-                    {% if type == 'new' %}✦ New{% endif %}
-                    {% if type == 'transfer' %}⇄ Transfer{% endif %}
-                    {% if type == 'other' %}◈ Other{% endif %}
-                </span>
-
-                {# Title block #}
-                <div class="flex-1 min-w-0">
-                    <h3 class="font-semibold text-slate-800 text-sm truncate">{{ bundle.base_name }}</h3>
-                    <p class="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span>📅 {{ bundle.academic_year }}</span>
-                        <span>🔁 {{ bundle.frequency }}</span>
-                        {% if bundle.study_mode %}
-                        <span class="inline-flex items-center gap-1 text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
-                            🎓 {{ bundle.study_mode.name }}
-                        </span>
-                        {% else %}
-                        <span class="text-slate-400">🎓 All Study Modes</span>
-                        {% endif %}
-                        <span class="text-slate-400">·</span>
-                        <span class="font-semibold text-slate-600">{{ bundle.grades|length }} grade{{ bundle.grades|length|pluralize }}</span>
-                    </p>
+    {# ── Nested Collapsible Categories (Regular, New, Transfer, Other) ── #}
+    <div class="space-y-2 mb-10">
+        
+        {# Category: Regular #}
+        <details class="bg-slate-50/50 rounded-xl border border-slate-200 overflow-hidden group/cat" {% if bundles.regular %}open{% endif %}>
+            <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-slate-100/80 transition list-none">
+                <div class="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center text-white">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                 </div>
-
-                {# Bundle-level export buttons #}
-                <div class="shrink-0 flex items-center gap-1.5" onclick="event.stopPropagation()">
-                    <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type={{ type }}{% if active_year %}&year={{ active_year }}{% endif %}"
-                       class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">CSV</a>
-                    <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type={{ type }}{% if active_year %}&year={{ active_year }}{% endif %}"
-                       class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition">PDF</a>
-                    <svg class="w-5 h-5 text-slate-400 ml-1 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                    </svg>
+                <h4 class="font-bold text-slate-700 text-sm">Regular Structures</h4>
+                <div class="ml-auto flex items-center gap-3">
+                    {# Export Buttons #}
+                    <div class="flex items-center gap-1.5 mr-2" onclick="event.stopPropagation()">
+                        <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=regular{% if active_year %}&year={{ active_year }}{% endif %}" 
+                           class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition border border-emerald-100">
+                           <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+                           CSV
+                        </a>
+                        <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=regular{% if active_year %}&year={{ active_year }}{% endif %}" 
+                           class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-bold hover:bg-indigo-100 transition border border-indigo-100">
+                           <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
+                           PDF
+                        </a>
+                    </div>
+                    <span class="text-xs font-bold text-slate-400 bg-white border border-slate-200 px-2.5 py-1 rounded-lg">{{ bundles.regular|length }} bundle{{ bundles.regular|length|pluralize }}</span>
+                    <svg class="w-5 h-5 text-slate-400 transition-transform group-open/cat:rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
                 </div>
             </summary>
-
-            {# Expanded body — list of grades inside this bundle #}
-            <div class="border-t border-slate-100 divide-y divide-slate-50">
-                {% for s in bundle.grades %}
-                <div class="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50/40">
-                    <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold shrink-0">
-                        {{ s.grade.order|default:forloop.counter }}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-semibold text-slate-800 text-sm">{{ s.grade.name }}</p>
-                        <p class="text-xs text-slate-400 mt-0.5">
-                            {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
-                            {% for it in s.items.all %}{% if forloop.first %} · {% endif %}{{ it.fee_type.name }}: {{ it.amount }}{% if not forloop.last %}, {% endif %}{% endfor %}
-                        </p>
-                    </div>
-                    <div class="shrink-0 flex gap-1.5">
-                        <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}" class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">✏️ Edit</a>
-                        <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}" class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">Assign →</a>
-                        <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}" onsubmit="return confirm('Delete this structure and ALL linked fee records? This cannot be undone.');" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">🗑 Delete</button>
-                        </form>
-                    </div>
-                </div>
+            <div class="p-4 bg-white border-t border-slate-200 space-y-3">
+                {% for bundle in bundles.regular %}
+                    {% include "fees/partials/_fee_bundle_card.html" with bundle=bundle type='regular' division=division %}
+                {% empty %}
+                    <p class="py-4 text-center text-xs text-slate-400 italic">No Regular structures found.</p>
                 {% endfor %}
             </div>
         </details>
-        {% endwith %}
-        {% endfor %}
-    </div>
 
-    {# Old tabs section removed — kept hidden block to preserve structure #}
-    <div class="hidden">
-        <div data-tab-panel="regular" class="hidden divide-y divide-slate-100">
-            {% for grade, types in grades_map.items %}{% with s=types.regular %}{% if s %}
-            <div class="flex items-center gap-4 px-5 py-3.5">
-                <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-slate-800 text-sm">{{ grade.name }}{% if s.name %} <span class="text-slate-400 font-normal text-xs">— {{ s.name }}</span>{% endif %}</p>
-                    <p class="text-xs text-slate-400 mt-0.5">
-                        {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
-                        &middot; {{ s.academic_year }} &middot; {{ s.get_frequency_display }}
-                        {% if s.study_mode %}&middot; <span class="text-indigo-600 font-medium">{{ s.study_mode.name }}</span>{% endif %}
-                    </p>
+        {# Category: New #}
+        <details class="bg-slate-50/50 rounded-xl border border-slate-200 overflow-hidden group/cat">
+            <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-slate-100/80 transition list-none">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
                 </div>
-                <div class="shrink-0 flex gap-1.5">
-                    <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}" class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">✏️ Edit</a>
-                    <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}" class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">Assign →</a>
-                    <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}" onsubmit="return confirm('Delete this structure and ALL linked fee records? This cannot be undone.');" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">🗑 Delete</button>
-                    </form>
+                <h4 class="font-bold text-slate-700 text-sm">New Admission</h4>
+                <div class="ml-auto flex items-center gap-3">
+                    {# Export Buttons #}
+                    <div class="flex items-center gap-1.5 mr-2" onclick="event.stopPropagation()">
+                        <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=new{% if active_year %}&year={{ active_year }}{% endif %}" 
+                           class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition border border-emerald-100">
+                           <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+                           CSV
+                        </a>
+                        <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=new{% if active_year %}&year={{ active_year }}{% endif %}" 
+                           class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-bold hover:bg-indigo-100 transition border border-indigo-100">
+                           <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
+                           PDF
+                        </a>
+                    </div>
+                    <span class="text-xs font-bold text-slate-400 bg-white border border-slate-200 px-2.5 py-1 rounded-lg">{{ bundles.new|length }} bundle{{ bundles.new|length|pluralize }}</span>
+                    <svg class="w-5 h-5 text-slate-400 transition-transform group-open/cat:rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
                 </div>
+            </summary>
+            <div class="p-4 bg-white border-t border-slate-200 space-y-3">
+                {% for bundle in bundles.new %}
+                    {% include "fees/partials/_fee_bundle_card.html" with bundle=bundle type='new' division=division %}
+                {% empty %}
+                    <p class="py-4 text-center text-xs text-slate-400 italic">No New structures found.</p>
+                {% endfor %}
             </div>
-            {% endif %}{% endwith %}{% endfor %}
-            {# Export CSV strip for Regular #}
-            <div class="px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex justify-end">
-                <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=regular{% if active_year %}&year={{ active_year }}{% endif %}"
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
-                    Export CSV
-                </a>
-                <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=regular{% if active_year %}&year={{ active_year }}{% endif %}"
-                   class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
-                    Export PDF
-                </a>
-            </div>
-            <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No Regular structures set for this division.</div>
-        </div>
+        </details>
 
-        {# ── New panel ── #}
-        <div data-tab-panel="new" class="hidden divide-y divide-slate-100">
-            {% for grade, types in grades_map.items %}{% with s=types.new %}{% if s %}
-            <div class="flex items-center gap-4 px-5 py-3.5">
-                <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-slate-800 text-sm">{{ grade.name }}{% if s.name %} <span class="text-slate-400 font-normal text-xs">— {{ s.name }}</span>{% endif %}</p>
-                    <p class="text-xs text-slate-400 mt-0.5">
-                        {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
-                        &middot; {{ s.academic_year }} &middot; {{ s.get_frequency_display }}
-                        {% if s.study_mode %}&middot; <span class="text-indigo-600 font-medium">{{ s.study_mode.name }}</span>{% endif %}
-                    </p>
+        {# Category: Transfer #}
+        <details class="bg-slate-50/50 rounded-xl border border-slate-200 overflow-hidden group/cat">
+            <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-slate-100/80 transition list-none">
+                <div class="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-white">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
                 </div>
-                <div class="shrink-0 flex gap-1.5">
-                    <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}" class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">✏️ Edit</a>
-                    <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}" class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">Assign →</a>
-                    <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}" onsubmit="return confirm('Delete this structure and ALL linked fee records? This cannot be undone.');" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">🗑 Delete</button>
-                    </form>
+                <h4 class="font-bold text-slate-700 text-sm">Transfer</h4>
+                <div class="ml-auto flex items-center gap-3">
+                    {# Export Buttons #}
+                    <div class="flex items-center gap-1.5 mr-2" onclick="event.stopPropagation()">
+                        <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=transfer{% if active_year %}&year={{ active_year }}{% endif %}" 
+                           class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition border border-emerald-100">
+                           <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+                           CSV
+                        </a>
+                        <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=transfer{% if active_year %}&year={{ active_year }}{% endif %}" 
+                           class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-bold hover:bg-indigo-100 transition border border-indigo-100">
+                           <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
+                           PDF
+                        </a>
+                    </div>
+                    <span class="text-xs font-bold text-slate-400 bg-white border border-slate-200 px-2.5 py-1 rounded-lg">{{ bundles.transfer|length }} bundle{{ bundles.transfer|length|pluralize }}</span>
+                    <svg class="w-5 h-5 text-slate-400 transition-transform group-open/cat:rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
                 </div>
+            </summary>
+            <div class="p-4 bg-white border-t border-slate-200 space-y-3">
+                {% for bundle in bundles.transfer %}
+                    {% include "fees/partials/_fee_bundle_card.html" with bundle=bundle type='transfer' division=division %}
+                {% empty %}
+                    <p class="py-4 text-center text-xs text-slate-400 italic">No Transfer structures found.</p>
+                {% endfor %}
             </div>
-            {% endif %}{% endwith %}{% endfor %}
-            {# Export CSV strip for New #}
-            <div class="px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex justify-end">
-                <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=new{% if active_year %}&year={{ active_year }}{% endif %}"
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
-                    Export CSV
-                </a>
-                <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=new{% if active_year %}&year={{ active_year }}{% endif %}"
-                   class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
-                    Export PDF
-                </a>
-            </div>
-            <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No New structures set for this division.</div>
-        </div>
+        </details>
 
-        {# ── Transfer panel ── #}
-        <div data-tab-panel="transfer" class="hidden divide-y divide-slate-100">
-            {% for grade, types in grades_map.items %}{% with s=types.transfer %}{% if s %}
-            <div class="flex items-center gap-4 px-5 py-3.5">
-                <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-slate-800 text-sm">{{ grade.name }}{% if s.name %} <span class="text-slate-400 font-normal text-xs">— {{ s.name }}</span>{% endif %}</p>
-                    <p class="text-xs text-slate-400 mt-0.5">
-                        {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
-                        &middot; {{ s.academic_year }} &middot; {{ s.get_frequency_display }}
-                        {% if s.study_mode %}&middot; <span class="text-indigo-600 font-medium">{{ s.study_mode.name }}</span>{% endif %}
-                    </p>
+        {# Category: Other #}
+        <details class="bg-slate-50/50 rounded-xl border border-slate-200 overflow-hidden group/cat">
+            <summary class="flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-slate-100/80 transition list-none">
+                <div class="w-8 h-8 rounded-lg bg-slate-400 flex items-center justify-center text-white">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
                 </div>
-                <div class="shrink-0 flex gap-1.5">
-                    <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}" class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">✏️ Edit</a>
-                    <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}" class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">Assign →</a>
-                    <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}" onsubmit="return confirm('Delete this structure and ALL linked fee records? This cannot be undone.');" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">🗑 Delete</button>
-                    </form>
+                <h4 class="font-bold text-slate-700 text-sm">Other</h4>
+                <div class="ml-auto flex items-center gap-3">
+                    {# Export Buttons #}
+                    <div class="flex items-center gap-1.5 mr-2" onclick="event.stopPropagation()">
+                        <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=other{% if active_year %}&year={{ active_year }}{% endif %}" 
+                           class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 transition border border-emerald-100">
+                           <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+                           CSV
+                        </a>
+                        <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=other{% if active_year %}&year={{ active_year }}{% endif %}" 
+                           class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-bold hover:bg-indigo-100 transition border border-indigo-100">
+                           <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
+                           PDF
+                        </a>
+                    </div>
+                    <span class="text-xs font-bold text-slate-400 bg-white border border-slate-200 px-2.5 py-1 rounded-lg">{{ bundles.other|length }} bundle{{ bundles.other|length|pluralize }}</span>
+                    <svg class="w-5 h-5 text-slate-400 transition-transform group-open/cat:rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
                 </div>
+            </summary>
+            <div class="p-4 bg-white border-t border-slate-200 space-y-3">
+                {% for bundle in bundles.other %}
+                    {% include "fees/partials/_fee_bundle_card.html" with bundle=bundle type='other' division=division %}
+                {% empty %}
+                    <p class="py-4 text-center text-xs text-slate-400 italic">No Other structures found.</p>
+                {% endfor %}
             </div>
-            {% endif %}{% endwith %}{% endfor %}
-            {# Export CSV strip for Transfer #}
-            <div class="px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex justify-end">
-                <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=transfer{% if active_year %}&year={{ active_year }}{% endif %}"
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
-                    Export CSV
-                </a>
-                <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=transfer{% if active_year %}&year={{ active_year }}{% endif %}"
-                   class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
-                    Export PDF
-                </a>
-            </div>
-            <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No Transfer structures set for this division.</div>
-        </div>
-
-        {# ── Other panel ── #}
-        <div data-tab-panel="other" class="hidden divide-y divide-slate-100">
-            {% for grade, types in grades_map.items %}{% with s=types.other %}{% if s %}
-            <div class="flex items-center gap-4 px-5 py-3.5">
-                <div class="flex-1 min-w-0">
-                    <p class="font-semibold text-slate-800 text-sm">{{ grade.name }}{% if s.name %} <span class="text-slate-400 font-normal text-xs">— {{ s.name }}</span>{% endif %}</p>
-                    <p class="text-xs text-slate-400 mt-0.5">
-                        {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
-                        &middot; {{ s.academic_year }} &middot; {{ s.get_frequency_display }}
-                        {% if s.study_mode %}&middot; <span class="text-indigo-600 font-medium">{{ s.study_mode.name }}</span>{% endif %}
-                    </p>
-                </div>
-                <div class="shrink-0 flex gap-1.5">
-                    <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}" class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">✏️ Edit</a>
-                    <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}" class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">Assign →</a>
-                    <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}" onsubmit="return confirm('Delete this structure and ALL linked fee records? This cannot be undone.');" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">🗑 Delete</button>
-                    </form>
-                </div>
-            </div>
-            {% endif %}{% endwith %}{% endfor %}
-            {# Export CSV strip for Other #}
-            <div class="px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex justify-end">
-                <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=other{% if active_year %}&year={{ active_year }}{% endif %}"
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
-                    Export CSV
-                </a>
-                <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=other{% if active_year %}&year={{ active_year }}{% endif %}"
-                   class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
-                    Export PDF
-                </a>
-            </div>
-            <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No Other structures set for this division.</div>
-        </div>
+        </details>
 
     </div>
-
 </div>
 {% endfor %}
 
@@ -336,23 +243,4 @@
         📌 Bulk Assign to Students →
     </a>
 </div>
-
-<script>
-function switchTab(containerId, type) {
-    const container = document.getElementById(containerId);
-    container.querySelectorAll('[data-tab-panel]').forEach(p => p.classList.add('hidden'));
-    container.querySelector('[data-tab-panel="' + type + '"]').classList.remove('hidden');
-    container.querySelectorAll('[data-tab-btn]').forEach(btn => {
-        btn.className = 'px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-600 -mb-px transition-all';
-    });
-    const activeBtn = container.querySelector('[data-tab-btn="' + type + '"]');
-    activeBtn.className = 'px-6 py-3 text-sm font-semibold border-b-2 -mb-px transition-all ' + activeBtn.dataset.activeClasses;
-}
-
-document.querySelectorAll('[data-tab-panel]').forEach(panel => {
-    const rows = panel.querySelectorAll('.flex.items-center.gap-4');
-    const msg  = panel.querySelector('.tab-empty');
-    if (msg && rows.length > 0) msg.classList.add('hidden');
-});
-</script>
 {% endblock %}

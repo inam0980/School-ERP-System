@@ -22,6 +22,7 @@ urlpatterns = [
     path('structures/add/',               views.fee_structure_form,             name='fee_structure_add'),
     path('structures/<int:pk>/edit/',     views.fee_structure_form,    name='fee_structure_edit'),
     path('structures/<int:pk>/delete/',   views.fee_structure_delete,  name='fee_structure_delete'),
+    path('structures/bundle-delete/',    views.fee_structure_bundle_delete, name='fee_structure_bundle_delete'),
     path('structures/<int:pk>/items/',    views.fee_structure_items_json, name='fee_structure_items'),
 
     # Bulk assign

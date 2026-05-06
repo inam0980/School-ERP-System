@@ -155,10 +155,26 @@ def fee_structure_list(request):
             }
         bundles[key]['grades'].append(s)
 
-    # Group bundles by division for outer rendering
+    # Group bundles by division and structure_type for outer rendering
     divisions_map = {}
     for bundle in bundles.values():
-        divisions_map.setdefault(bundle['division'], []).append(bundle)
+        div = bundle['division']
+        if div not in divisions_map:
+            divisions_map[div] = {
+                'regular':     [],
+                'new':         [],
+                'transfer':    [],
+                'other':       [],
+                'total_count': 0,
+            }
+        stype = bundle['structure_type']
+        if stype in divisions_map[div]:
+            divisions_map[div][stype].append(bundle)
+            divisions_map[div]['total_count'] += 1
+        else:
+            # Fallback for any unknown types
+            divisions_map[div].setdefault('other', []).append(bundle)
+            divisions_map[div]['total_count'] += 1
 
     return render(request, 'fees/fee_structure_list.html', {
         'divisions_map':  divisions_map,
@@ -507,6 +523,55 @@ def fee_structure_delete(request, pk):
         )
     else:
         messages.success(request, "Fee structure deleted.")
+    return redirect('fees:fee_structure_list')
+
+
+@login_required
+@role_required(*_ADMIN)
+@require_POST
+def fee_structure_bundle_delete(request):
+    division_id   = request.POST.get('division_id')
+    stype         = request.POST.get('stype')
+    study_mode_id = request.POST.get('study_mode_id')
+    year_id       = request.POST.get('year_id')
+    base_name     = request.POST.get('base_name')
+
+    # Filter matching structures by basic meta
+    qs = FeeStructure.objects.filter(
+        grade__division_id=division_id,
+        structure_type=stype,
+        academic_year_id=year_id,
+    )
+    if study_mode_id and study_mode_id != '0':
+        qs = qs.filter(study_mode_id=study_mode_id)
+    else:
+        qs = qs.filter(study_mode__isnull=True)
+
+    # Refine by base_name (must handle the suffix logic)
+    to_delete_ids = []
+    for s in qs:
+        suffix = f" — {s.grade.name}"
+        s_base = s.name[:-len(suffix)] if (s.name and s.name.endswith(suffix)) else (s.name or 'Untitled Structure')
+        if s_base == base_name:
+            to_delete_ids.append(s.pk)
+
+    if not to_delete_ids:
+        messages.warning(request, "No matching bundle structures found to delete.")
+        return redirect('fees:fee_structure_list')
+
+    final_qs = FeeStructure.objects.filter(pk__in=to_delete_ids)
+    assigned_qs = StudentFee.objects.filter(fee_structure__structure__in=final_qs)
+    bundle_count = final_qs.count()
+    assigned_count = assigned_qs.count()
+
+    with transaction.atomic():
+        assigned_qs.delete()
+        final_qs.delete()
+
+    messages.success(
+        request, 
+        f"Entire bundle '{base_name}' deleted ({bundle_count} grades removed, {assigned_count} student fee records cleared)."
+    )
     return redirect('fees:fee_structure_list')
 
 
