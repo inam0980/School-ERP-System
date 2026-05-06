@@ -219,18 +219,47 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 <span class="text-sm font-semibold">Enrollment Status / حالة القيد</span>
             </div>
-            <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-                {% include 'students/_field.html' with field=form.enrollment_type %}
-                {% include 'students/_field.html' with field=form.fee_category %}
-                {% include 'students/_field.html' with field=form.admission_date %}
-                <div class="md:col-span-2">
-                    {% include 'students/_field.html' with field=form.previous_school %}
-                </div>
-                <div class="md:col-span-2 flex items-center gap-3">
-                    {{ form.is_active }}
-                    <label class="text-sm font-medium text-slate-700 cursor-pointer" for="{{ form.is_active.id_for_label }}">
-                        {{ form.is_active.label }}
+            <div class="px-6 py-5 space-y-5">
+
+                <!-- ── Enrollment Type Picker (New / Regular / Transfer) ── -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5" for="{{ form.enrollment_type.id_for_label }}">
+                        {{ form.enrollment_type.label }} <span class="text-red-400">*</span>
                     </label>
+                    {{ form.enrollment_type }}
+                    <p class="text-xs text-slate-400 mt-1">Select <b>New</b> for first-time admissions, <b>Regular</b> for continuing students, or <b>Transfer</b> for incoming transfers.</p>
+                </div>
+
+                <!-- ── Study Mode (appears once enrollment type is picked) ── -->
+                <div id="studyModeWrap" class="hidden p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+                    <label class="block text-sm font-semibold text-indigo-800 mb-1.5" for="{{ form.study_mode.id_for_label }}">
+                        {{ form.study_mode.label }} <span class="text-red-400">*</span>
+                    </label>
+                    <p class="text-xs text-indigo-700 mb-2">Choose how this student studies. Manage available modes from <b>School Setup → Study Modes</b>.</p>
+                    {{ form.study_mode }}
+                    {% if form.study_mode.field.queryset.count == 0 %}
+                    <p class="text-xs text-amber-700 mt-2 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        No study modes defined yet. Add some from <code>/admin/core/studymode/</code>.
+                    </p>
+                    {% endif %}
+                    {% if form.study_mode.errors %}
+                    <p class="text-xs text-red-500 mt-1">{{ form.study_mode.errors|join:", " }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {% include 'students/_field.html' with field=form.fee_category %}
+                    {% include 'students/_field.html' with field=form.admission_date %}
+                    <div class="md:col-span-2">
+                        {% include 'students/_field.html' with field=form.previous_school %}
+                    </div>
+                    <div class="md:col-span-2 flex items-center gap-3">
+                        {{ form.is_active }}
+                        <label class="text-sm font-medium text-slate-700 cursor-pointer" for="{{ form.is_active.id_for_label }}">
+                            {{ form.is_active.label }}
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
@@ -579,6 +608,61 @@ gradeSel.addEventListener('change',   () => loadSections(gradeSel.value));
 {% if student %}
 if (divisionSel.value) loadGrades(divisionSel.value);
 {% endif %}
+
+// ── Enrollment Type → Study Mode toggle ─────────────────────────────
+const enrollmentSel  = document.getElementById('id_enrollment_type');
+const studyModeWrap  = document.getElementById('studyModeWrap');
+const studyModeSel   = document.getElementById('id_study_mode');
+
+function toggleStudyMode() {
+    if (!enrollmentSel || !studyModeWrap) return;
+    // Show Study Mode whenever ANY enrollment type is selected (NEW, TRANSFER, or REGULAR)
+    const hasValue = !!enrollmentSel.value;
+    if (hasValue) {
+        studyModeWrap.classList.remove('hidden');
+        if (studyModeSel) studyModeSel.required = true;
+    } else {
+        studyModeWrap.classList.add('hidden');
+        if (studyModeSel) {
+            studyModeSel.required = false;
+            studyModeSel.value    = '';
+        }
+    }
+}
+
+if (enrollmentSel) {
+    enrollmentSel.addEventListener('change', toggleStudyMode);
+    // Initialise on page load (covers edit mode where REGULAR may already be set)
+    toggleStudyMode();
+}
+
+// ── Enrollment Type → Fee Category auto-sync ────────────────────────
+const feeCategorySel = document.getElementById('{{ form.fee_category.id_for_label }}');
+
+const ENROLLMENT_TO_FEE = {
+    'NEW':      'new',
+    'TRANSFER': 'transfer',
+    'REGULAR':  'regular',
+};
+
+function syncFeeCategory() {
+    if (!enrollmentSel || !feeCategorySel) return;
+    const mapped = ENROLLMENT_TO_FEE[enrollmentSel.value];
+    if (mapped) {
+        feeCategorySel.value = mapped;
+        // Visual cue that it was auto-set
+        feeCategorySel.classList.add('bg-indigo-50');
+        setTimeout(() => feeCategorySel.classList.remove('bg-indigo-50'), 600);
+    }
+}
+
+if (enrollmentSel && feeCategorySel) {
+    enrollmentSel.addEventListener('change', syncFeeCategory);
+    {% if not student %}
+    // Only auto-sync on NEW student creation, not when editing existing records
+    syncFeeCategory();
+    {% endif %}
+}
 </script>
 
 <script>

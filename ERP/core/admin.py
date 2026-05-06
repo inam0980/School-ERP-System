@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AcademicYear, Division, Grade, Section, Subject
+from .models import AcademicYear, Division, Grade, Section, Subject, StudyMode
 
 
 @admin.register(AcademicYear)
@@ -34,3 +34,12 @@ class SubjectAdmin(admin.ModelAdmin):
     list_display  = ('name', 'code', 'grade', 'division', 'is_active')
     list_filter   = ('division', 'is_active')
     search_fields = ('name', 'code')
+
+
+@admin.register(StudyMode)
+class StudyModeAdmin(admin.ModelAdmin):
+    list_display  = ('name', 'arabic_name', 'order', 'is_active', 'created_at')
+    list_filter   = ('is_active',)
+    search_fields = ('name', 'arabic_name')
+    list_editable = ('order', 'is_active')
+    ordering      = ('order', 'name')

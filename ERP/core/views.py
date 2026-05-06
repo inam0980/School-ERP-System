@@ -5,8 +5,8 @@ from django.http import JsonResponse
 from django.db.models import Q, ProtectedError
 
 from accounts.decorators import role_required
-from .models import AcademicYear, Division, Grade, Section, Subject, Board
-from .forms import AcademicYearForm, DivisionForm, GradeForm, SectionForm, SubjectForm, BoardForm
+from .models import AcademicYear, Division, Grade, Section, Subject, Board, StudyMode
+from .forms import AcademicYearForm, DivisionForm, GradeForm, SectionForm, SubjectForm, BoardForm, StudyModeForm
 
 _ADMIN = ('SUPER_ADMIN', 'ADMIN')
 
@@ -403,6 +403,61 @@ def board_delete(request, pk):
         return redirect('core:board_list')
     return render(request, 'core/school_setup/confirm_delete.html', {
         'obj': obj, 'back_url': 'core:board_list',
+    })
+
+
+# ────────────────────────── STUDY MODES ──────────────────────────
+
+@login_required
+@role_required(*_ADMIN)
+def study_mode_list(request):
+    q  = request.GET.get('q', '')
+    qs = StudyMode.objects.all()
+    if q:
+        qs = qs.filter(Q(name__icontains=q) | Q(arabic_name__icontains=q))
+    return render(request, 'core/school_setup/study_modes.html', {'modes': qs, 'q': q})
+
+
+@login_required
+@role_required(*_ADMIN)
+def study_mode_add(request):
+    form = StudyModeForm(request.POST or None)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Study Mode added successfully.")
+        return redirect('core:study_mode_list')
+    return render(request, 'core/school_setup/form.html', {
+        'form': form, 'title': 'Add Study Mode', 'back_url': 'core:study_mode_list',
+    })
+
+
+@login_required
+@role_required(*_ADMIN)
+def study_mode_edit(request, pk):
+    obj  = get_object_or_404(StudyMode, pk=pk)
+    form = StudyModeForm(request.POST or None, instance=obj)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Study Mode updated.")
+        return redirect('core:study_mode_list')
+    return render(request, 'core/school_setup/form.html', {
+        'form': form, 'title': f'Edit: {obj}', 'back_url': 'core:study_mode_list',
+    })
+
+
+@login_required
+@role_required(*_ADMIN)
+def study_mode_delete(request, pk):
+    obj = get_object_or_404(StudyMode, pk=pk)
+    if request.method == 'POST':
+        try:
+            obj.delete()
+            messages.success(request, "Study Mode deleted.")
+        except ProtectedError:
+            messages.error(request, f"Cannot delete '{obj}' because it is currently assigned to one or more students. Reassign those students first.")
+        return redirect('core:study_mode_list')
+    return render(request, 'core/school_setup/confirm_delete.html', {
+        'obj': obj, 'back_url': 'core:study_mode_list',
     })
 
 

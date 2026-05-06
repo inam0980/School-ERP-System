@@ -60,57 +60,108 @@
 {% endfor %}
 {% endif %}
 
-{# ── Division sections ── #}
+{# ── Division sections (each division shows its bundle cards) ── #}
 {% if divisions_map %}
-{% for division, grades_map in divisions_map.items %}
+{% for division, bundles in divisions_map.items %}
 <div class="mb-8">
 
     {# Division header #}
-    <div class="flex items-center gap-4 px-5 py-4 bg-primary rounded-xl shadow-sm mb-0">
+    <div class="flex items-center gap-4 px-5 py-4 bg-primary rounded-xl shadow-sm mb-3">
         <div class="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white text-lg font-bold shrink-0">
             {{ division.name|slice:":1" }}
         </div>
         <div class="flex-1 min-w-0">
             <h2 class="text-white font-bold text-base leading-snug">{{ division }} Division</h2>
             <p class="text-white/65 text-xs mt-0.5">
-                {{ grades_map|length }} grade{{ grades_map|length|pluralize }}
+                {{ bundles|length }} structure bundle{{ bundles|length|pluralize }}
             </p>
         </div>
         <span class="shrink-0 bg-white/15 text-white text-xs font-semibold px-3 py-1 rounded-full">
-            {{ grades_map|length }} grade{{ grades_map|length|pluralize }}
+            {{ bundles|length }}
         </span>
     </div>
 
-    {# Tabbed type view #}
-    <div class="border border-t-0 border-slate-200 rounded-b-xl bg-white shadow-sm overflow-hidden" id="divtabs-{{ forloop.counter }}">
+    {# ── Bundle cards (one collapsible card per fee-structure bundle) ── #}
+    <div class="space-y-3">
+        {% for bundle in bundles %}
+        {% with type=bundle.structure_type %}
+        <details class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group">
+            <summary class="flex items-center gap-4 px-5 py-4 cursor-pointer select-none hover:bg-slate-50/60 transition list-none">
+                {# Type badge #}
+                <span class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold
+                    {% if type == 'regular' %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}
+                    {% if type == 'new' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% endif %}
+                    {% if type == 'transfer' %}bg-amber-50 text-amber-700 border border-amber-200{% endif %}
+                    {% if type == 'other' %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                    {% if type == 'regular' %}↻ Regular{% endif %}
+                    {% if type == 'new' %}✦ New{% endif %}
+                    {% if type == 'transfer' %}⇄ Transfer{% endif %}
+                    {% if type == 'other' %}◈ Other{% endif %}
+                </span>
 
-        {# Tab buttons #}
-        <div class="flex border-b border-slate-200 bg-slate-50/70">
-            <button type="button"
-                    onclick="switchTab('divtabs-{{ forloop.counter }}', 'regular')"
-                    data-tab-btn="regular"
-                    data-active-classes="border-blue-500 text-blue-600 bg-white"
-                    class="px-6 py-3 text-sm font-semibold border-b-2 border-blue-500 text-blue-600 bg-white -mb-px transition-all">
-                ↻ Regular
-            </button>
-            <button type="button"
-                    onclick="switchTab('divtabs-{{ forloop.counter }}', 'new')"
-                    data-tab-btn="new"
-                    data-active-classes="border-emerald-500 text-emerald-600 bg-white"
-                    class="px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-600 -mb-px transition-all">
-                ✦ New
-            </button>
-            <button type="button"
-                    onclick="switchTab('divtabs-{{ forloop.counter }}', 'other')"
-                    data-tab-btn="other"
-                    data-active-classes="border-slate-500 text-slate-700 bg-white"
-                    class="px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-600 -mb-px transition-all">
-                ◈ Other
-            </button>
-        </div>
+                {# Title block #}
+                <div class="flex-1 min-w-0">
+                    <h3 class="font-semibold text-slate-800 text-sm truncate">{{ bundle.base_name }}</h3>
+                    <p class="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span>📅 {{ bundle.academic_year }}</span>
+                        <span>🔁 {{ bundle.frequency }}</span>
+                        {% if bundle.study_mode %}
+                        <span class="inline-flex items-center gap-1 text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                            🎓 {{ bundle.study_mode.name }}
+                        </span>
+                        {% else %}
+                        <span class="text-slate-400">🎓 All Study Modes</span>
+                        {% endif %}
+                        <span class="text-slate-400">·</span>
+                        <span class="font-semibold text-slate-600">{{ bundle.grades|length }} grade{{ bundle.grades|length|pluralize }}</span>
+                    </p>
+                </div>
 
-        {# ── Regular panel ── #}
-        <div data-tab-panel="regular" class="divide-y divide-slate-100">
+                {# Bundle-level export buttons #}
+                <div class="shrink-0 flex items-center gap-1.5" onclick="event.stopPropagation()">
+                    <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type={{ type }}{% if active_year %}&year={{ active_year }}{% endif %}"
+                       class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">CSV</a>
+                    <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type={{ type }}{% if active_year %}&year={{ active_year }}{% endif %}"
+                       class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition">PDF</a>
+                    <svg class="w-5 h-5 text-slate-400 ml-1 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </div>
+            </summary>
+
+            {# Expanded body — list of grades inside this bundle #}
+            <div class="border-t border-slate-100 divide-y divide-slate-50">
+                {% for s in bundle.grades %}
+                <div class="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50/40">
+                    <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 text-xs font-bold shrink-0">
+                        {{ s.grade.order|default:forloop.counter }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-slate-800 text-sm">{{ s.grade.name }}</p>
+                        <p class="text-xs text-slate-400 mt-0.5">
+                            {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
+                            {% for it in s.items.all %}{% if forloop.first %} · {% endif %}{{ it.fee_type.name }}: {{ it.amount }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        </p>
+                    </div>
+                    <div class="shrink-0 flex gap-1.5">
+                        <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}" class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">✏️ Edit</a>
+                        <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}" class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">Assign →</a>
+                        <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}" onsubmit="return confirm('Delete this structure and ALL linked fee records? This cannot be undone.');" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">🗑 Delete</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endwith %}
+        {% endfor %}
+    </div>
+
+    {# Old tabs section removed — kept hidden block to preserve structure #}
+    <div class="hidden">
+        <div data-tab-panel="regular" class="hidden divide-y divide-slate-100">
             {% for grade, types in grades_map.items %}{% with s=types.regular %}{% if s %}
             <div class="flex items-center gap-4 px-5 py-3.5">
                 <div class="flex-1 min-w-0">
@@ -118,6 +169,7 @@
                     <p class="text-xs text-slate-400 mt-0.5">
                         {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
                         &middot; {{ s.academic_year }} &middot; {{ s.get_frequency_display }}
+                        {% if s.study_mode %}&middot; <span class="text-indigo-600 font-medium">{{ s.study_mode.name }}</span>{% endif %}
                     </p>
                 </div>
                 <div class="shrink-0 flex gap-1.5">
@@ -155,6 +207,7 @@
                     <p class="text-xs text-slate-400 mt-0.5">
                         {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
                         &middot; {{ s.academic_year }} &middot; {{ s.get_frequency_display }}
+                        {% if s.study_mode %}&middot; <span class="text-indigo-600 font-medium">{{ s.study_mode.name }}</span>{% endif %}
                     </p>
                 </div>
                 <div class="shrink-0 flex gap-1.5">
@@ -183,6 +236,44 @@
             <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No New structures set for this division.</div>
         </div>
 
+        {# ── Transfer panel ── #}
+        <div data-tab-panel="transfer" class="hidden divide-y divide-slate-100">
+            {% for grade, types in grades_map.items %}{% with s=types.transfer %}{% if s %}
+            <div class="flex items-center gap-4 px-5 py-3.5">
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-slate-800 text-sm">{{ grade.name }}{% if s.name %} <span class="text-slate-400 font-normal text-xs">— {{ s.name }}</span>{% endif %}</p>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                        {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
+                        &middot; {{ s.academic_year }} &middot; {{ s.get_frequency_display }}
+                        {% if s.study_mode %}&middot; <span class="text-indigo-600 font-medium">{{ s.study_mode.name }}</span>{% endif %}
+                    </p>
+                </div>
+                <div class="shrink-0 flex gap-1.5">
+                    <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}" class="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">✏️ Edit</a>
+                    <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}" class="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition">Assign →</a>
+                    <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}" onsubmit="return confirm('Delete this structure and ALL linked fee records? This cannot be undone.');" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-100 transition">🗑 Delete</button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}{% endwith %}{% endfor %}
+            {# Export CSV strip for Transfer #}
+            <div class="px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 flex justify-end">
+                <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type=transfer{% if active_year %}&year={{ active_year }}{% endif %}"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+                    Export CSV
+                </a>
+                <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type=transfer{% if active_year %}&year={{ active_year }}{% endif %}"
+                   class="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
+                    Export PDF
+                </a>
+            </div>
+            <div class="tab-empty px-5 py-8 text-center text-sm text-slate-400 italic">No Transfer structures set for this division.</div>
+        </div>
+
         {# ── Other panel ── #}
         <div data-tab-panel="other" class="hidden divide-y divide-slate-100">
             {% for grade, types in grades_map.items %}{% with s=types.other %}{% if s %}
@@ -192,6 +283,7 @@
                     <p class="text-xs text-slate-400 mt-0.5">
                         {{ s.items.count }} fee type{% if s.items.count != 1 %}s{% endif %}
                         &middot; {{ s.academic_year }} &middot; {{ s.get_frequency_display }}
+                        {% if s.study_mode %}&middot; <span class="text-indigo-600 font-medium">{{ s.study_mode.name }}</span>{% endif %}
                     </p>
                 </div>
                 <div class="shrink-0 flex gap-1.5">

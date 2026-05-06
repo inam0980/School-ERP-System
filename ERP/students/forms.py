@@ -1,5 +1,5 @@
 from django import forms
-from core.models import Grade, Section, Division, AcademicYear
+from core.models import Grade, Section, Division, AcademicYear, StudyMode
 from .models import Student, StudentDocument, Sibling, AuthorizedPickup
 
 _INPUT  = ('w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 '
@@ -66,7 +66,7 @@ class StudentForm(forms.ModelForm):
             # Address
             'address', 'arabic_address',
             # Status
-            'enrollment_type', 'fee_category', 'admission_date', 'previous_school', 'is_active',
+            'enrollment_type', 'study_mode', 'fee_category', 'admission_date', 'previous_school', 'is_active',
             # Photo
             'photo',
         ]
@@ -84,6 +84,8 @@ class StudentForm(forms.ModelForm):
             'father_employed_at_school': forms.Select(attrs={'class': _INPUT}),
             'mother_employed_at_school': forms.Select(attrs={'class': _INPUT}),
             'fee_category':              forms.Select(attrs={'class': _INPUT}),
+            'enrollment_type':           forms.Select(attrs={'class': _INPUT, 'id': 'id_enrollment_type'}),
+            'study_mode':                forms.Select(attrs={'class': _INPUT, 'id': 'id_study_mode'}),
             'is_active':       forms.CheckboxInput(attrs={'class': _CHECK}),
             'photo':           forms.FileInput(attrs={'class': _FILE, 'accept': 'image/*'}),
         }
@@ -99,6 +101,10 @@ class StudentForm(forms.ModelForm):
         # Dynamic queryset — all; JS will filter division→grade→section
         self.fields['grade'].queryset   = Grade.objects.select_related('division').all()
         self.fields['section'].queryset = Section.objects.select_related('grade__division').all()
+        # Only active study modes are selectable; field optional at the form level
+        self.fields['study_mode'].queryset    = StudyMode.objects.filter(is_active=True)
+        self.fields['study_mode'].required    = False
+        self.fields['study_mode'].empty_label = '— Select Study Mode / اختر نمط الدراسة —'
         # Default current academic year
         current = AcademicYear.objects.filter(is_current=True).first()
         if current and not self.instance.pk:
@@ -108,6 +114,16 @@ class StudentForm(forms.ModelForm):
         f = self.cleaned_data.get('photo')
         _validate_image(f)
         return f
+
+    def clean(self):
+        cleaned = super().clean()
+        enrollment_type = cleaned.get('enrollment_type')
+        study_mode      = cleaned.get('study_mode')
+        # Study Mode is required whenever an enrollment type is selected
+        if enrollment_type and not study_mode:
+            self.add_error('study_mode',
+                           'Please select a Study Mode for this student.')
+        return cleaned
 
 
 class DocumentUploadForm(forms.ModelForm):

@@ -23,8 +23,8 @@ class AuthorizedPickupInline(admin.TabularInline):
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display   = ('student_id', 'full_name', 'arabic_name', 'grade', 'section', 'division', 'is_active')
-    list_filter    = ('division', 'grade', 'gender', 'is_active', 'enrollment_type')
+    list_display   = ('student_id', 'full_name', 'arabic_name', 'grade', 'section', 'division', 'enrollment_type', 'study_mode', 'is_active')
+    list_filter    = ('division', 'grade', 'gender', 'is_active', 'enrollment_type', 'study_mode')
     search_fields  = ('full_name', 'arabic_name', 'student_id', 'guardian_phone')
     ordering       = ('grade', 'section', 'full_name')
     readonly_fields = ('student_id', 'created_at', 'updated_at')
@@ -46,7 +46,7 @@ class StudentAdmin(admin.ModelAdmin):
         )}),
         ('General Contact / جهة الاتصال', {'fields': ('guardian_phone', 'guardian_phone2', 'guardian_email')}),
         ('Address / العنوان',      {'fields': ('address', 'arabic_address')}),
-        ('Status / الحالة',        {'fields': ('enrollment_type', 'admission_date', 'previous_school', 'is_active', 'created_by', 'created_at', 'updated_at')}),
+        ('Status / الحالة',        {'fields': ('enrollment_type', 'study_mode', 'admission_date', 'previous_school', 'is_active', 'created_by', 'created_at', 'updated_at')}),
     )
 
 

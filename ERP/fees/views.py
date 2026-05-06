@@ -118,31 +118,52 @@ def fee_type_delete(request, pk):
 def fee_structure_list(request):
     year_id = request.GET.get('year')
     qs = FeeStructure.objects.select_related(
-        'academic_year', 'grade__division'
-    ).prefetch_related('items__fee_type')
+        'academic_year', 'grade__division', 'study_mode'
+    ).prefetch_related('items__fee_type').order_by(
+        'grade__division__name', 'structure_type', 'study_mode__name',
+        'academic_year__name', 'name', 'grade__order', 'grade__name'
+    )
     if year_id:
         qs = qs.filter(academic_year_id=year_id)
 
-    # Group by division → grade → structure_type
-    divisions_map = {}
+    # ── Group structures into "bundle cards" ──
+    # Bundle key: (division, structure_type, study_mode, academic_year, base_name)
+    # Each bundle = one card; grades inside it = expandable rows.
+    bundles = {}  # bundle_key → {meta..., 'grades': [structure, ...]}
     for s in qs:
-        div = s.grade.division
-        grade = s.grade
-        divisions_map.setdefault(div, {}).setdefault(grade, {})[s.structure_type] = s
+        # Strip the trailing " — {grade.name}" suffix to recover the base bundle name
+        suffix = f" — {s.grade.name}"
+        base_name = s.name[:-len(suffix)] if (s.name and s.name.endswith(suffix)) else (s.name or 'Untitled Structure')
 
-    # Build a lookup: (division_pk, structure_type) → first academic_year_pk found
-    # Used by the template to render per-type Export CSV links
-    div_type_year = {}
-    for s in qs:
-        key = (s.grade.division_id, s.structure_type)
-        if key not in div_type_year:
-            div_type_year[key] = s.academic_year_id
+        key = (
+            s.grade.division_id,
+            s.structure_type,
+            s.study_mode_id or 0,
+            s.academic_year_id,
+            base_name,
+        )
+        if key not in bundles:
+            bundles[key] = {
+                'division':       s.grade.division,
+                'structure_type': s.structure_type,
+                'type_display':   s.get_structure_type_display(),
+                'study_mode':     s.study_mode,
+                'academic_year':  s.academic_year,
+                'base_name':      base_name,
+                'frequency':      s.get_frequency_display(),
+                'grades':         [],
+            }
+        bundles[key]['grades'].append(s)
+
+    # Group bundles by division for outer rendering
+    divisions_map = {}
+    for bundle in bundles.values():
+        divisions_map.setdefault(bundle['division'], []).append(bundle)
 
     return render(request, 'fees/fee_structure_list.html', {
         'divisions_map':  divisions_map,
         'years':          AcademicYear.objects.all(),
         'active_year':    year_id,
-        'div_type_year':  div_type_year,
     })
 
 
@@ -365,7 +386,8 @@ def fee_structure_form(request, pk=None):
         structure_type      = request.POST.get('structure_type', 'regular').strip()
         structure_name_base = request.POST.get('structure_name', '').strip()
         global_discount_raw = request.POST.get('global_group_discount', '0').strip() or '0'
-        if structure_type not in ('regular', 'new', 'other'):
+        study_mode_id       = request.POST.get('study_mode', '').strip() or None
+        if structure_type not in ('regular', 'new', 'transfer', 'other'):
             structure_type = 'regular'
         try:
             global_discount = Decimal(global_discount_raw)
@@ -419,6 +441,7 @@ def fee_structure_form(request, pk=None):
                             academic_year=year,
                             grade=grade,
                             structure_type=structure_type,
+                            study_mode_id=study_mode_id or None,
                             defaults={'name': bundle_name, 'frequency': 'ANNUAL'},
                         )
                         if entrance > 0:
@@ -453,12 +476,15 @@ def fee_structure_form(request, pk=None):
                     messages.error(request, 'No grades saved. Enter Gross Tuition for at least one grade.')
 
     years = AcademicYear.objects.all()
+    from core.models import StudyMode
+    study_modes = StudyMode.objects.filter(is_active=True)
     return render(request, 'fees/fee_structure_form.html', {
         'form':        None,
         'instance':    None,
         'title':       'Add Fee Structure',
         'years':       years,
         'divisions':   divisions,
+        'study_modes': study_modes,
         'grades_json': json.dumps(grades_by_div),
         'post_data':   request.POST if request.method == 'POST' else {},
     })
@@ -558,22 +584,28 @@ def bulk_assign_fees(request):
 
         section = form.cleaned_data.get('section')
 
-        # ── Strict category match: only assign to students whose
-        #    fee_category matches the structure's structure_type ──────
+        # ── Strict category + study-mode match ─────────────────────────
+        # Students must match BOTH:
+        #   (a) fee_category == structure.structure_type
+        #   (b) study_mode == structure.study_mode (when structure has one set)
         students = Student.objects.filter(
             grade=structure.grade,
             is_active=True,
-            fee_category=structure.structure_type,   # 'new' / 'regular' / 'other'
+            fee_category=structure.structure_type,
         )
+        if structure.study_mode_id:
+            students = students.filter(study_mode_id=structure.study_mode_id)
         if section:
             students = students.filter(section=section)
 
-        # Count students excluded due to category mismatch (for reporting)
+        # Count students excluded due to category/study-mode mismatch (for reporting)
         all_students_qs = Student.objects.filter(grade=structure.grade, is_active=True)
         if section:
             all_students_qs = all_students_qs.filter(section=section)
-        cat_skipped_count = all_students_qs.exclude(
-            fee_category=structure.structure_type).count()
+        excluded_qs = all_students_qs.exclude(fee_category=structure.structure_type)
+        if structure.study_mode_id:
+            excluded_qs = excluded_qs | all_students_qs.exclude(study_mode_id=structure.study_mode_id)
+        cat_skipped_count = excluded_qs.distinct().count()
 
         created = skipped = one_time_skipped = 0
         assigned_students = []
@@ -581,9 +613,10 @@ def bulk_assign_fees(request):
         for student in students:
             student_created = False
             for item in items:
-                # NEW students  → assign all items (including entrance/registration)
-                # REGULAR/OTHER → skip one-time fees; only assign tuition and other items
-                if structure.structure_type != FeeStructure.TYPE_NEW \
+                # NEW & TRANSFER students → assign all items (including entrance/registration)
+                #   (Transfer students are new to this school, so they pay one-time fees too)
+                # REGULAR/OTHER          → skip one-time fees; only tuition and recurring items
+                if structure.structure_type not in (FeeStructure.TYPE_NEW, FeeStructure.TYPE_TRANSFER) \
                         and item.fee_type.category in ONE_TIME_CATS:
                     one_time_skipped += 1
                     continue

@@ -1,7 +1,7 @@
 import uuid
 from django.db import models
 from django.conf import settings
-from core.models import AcademicYear, Division, Grade, Section
+from core.models import AcademicYear, Division, Grade, Section, StudyMode
 
 
 def student_photo_path(instance, filename):
@@ -29,13 +29,15 @@ class Student(models.Model):
     ]
 
     # ── Fee category choices ──────────────────────────────────────────
-    FEE_CAT_NEW     = 'new'
-    FEE_CAT_REGULAR = 'regular'
-    FEE_CAT_OTHER   = 'other'
+    FEE_CAT_NEW      = 'new'
+    FEE_CAT_REGULAR  = 'regular'
+    FEE_CAT_TRANSFER = 'transfer'
+    FEE_CAT_OTHER    = 'other'
     FEE_CATEGORY_CHOICES = [
-        (FEE_CAT_NEW,     'New'),
-        (FEE_CAT_REGULAR, 'Regular'),
-        (FEE_CAT_OTHER,   'Other'),
+        (FEE_CAT_NEW,      'New'),
+        (FEE_CAT_REGULAR,  'Regular'),
+        (FEE_CAT_TRANSFER, 'Transfer'),
+        (FEE_CAT_OTHER,    'Other'),
     ]
 
     # ── ID type choices ───────────────────────────────────────────────
@@ -128,6 +130,12 @@ class Student(models.Model):
 
     # ── Status & Admission ────────────────────────────────────────────
     enrollment_type = models.CharField(max_length=15, choices=ENROLLMENT_TYPES, default=NEW, verbose_name="Enrollment Type / نوع القيد")
+    study_mode      = models.ForeignKey(
+        StudyMode, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='students',
+        verbose_name="Study Mode / نمط الدراسة",
+        help_text="Required for Regular (continuing) students; choose how they study."
+    )
     fee_category    = models.CharField(
         max_length=10, choices=FEE_CATEGORY_CHOICES, default=FEE_CAT_REGULAR,
         verbose_name="Fee Category",
