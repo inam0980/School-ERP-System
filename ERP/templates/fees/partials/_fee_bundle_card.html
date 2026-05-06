@@ -1,0 +1,93 @@
+<details class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group">
+    <summary class="flex flex-col p-4 cursor-pointer select-none hover:bg-slate-50/60 transition list-none relative">
+        
+        {# Title and Meta #}
+        <div class="pr-6">
+            <h3 class="font-bold text-slate-800 text-sm leading-tight mb-1">{{ bundle.base_name }}</h3>
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-1.5 text-[10px] text-slate-500">
+                    <span>📅 {{ bundle.academic_year }}</span>
+                    <span class="text-slate-300">|</span>
+                    <span>🔁 {{ bundle.frequency }}</span>
+                </div>
+                <div class="flex flex-wrap gap-1 mt-1">
+                    {# Structure Type Tag #}
+                    <div class="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        🏷️ {{ bundle.type_display }}
+                    </div>
+                    
+                    {# Study Mode Tag #}
+                    {% if bundle.study_mode %}
+                    <div class="inline-flex items-center gap-1 text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        🎓 {{ bundle.study_mode.name }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="text-[10px] font-semibold text-slate-400">
+                    {{ bundle.grades|length }} grade{{ bundle.grades|length|pluralize }}
+                </div>
+            </div>
+        </div>
+
+        {# Quick Action Buttons (absolute top right for summary) #}
+        <div class="absolute top-4 right-4 flex flex-col gap-1" onclick="event.stopPropagation()">
+             <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type={{ type }}{% if active_year %}&year={{ active_year }}{% endif %}"
+               class="p-1 rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition" title="Export CSV">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+            </a>
+            <a href="{% url 'fees:fee_structure_export_group_pdf' %}?division={{ division.pk }}&type={{ type }}{% if active_year %}&year={{ active_year }}{% endif %}"
+               class="p-1 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition" title="Export PDF">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/></svg>
+            </a>
+            
+            {# Entire Bundle Delete Button #}
+            <form method="post" action="{% url 'fees:fee_structure_bundle_delete' %}" onsubmit="return confirm('⚠️ DANGER: Delete ENTIRE BUNDLE (all grades and assigned fees)?');" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="division_id" value="{{ division.pk }}">
+                <input type="hidden" name="stype" value="{{ bundle.structure_type }}">
+                <input type="hidden" name="study_mode_id" value="{{ bundle.study_mode.pk|default:'0' }}">
+                <input type="hidden" name="year_id" value="{{ bundle.academic_year.pk }}">
+                <input type="hidden" name="base_name" value="{{ bundle.base_name }}">
+                <button type="submit" class="p-1 rounded bg-red-50 text-red-600 hover:bg-red-100 transition" title="Delete Entire Bundle">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+            </form>
+
+            <svg class="w-4 h-4 text-slate-300 transition-transform group-open:rotate-180 self-center mt-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </div>
+    </summary>
+
+    {# Expanded body — list of grades inside this bundle #}
+    <div class="border-t border-slate-100 divide-y divide-slate-50 bg-slate-50/30">
+        {% for s in bundle.grades %}
+        <div class="px-4 py-3">
+            <div class="flex items-center justify-between mb-1.5">
+                <p class="font-bold text-slate-700 text-xs">{{ s.grade.name }}</p>
+                <div class="flex gap-1">
+                    <a href="{% url 'fees:fee_structure_edit' pk=s.pk %}" class="p-1 rounded hover:bg-amber-100 text-amber-600 transition" title="Edit">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                    </a>
+                    <a href="{% url 'fees:bulk_assign' %}?structure={{ s.pk }}" class="p-1 rounded hover:bg-emerald-100 text-emerald-600 transition" title="Assign">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap gap-1">
+                {% for it in s.items.all %}
+                <span class="text-[9px] bg-white border border-slate-200 px-1.5 py-0.5 rounded-sm text-slate-500 whitespace-nowrap">
+                    {{ it.fee_type.name|truncatechars:10 }}: <span class="font-bold text-slate-700">{{ it.amount|floatformat:0 }}</span>
+                </span>
+                {% endfor %}
+            </div>
+
+            <form method="post" action="{% url 'fees:fee_structure_delete' pk=s.pk %}" onsubmit="return confirm('Delete?');" class="mt-2 text-right">
+                {% csrf_token %}
+                <button type="submit" class="text-[9px] text-red-400 hover:text-red-600 font-medium uppercase tracking-tighter">Delete Structure</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+</details>
