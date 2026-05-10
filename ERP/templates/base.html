@@ -213,9 +213,31 @@
             </a>
         </nav>
 
-        <!-- Sidebar Footer -->
-        <div class="px-4 py-3 border-t border-white/10 text-center text-xs text-slate-500">
-            &copy; 2026 Al-Kawthar International Schools
+        <!-- Sidebar Footer — logged-in user + role -->
+        <div class="px-4 py-4 border-t border-white/10">
+            {% if user.is_authenticated %}
+            <a href="{% url 'accounts:profile' %}" class="flex items-center gap-3 mb-3 hover:bg-white/10 rounded-lg p-1.5 -mx-1.5 transition">
+                <div class="w-9 h-9 rounded-full bg-accent flex items-center justify-center
+                            text-[#1e3a5f] text-sm font-bold shrink-0 select-none">
+                    {{ user.first_name|first|default:user.username|first|upper }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p class="text-white text-xs font-semibold truncate leading-tight">
+                        {{ user.full_name|default:user.username }}
+                    </p>
+                    <span class="inline-block mt-1 text-xs font-bold px-2.5 py-0.5 rounded-full leading-tight
+                        {% if user.role == 'SUPER_ADMIN' %}bg-red-500 text-white
+                        {% elif user.role == 'ADMIN' %}bg-amber-400 text-amber-900
+                        {% elif user.role == 'TEACHER' %}bg-blue-500 text-white
+                        {% elif user.role == 'ACCOUNTANT' %}bg-emerald-500 text-white
+                        {% elif user.role == 'PARENT' %}bg-teal-500 text-white
+                        {% else %}bg-slate-500 text-white{% endif %}">
+                        {{ user.get_role_display }}
+                    </span>
+                </div>
+            </a>
+            {% endif %}
+            <p class="text-center text-xs text-slate-500">&copy; 2026 Al-Kawthar International Schools</p>
         </div>
     </aside>
 
@@ -242,7 +264,7 @@
                 <!-- User section -->
                 <div class="flex items-center gap-4">
                     {% if user.is_authenticated %}
-                    <div class="flex items-center gap-2">
+                    <a href="{% url 'accounts:profile' %}" class="flex items-center gap-2 hover:opacity-80 transition">
                         <div class="w-8 h-8 rounded-full bg-[#1e3a5f] flex items-center justify-center
                                     text-white text-sm font-semibold select-none">
                             {{ user.first_name|first|default:user.username|first|upper }}
@@ -251,9 +273,17 @@
                             <p class="text-sm font-medium text-slate-700 leading-tight">
                                 {{ user.get_full_name|default:user.username }}
                             </p>
-                            <p class="text-xs text-slate-400">{{ user.email }}</p>
+                            <span class="inline-block text-xs font-bold px-2 py-0.5 rounded-full
+                                {% if user.role == 'SUPER_ADMIN' %}bg-red-100 text-red-700
+                                {% elif user.role == 'ADMIN' %}bg-amber-100 text-amber-700
+                                {% elif user.role == 'TEACHER' %}bg-blue-100 text-blue-700
+                                {% elif user.role == 'ACCOUNTANT' %}bg-emerald-100 text-emerald-700
+                                {% elif user.role == 'PARENT' %}bg-teal-100 text-teal-700
+                                {% else %}bg-slate-100 text-slate-600{% endif %}">
+                                {{ user.get_role_display }}
+                            </span>
                         </div>
-                    </div>
+                    </a>
                     <a href="/accounts/logout/"
                        class="text-xs bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg font-medium transition">
                         Logout

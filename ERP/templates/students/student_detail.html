@@ -78,6 +78,60 @@
     </div>
 
     <!-- ══════════════════════════════════════════════════════════ -->
+    <!--  ACADEMIC DETAILS                                        -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-5 py-3 bg-indigo-50 border-b border-indigo-100 flex items-center gap-2">
+            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0-6l-3-1.667M12 20l-9-5"/>
+            </svg>
+            <span class="text-sm font-semibold text-indigo-700">Academic Details / التفاصيل الأكاديمية</span>
+        </div>
+        <div class="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-3">
+            <div class="flex items-center justify-between gap-3">
+                <span class="text-xs text-slate-400 w-36 flex-shrink-0">Division / القسم</span>
+                <span class="text-sm font-semibold text-indigo-700 text-right">{{ student.division }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+                <span class="text-xs text-slate-400 w-36 flex-shrink-0">Grade / الصف</span>
+                <span class="text-sm font-semibold text-slate-800 text-right">{{ student.grade }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+                <span class="text-xs text-slate-400 w-36 flex-shrink-0">Section / الفصل</span>
+                <span class="text-sm font-semibold text-slate-800 text-right">{{ student.section }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+                <span class="text-xs text-slate-400 w-36 flex-shrink-0">Academic Year / السنة الدراسية</span>
+                <span class="text-sm text-slate-700 text-right">{{ student.academic_year }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+                <span class="text-xs text-slate-400 w-36 flex-shrink-0">Roll No. / رقم السجل</span>
+                <span class="text-sm text-slate-700 text-right">{{ student.roll_number|default:"—" }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+                <span class="text-xs text-slate-400 w-36 flex-shrink-0">Enrollment Type / نوع القيد</span>
+                <span class="text-sm text-slate-700 text-right">{{ student.get_enrollment_type_display }}</span>
+            </div>
+            {% if student.study_mode %}
+            <div class="flex items-center justify-between gap-3">
+                <span class="text-xs text-slate-400 w-36 flex-shrink-0">Study Mode / نمط الدراسة</span>
+                <span class="text-sm text-slate-700 text-right">{{ student.study_mode }}</span>
+            </div>
+            {% endif %}
+            <div class="flex items-center justify-between gap-3">
+                <span class="text-xs text-slate-400 w-36 flex-shrink-0">Fee Category</span>
+                <span class="inline-block text-xs font-semibold px-2.5 py-0.5 rounded-full
+                    {% if student.fee_category == 'new' %}bg-emerald-100 text-emerald-700
+                    {% elif student.fee_category == 'regular' %}bg-blue-100 text-blue-700
+                    {% elif student.fee_category == 'transfer' %}bg-amber-100 text-amber-700
+                    {% else %}bg-slate-100 text-slate-600{% endif %}">
+                    {{ student.get_fee_category_display }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
     <!--  FEE SUMMARY (visible to accountants & admins)          -->
     <!-- ══════════════════════════════════════════════════════════ -->
     {% if user.role in 'SUPER_ADMIN,ADMIN,ACCOUNTANT' %}
