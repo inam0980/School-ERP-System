@@ -21,7 +21,7 @@
 
         <form method="post" class="flex gap-3 justify-center">
             {% csrf_token %}
-            <a href="javascript:history.back()"
+            <a href="{% url back_url %}"
                class="flex-1 px-5 py-2.5 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 transition text-sm font-medium">
                Cancel
             </a>
