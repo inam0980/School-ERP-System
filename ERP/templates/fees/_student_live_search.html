@@ -1,0 +1,101 @@
+{# Shared live student search helper — {% include %} inside a <script> block.         #}
+{# Call: initStudentLiveSearch(inputId, dropdownId, spinnerId, selectUrlPrefix)        #}
+{# selectUrlPrefix is prepended to student pk, e.g. '?student_id=' or '/fees/collect/#}
+function initStudentLiveSearch(inputId, dropdownId, spinnerId, selectUrlPrefix) {
+    const inp      = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
+    const spinner  = spinnerId ? document.getElementById(spinnerId) : null;
+    if (!inp || !dropdown) return;
+
+    let timer = null;
+
+    function positionDropdown() {
+        const r = inp.getBoundingClientRect();
+        dropdown.style.top   = (r.bottom + window.scrollY + 4) + 'px';
+        dropdown.style.left  = (r.left  + window.scrollX) + 'px';
+        dropdown.style.width = r.width + 'px';
+    }
+
+    function closeDropdown() {
+        dropdown.classList.add('hidden');
+        dropdown.innerHTML = '';
+    }
+
+    function buildItem(s) {
+        const a = document.createElement('a');
+        a.href  = selectUrlPrefix + s.pk;
+        a.style.cssText = 'display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid #f1f5f9;text-decoration:none;';
+        a.onmouseenter = () => a.style.background = 'rgba(30,64,175,.05)';
+        a.onmouseleave = () => { if (!a.classList.contains('kbd-active')) a.style.background = ''; };
+        a.innerHTML = `
+            <div style="width:34px;height:34px;border-radius:50%;background:rgba(30,64,175,.1);color:#1e40af;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${s.initial}</div>
+            <div style="flex:1;min-width:0;">
+                <p style="font-weight:500;color:#1e293b;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    ${s.full_name}${s.arabic_name ? ' <span style="color:#94a3b8;font-size:11px;">' + s.arabic_name + '</span>' : ''}
+                </p>
+                <p style="font-size:11px;color:#64748b;margin-top:1px;">
+                    ${s.student_id}${s.iqama_number ? ' &nbsp;·&nbsp; Iqama: <span style="font-family:monospace;">' + s.iqama_number + '</span>' : ''} &nbsp;·&nbsp; <strong style="color:#475569;">${s.division}</strong> &nbsp;·&nbsp; ${s.grade} / Sec ${s.section}
+                </p>
+            </div>
+            <svg width="14" height="14" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>`;
+        return a;
+    }
+
+    async function doSearch(q) {
+        if (spinner) spinner.classList.remove('hidden');
+        try {
+            const res  = await fetch('{% url "fees:student_search_api" %}?q=' + encodeURIComponent(q));
+            const data = await res.json();
+            dropdown.innerHTML = '';
+            if (!data.results.length) {
+                dropdown.innerHTML = '<p style="padding:10px 18px;font-size:13px;color:#94a3b8;">No students found for "' + q + '"</p>';
+            } else {
+                data.results.forEach(s => dropdown.appendChild(buildItem(s)));
+            }
+            positionDropdown();
+            dropdown.classList.remove('hidden');
+        } finally {
+            if (spinner) spinner.classList.add('hidden');
+        }
+    }
+
+    inp.addEventListener('input', function () {
+        clearTimeout(timer);
+        const q = inp.value.trim();
+        if (!q) { closeDropdown(); return; }
+        timer = setTimeout(() => doSearch(q), 200);
+    });
+
+    window.addEventListener('scroll', () => { if (!dropdown.classList.contains('hidden')) positionDropdown(); }, true);
+    window.addEventListener('resize', () => { if (!dropdown.classList.contains('hidden')) positionDropdown(); });
+
+    document.addEventListener('click', function (e) {
+        if (!inp.contains(e.target) && !dropdown.contains(e.target)) closeDropdown();
+    });
+
+    inp.addEventListener('keydown', function (e) {
+        const items = dropdown.querySelectorAll('a');
+        if (!items.length) return;
+        const active = dropdown.querySelector('a.kbd-active');
+        let idx = Array.from(items).indexOf(active);
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (active) { active.classList.remove('kbd-active'); active.style.background = ''; }
+            idx = (idx + 1) % items.length;
+            items[idx].classList.add('kbd-active'); items[idx].style.background = 'rgba(30,64,175,.08)';
+            items[idx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (active) { active.classList.remove('kbd-active'); active.style.background = ''; }
+            idx = (idx - 1 + items.length) % items.length;
+            items[idx].classList.add('kbd-active'); items[idx].style.background = 'rgba(30,64,175,.08)';
+            items[idx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+            if (active) { e.preventDefault(); active.click(); }
+        } else if (e.key === 'Escape') {
+            closeDropdown();
+        }
+    });
+
+    if (inp.value.trim()) doSearch(inp.value.trim());
+}

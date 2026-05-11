@@ -53,6 +53,7 @@ def student_list(request):
                 Q(full_name__icontains=q) |
                 Q(arabic_name__icontains=q) |
                 Q(student_id__icontains=q) |
+                Q(iqama_number__icontains=q) |
                 Q(guardian_phone__icontains=q)
             )
         if division:
@@ -108,6 +109,7 @@ def student_export_csv(request):
                 Q(full_name__icontains=q) |
                 Q(arabic_name__icontains=q) |
                 Q(student_id__icontains=q) |
+                Q(iqama_number__icontains=q) |
                 Q(guardian_phone__icontains=q)
             )
         if division:
