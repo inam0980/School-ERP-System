@@ -580,15 +580,101 @@ def fee_structure_form(request, pk=None):
     years = AcademicYear.objects.all()
     from core.models import StudyMode
     study_modes = StudyMode.objects.filter(is_active=True)
+
+    # ── BUNDLE EDIT MODE ─────────────────────────────────────────────────
+    # Reuses the create form, pre-populated with an existing bundle's data.
+    # Triggered by `?edit=1&division=X&year=Y&type=regular[&study_mode=W][&base_name=...]`
+    bundle_data       = {}    # grade_pk → {'entrance','registration','gross','down','group_disc_pct'}
+    prefill_post_data = {}    # mimics POST values so existing template repopulation works
+    is_bundle_edit    = False
+
+    if request.method == 'GET' and request.GET.get('edit') == '1':
+        edit_div_id    = request.GET.get('division', '').strip()
+        edit_year_id   = request.GET.get('year', '').strip()
+        edit_stype     = (request.GET.get('type', 'regular').strip() or 'regular').lower()
+        edit_mode_id   = request.GET.get('study_mode', '').strip()
+        edit_base_name = request.GET.get('base_name', '').strip()
+
+        qs_filter = {}
+        if edit_div_id:   qs_filter['grade__division_id'] = edit_div_id
+        if edit_year_id:  qs_filter['academic_year_id']   = edit_year_id
+        if edit_stype:    qs_filter['structure_type']     = edit_stype
+        if edit_mode_id:  qs_filter['study_mode_id']      = edit_mode_id
+
+        bundle_qs = (
+            FeeStructure.objects
+            .filter(**qs_filter)
+            .select_related('grade', 'academic_year', 'study_mode')
+            .prefetch_related('items__fee_type')
+            .order_by('grade__order', 'grade__name')
+        )
+        if edit_base_name:
+            bundle_qs = bundle_qs.filter(name__startswith=edit_base_name)
+
+        bundle_qs = list(bundle_qs)
+
+        if bundle_qs:
+            is_bundle_edit = True
+            first = bundle_qs[0]
+            # Bundle-level prefill values for top of form
+            prefill_post_data = {
+                'academic_year':     str(first.academic_year_id) if first.academic_year_id else '',
+                'division':          str(first.grade.division_id) if first.grade and first.grade.division_id else edit_div_id,
+                'structure_type':    first.structure_type or edit_stype,
+                'study_mode':        str(first.study_mode_id) if first.study_mode_id else '',
+                'structure_name':    (first.name.rsplit(' — ', 1)[0] if ' — ' in (first.name or '') else (first.name or '')),
+            }
+
+            # Derive installments_count from items
+            max_inst = 0
+            for s in bundle_qs:
+                for it in s.items.all():
+                    if it.fee_type.name == '1st Installment' and it.amount > 0: max_inst = max(max_inst, 1)
+                    if it.fee_type.name == '2nd Installment' and it.amount > 0: max_inst = max(max_inst, 2)
+                    if it.fee_type.name == '3rd Installment' and it.amount > 0: max_inst = max(max_inst, 3)
+            # +1 because UI installments_count includes the down-payment row
+            if max_inst > 0:
+                prefill_post_data['installments_count'] = str(max_inst + 1)
+
+            # Per-grade prefill
+            for s in bundle_qs:
+                items_by_cat  = {}
+                items_by_name = {}
+                for it in s.items.all():
+                    # Use last write (or first if duplicate) for category lookup
+                    if it.fee_type.category not in items_by_cat:
+                        items_by_cat[it.fee_type.category]  = it.amount
+                    items_by_name[it.fee_type.name]     = it.amount
+
+                def _get(cat, *name_fallbacks):
+                    """Look up amount: by category first, then by exact name."""
+                    val = items_by_cat.get(cat)
+                    if val and val > 0:
+                        return val
+                    for nm in name_fallbacks:
+                        v = items_by_name.get(nm)
+                        if v and v > 0:
+                            return v
+                    return Decimal('0')
+
+                bundle_data[str(s.grade_id)] = {
+                    'entrance':     str(_get(FeeType.ENTRANCE_EXAM, 'Entrance Exam Fee', 'Entrance Exam')),
+                    'registration': str(_get(FeeType.REGISTRATION,  'Registration Fee', 'Registration')),
+                    'gross':        str(_get(FeeType.TUITION,       'Tuition Fee', 'Tuition')),
+                    'down':         str(_get(FeeType.RESERVATION,   'Reservation / Down Payment', 'Down Payment')),
+                }
+
     return render(request, 'fees/fee_structure_form.html', {
         'form':        None,
         'instance':    None,
-        'title':       'Add Fee Structure',
+        'title':       'Edit Fee Structure Bundle' if is_bundle_edit else 'Add Fee Structure',
         'years':       years,
         'divisions':   divisions,
         'study_modes': study_modes,
         'grades_json': json.dumps(grades_by_div),
-        'post_data':   request.POST if request.method == 'POST' else {},
+        'post_data':   request.POST if request.method == 'POST' else prefill_post_data,
+        'bundle_data_json': json.dumps(bundle_data),
+        'is_bundle_edit':   is_bundle_edit,
     })
 
 

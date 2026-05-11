@@ -31,6 +31,10 @@
 
         {# Quick Action Buttons (absolute top right for summary) #}
         <div class="absolute top-4 right-4 flex flex-col gap-1" onclick="event.stopPropagation()">
+            <a href="{% url 'fees:fee_structure_add' %}?edit=1&division={{ division.pk }}&type={{ bundle.structure_type }}{% if bundle.academic_year %}&year={{ bundle.academic_year.pk }}{% endif %}{% if bundle.study_mode %}&study_mode={{ bundle.study_mode.pk }}{% endif %}&base_name={{ bundle.base_name|urlencode }}"
+               class="p-1 rounded bg-amber-50 text-amber-600 hover:bg-amber-100 transition" title="Edit Entire Bundle">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+            </a>
              <a href="{% url 'fees:fee_structure_export_group_csv' %}?division={{ division.pk }}&type={{ type }}{% if active_year %}&year={{ active_year }}{% endif %}"
                class="p-1 rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition" title="Export CSV">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>

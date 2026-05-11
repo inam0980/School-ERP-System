@@ -25,6 +25,15 @@
     {% endif %}
 </div>
 
+{% if is_bundle_edit %}
+<div class="flex items-center gap-3 mb-4 px-4 py-3 rounded-xl bg-indigo-50 border border-indigo-300 text-indigo-800 text-sm shadow-sm">
+    <svg class="w-5 h-5 shrink-0 text-indigo-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+    </svg>
+    <span><strong>Editing existing fee structure bundle.</strong> Modify any values and click <em>Save</em> to update all grades in this bundle. Existing structures will be updated in place.</span>
+</div>
+{% endif %}
+
 {% if not instance %}
 <div id="fs-hint" class="flex items-center gap-3 mb-4 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-800 text-sm shadow-sm">
     <svg class="w-5 h-5 shrink-0 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -615,8 +624,9 @@
     document.querySelectorAll('.ft-amount').forEach(inp => inp.addEventListener('input', updateCounts));
     updateCounts();
 
-    // ── CREATE mode: division table ───────────────────────────
+    // ── CREATE / BUNDLE-EDIT mode: division table ──────────────
     const gradesData  = {{ grades_json|safe }};
+    window.BUNDLE_DATA = {{ bundle_data_json|default:"{}"|safe }};
     const divSel      = document.getElementById('create-division');
     const tableWrap   = document.getElementById('grade-table-wrapper');
     const noMsg       = document.getElementById('no-division-msg');
@@ -730,15 +740,39 @@
                     }
                 });
             });
-            // Pre-fill from global price defaults if already set
-            const gEn  = document.getElementById('global-entrance');
-            const gReg = document.getElementById('global-registration');
-            const gDp  = document.getElementById('global-downpayment');
-            const gDisc = document.getElementById('global-discount');
-            if (gEn  && gEn.value)  document.getElementById('en_'  + g.pk).value = fmtInput(parseFloat(gEn.value));
-            if (gReg && gReg.value) document.getElementById('reg_' + g.pk).value = fmtInput(parseFloat(gReg.value));
-            if (gDp  && gDp.value)  document.getElementById('dp_'  + g.pk).value = fmtInput(parseFloat(gDp.value));
-            if (gDisc && gDisc.value) document.getElementById('gd_' + g.pk).value = gDisc.value;
+            // ── BUNDLE EDIT mode is authoritative — load saved values first
+            const _bd = (window.BUNDLE_DATA || {})[String(g.pk)];
+            const _hasBundleData = !!_bd;
+
+            if (_hasBundleData) {
+                const _set = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    const num = parseFloat(val);
+                    if (isNaN(num) || num <= 0) {
+                        el.value = '';
+                    } else {
+                        el.value = fmtInput(num);
+                    }
+                };
+                _set('en_'  + g.pk, _bd.entrance);
+                _set('reg_' + g.pk, _bd.registration);
+                _set('gt_'  + g.pk, _bd.gross);
+                _set('dp_'  + g.pk, _bd.down);
+                // Discount field unknown when editing — leave blank/0
+                const gdEl = document.getElementById('gd_' + g.pk);
+                if (gdEl) gdEl.value = '';
+            } else {
+                // CREATE mode — pre-fill from globals if user typed any
+                const gEn  = document.getElementById('global-entrance');
+                const gReg = document.getElementById('global-registration');
+                const gDp  = document.getElementById('global-downpayment');
+                const gDisc = document.getElementById('global-discount');
+                if (gEn  && gEn.value)  document.getElementById('en_'  + g.pk).value = fmtInput(parseFloat(gEn.value));
+                if (gReg && gReg.value) document.getElementById('reg_' + g.pk).value = fmtInput(parseFloat(gReg.value));
+                if (gDp  && gDp.value)  document.getElementById('dp_'  + g.pk).value = fmtInput(parseFloat(gDp.value));
+                if (gDisc && gDisc.value) document.getElementById('gd_' + g.pk).value = gDisc.value;
+            }
             recalc(g.pk);
         });
         tableWrap.classList.remove('hidden');
