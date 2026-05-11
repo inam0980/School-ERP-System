@@ -50,6 +50,14 @@ class Student(models.Model):
         (PASSPORT_ID,      'Passport / جواز السفر'),
     ]
 
+    # ── Religion choices ──────────────────────────────────────────────
+    MUSLIM     = 'Muslim'
+    NON_MUSLIM = 'Non-Muslim'
+    RELIGION_CHOICES = [
+        (MUSLIM,     'Muslim / مسلم'),
+        (NON_MUSLIM, 'Non-Muslim / غير مسلم'),
+    ]
+
     # ── Identity ──────────────────────────────────────────────────────
     student_id   = models.CharField(max_length=20, unique=True, editable=False)
     full_name    = models.CharField(max_length=200, verbose_name="Full Name (English)")
@@ -65,7 +73,7 @@ class Student(models.Model):
     national_id  = models.CharField(max_length=50, blank=True, verbose_name="ID Number / رقم الهوية")
     iqama_number = models.CharField(max_length=50, blank=True, verbose_name="Iqama Number / رقم الإقامة")
     passport_number = models.CharField(max_length=50, blank=True, verbose_name="Passport Number / رقم جواز السفر")
-    religion     = models.CharField(max_length=100, blank=True, verbose_name="Religion / الديانة")
+    religion     = models.CharField(max_length=20, blank=True, choices=RELIGION_CHOICES, verbose_name="Religion / الديانة")
     birth_place  = models.CharField(max_length=200, blank=True, verbose_name="Birth Place / مكان الميلاد")
 
     # ── Academic ──────────────────────────────────────────────────────

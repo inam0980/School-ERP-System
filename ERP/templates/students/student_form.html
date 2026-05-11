@@ -516,8 +516,8 @@ function setCitizenship(type) {
         chkSaudi.classList.remove('hidden');
         chkExpat.classList.add('hidden');
 
-        nationalityInput.value    = 'Saudi';
-        nationalityInput.readOnly = true;
+        nationalityInput.value             = 'Saudi Arabia';
+        nationalityInput.style.pointerEvents = 'none';
         nationalityInput.classList.add('bg-green-50', 'text-green-800', 'font-medium');
     } else {
         cardExpat.classList.add('border-blue-500', 'bg-blue-50');
@@ -527,8 +527,8 @@ function setCitizenship(type) {
         chkExpat.classList.remove('hidden');
         chkSaudi.classList.add('hidden');
 
-        if (nationalityInput.value === 'Saudi') nationalityInput.value = '';
-        nationalityInput.readOnly = false;
+        if (nationalityInput.value === 'Saudi Arabia') nationalityInput.value = '';
+        nationalityInput.style.pointerEvents = '';
         nationalityInput.classList.remove('bg-green-50', 'text-green-800', 'font-medium');
     }
 
@@ -551,7 +551,7 @@ document.getElementById('studentForm').addEventListener('submit', function(e) {
 (function initCitizenshipPicker() {
     const currentNationality = "{{ student.nationality|default:'' }}";
     const currentIdType      = "{{ student.id_type|default:'' }}";
-    if (currentNationality === 'Saudi' || currentIdType === 'NATIONAL_ID') {
+    if (currentNationality === 'Saudi Arabia' || currentIdType === 'NATIONAL_ID') {
         setCitizenship('saudi');
     } else if (currentNationality || currentIdType) {
         setCitizenship('expat');
