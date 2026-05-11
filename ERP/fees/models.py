@@ -344,6 +344,9 @@ class TaxInvoice(models.Model):
     # Line items stored as JSON snapshot
     line_items_json = models.JSONField(default=list, blank=True)
 
+    # Print tracking
+    first_printed_at = models.DateTimeField(null=True, blank=True)
+
     # Credit note linkage
     original_invoice   = models.ForeignKey(
         'self', null=True, blank=True,

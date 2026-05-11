@@ -1564,6 +1564,8 @@ def generate_invoice(request, student_pk):
             'total':          float(base + tax),
         })
 
+    has_prior = TaxInvoice.objects.filter(student=student).exists()
+
     invoice = TaxInvoice.objects.create(
         student    = student,
         subtotal   = subtotal,
@@ -1572,6 +1574,7 @@ def generate_invoice(request, student_pk):
         status     = TaxInvoice.ISSUED,
         created_by = request.user,
         line_items_json = line_items,
+        first_printed_at = timezone.now() if has_prior else None,
     )
     messages.success(request, f"Invoice {invoice.invoice_number} generated.")
     return redirect('fees:invoice_print', pk=invoice.pk)
@@ -1585,9 +1588,15 @@ def invoice_print(request, pk):
                                           'student__section', 'created_by'),
         pk=pk,
     )
+    is_reprint = invoice.first_printed_at is not None
+    if not is_reprint:
+        invoice.first_printed_at = timezone.now()
+        invoice.save(update_fields=['first_printed_at'])
     return render(request, 'fees/invoice_print.html', {
-        'invoice':    invoice,
-        'line_items': invoice.line_items_json or [],
+        'invoice':     invoice,
+        'line_items':  invoice.line_items_json or [],
+        'copy_labels': ['SCHOOL COPY — نسخة المدرسة'],
+        'is_reprint':  is_reprint,
     })
 
 
