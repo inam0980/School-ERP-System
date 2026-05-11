@@ -38,34 +38,17 @@
     <!-- STEP 1 — Search Student -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
         <h2 class="font-semibold text-primary mb-3">Step 1 — Search Student / البحث عن الطالب</h2>
-        <form method="get" class="flex gap-3">
-            {% if student %}<input type="hidden" name="student_id" value="{{ student.pk }}">{% endif %}
-            <input type="text" name="q" value="{{ query }}"
-                   placeholder="Student name, ID, or Arabic name …"
-                   class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:outline-none">
-            <button type="submit"
-                    class="bg-primary text-white px-5 py-2 rounded-lg text-sm hover:bg-primary-dark transition">
-                Search
-            </button>
-        </form>
-
-        {% if students %}
-        <div class="mt-4 divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
-            {% for s in students %}
-            <a href="?student_id={{ s.pk }}"
-               class="flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition text-sm">
-                <div>
-                    <span class="font-semibold text-slate-800">{{ s.full_name }}</span>
-                    {% if s.arabic_name %}<span class="text-slate-500 ml-2">{{ s.arabic_name }}</span>{% endif %}
-                </div>
-                <div class="text-slate-400 text-xs">{{ s.student_id }} · {{ s.grade }}</div>
-            </a>
-            {% endfor %}
+        <div class="relative">
+            <input type="text" id="icnSearchInput"
+                   value="{{ query }}"
+                   placeholder="Type name, ID, or Iqama number…"
+                   autocomplete="off"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm pr-8 focus:ring-2 focus:ring-primary/40 focus:outline-none">
+            <span id="icnSpinner" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
         </div>
-        {% elif query and not student %}
-        <p class="mt-3 text-sm text-slate-400">No students found for "{{ query }}".</p>
-        {% endif %}
+        <p class="mt-1.5 text-xs text-slate-400">Results appear as you type — click a name to select</p>
     </div>
+    <div id="icnDropdown" class="hidden fixed z-[9999] bg-white border border-slate-200 rounded-xl shadow-xl overflow-y-auto" style="max-height:320px;"></div>
 
     {% if student %}
     <!-- Student Banner -->
@@ -273,5 +256,9 @@ function recalcAll() {
 
 // Init totals on load
 document.addEventListener('DOMContentLoaded', recalcAll);
+
+// ── Live student search ──────────────────────────────────────────
+{% include 'fees/_student_live_search.html' %}
+initStudentLiveSearch('icnSearchInput', 'icnDropdown', 'icnSpinner', '?student_id=');
 </script>
 {% endblock %}

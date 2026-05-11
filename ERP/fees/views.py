@@ -1595,14 +1595,12 @@ def invoice_list(request):
     student_q = request.GET.get('student', '').strip()
     qs = TaxInvoice.objects.select_related('student', 'created_by')
     if student_q:
-        if student_q.isdigit():
-            qs = qs.filter(student_id=student_q)
-        else:
-            qs = qs.filter(
-                Q(student__full_name__icontains=student_q) |
-                Q(student__arabic_name__icontains=student_q) |
-                Q(student__student_id__icontains=student_q)
-            )
+        qs = qs.filter(
+            Q(student__full_name__icontains=student_q) |
+            Q(student__arabic_name__icontains=student_q) |
+            Q(student__student_id__icontains=student_q) |
+            Q(student__iqama_number__icontains=student_q)
+        )
     return render(request, 'fees/invoice_list.html', {
         'invoices':   qs.distinct()[:200],
         'student_pk': student_q,
@@ -2392,7 +2390,8 @@ def tax_credit_note(request):
         students = Student.objects.filter(
             Q(full_name__icontains=query) |
             Q(student_id__icontains=query) |
-            Q(arabic_name__icontains=query),
+            Q(arabic_name__icontains=query) |
+            Q(iqama_number__icontains=query),
             is_active=True,
         ).select_related('grade', 'section', 'division')[:30]
 
@@ -2502,7 +2501,8 @@ def invoice_credit_note(request):
         students = Student.objects.filter(
             Q(full_name__icontains=query) |
             Q(student_id__icontains=query) |
-            Q(arabic_name__icontains=query),
+            Q(arabic_name__icontains=query) |
+            Q(iqama_number__icontains=query),
             is_active=True,
         ).select_related('grade', 'section', 'division')[:30]
 
