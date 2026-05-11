@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}External Exam Fee Collection — Al-Kawthar{% endblock %}
 
 {% block content %}
@@ -167,9 +167,9 @@
             <div class="grid grid-cols-12 px-5 py-3 items-center text-sm hover:bg-slate-50 transition">
                 <div class="col-span-2 font-mono text-xs text-slate-600">{{ p.receipt_number }}</div>
                 <div class="col-span-3 text-slate-800">{{ p.fee_description }}</div>
-                <div class="col-span-2 text-right text-slate-600">{{ p.amount|floatformat:2 }}</div>
-                <div class="col-span-1 text-right text-slate-400">{{ p.vat_amount|floatformat:2 }}</div>
-                <div class="col-span-2 text-right font-semibold text-slate-800">{{ p.total|floatformat:2 }}</div>
+                <div class="col-span-2 text-right text-slate-600">{{ p.amount|money }}</div>
+                <div class="col-span-1 text-right text-slate-400">{{ p.vat_amount|money }}</div>
+                <div class="col-span-2 text-right font-semibold text-slate-800">{{ p.total|money }}</div>
                 <div class="col-span-1 text-center text-slate-500 text-xs">{{ p.payment_date|date:"Y-m-d" }}</div>
                 <div class="col-span-1 text-center">
                     <a href="{% url 'fees:ext_receipt_print' %}?pids={{ p.pk }}"
@@ -243,7 +243,7 @@
                                    oninput="recalcRow(this)">
                         </div>
                         <div class="col-span-2 text-right text-sm font-semibold text-indigo-700 fee-total-display px-1">
-                            {{ entrance_exam_default|floatformat:2 }}
+                            {{ entrance_exam_default|money }}
                         </div>
                     </div>
 
@@ -267,7 +267,7 @@
                                    oninput="recalcRow(this)">
                         </div>
                         <div class="col-span-2 text-right text-sm font-semibold text-indigo-700 fee-total-display px-1">
-                            {{ registration_default|floatformat:2 }}
+                            {{ registration_default|money }}
                         </div>
                     </div>
 

@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -207,14 +207,14 @@
                     {{ payment.student_fee.fee_structure.fee_type.name }}
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right">
-                    {{ payment.student_fee.amount|floatformat:2 }}
+                    {{ payment.student_fee.amount|money }}
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right
                     {% if payment.student_fee.discount %}text-green-700{% endif %}">
-                    {{ payment.student_fee.discount|default:"0.00"|floatformat:2 }}
+                    {{ payment.student_fee.discount|default:"0.00"|money }}
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right">
-                    {{ paid_before_vat|floatformat:2 }}
+                    {{ paid_before_vat|money }}
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-center font-semibold
                     {% if vat_pct == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
@@ -222,10 +222,10 @@
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right
                     {% if vat_pct == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
-                    {{ paid_vat|floatformat:2 }}
+                    {{ paid_vat|money }}
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right font-bold">
-                    {{ payment.paid_amount|floatformat:2 }}
+                    {{ payment.paid_amount|money }}
                 </td>
             </tr>
         </tbody>
@@ -268,7 +268,7 @@
                             <span style="direction:ltr;display:block;text-align:left;color:#64748b;">Net Amount Before VAT</span>
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-semibold">
-                            {{ paid_before_vat|floatformat:2 }}
+                            {{ paid_before_vat|money }}
                         </td>
                     </tr>
                     <tr>
@@ -279,7 +279,7 @@
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-semibold
                             {% if paid_vat == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
-                            {{ paid_vat|floatformat:2 }}
+                            {{ paid_vat|money }}
                         </td>
                     </tr>
                     <tr style="background:#f8fafc;">
@@ -290,7 +290,7 @@
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-bold text-base"
                             style="color:#1e3a5f;">
-                            SAR {{ payment.paid_amount|floatformat:2 }}
+                            SAR {{ payment.paid_amount|money }}
                         </td>
                     </tr>
                     <tr>
@@ -301,7 +301,7 @@
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-bold
                             {% if payment.student_fee.balance > 0 %}text-red-600{% else %}text-green-600{% endif %}">
-                            SAR {{ payment.student_fee.balance|floatformat:2 }}
+                            SAR {{ payment.student_fee.balance|money }}
                         </td>
                     </tr>
                     <tr>
@@ -311,7 +311,7 @@
                             <span style="direction:ltr;display:block;text-align:left;color:#64748b;">Total Previously Paid</span>
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-semibold">
-                            SAR {{ payment.student_fee.amount_paid|floatformat:2 }}
+                            SAR {{ payment.student_fee.amount_paid|money }}
                         </td>
                     </tr>
                 </table>

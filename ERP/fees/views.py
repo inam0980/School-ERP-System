@@ -435,23 +435,51 @@ def fee_structure_form(request, pk=None):
                 created_count = 0
 
                 def _get_fee_type(category, name):
-                    ft = FeeType.objects.filter(category=category).first()
+                    # For OTHER category match by name so 1st/2nd/3rd installments stay separate
+                    if category == FeeType.OTHER:
+                        ft = FeeType.objects.filter(category=category, name=name).first()
+                    else:
+                        ft = FeeType.objects.filter(category=category).first()
                     if not ft:
                         ft = FeeType.objects.create(name=name, category=category, is_mandatory=False)
                     return ft
 
+                def _d(val, default='0'):
+                    """Parse a Decimal from POST data, stripping commas safely."""
+                    return Decimal(str(val).replace(',', '').strip() or default)
+
+                try:
+                    n_inst = int(request.POST.get('installments_count', '3').strip())
+                except (ValueError, TypeError):
+                    n_inst = 3
+                n_inst = max(1, min(4, n_inst))
+
                 for grade in grades:
-                    gross_raw = request.POST.get(f'gross_tuition_{grade.pk}', '').strip()
+                    gross_raw = request.POST.get(f'gross_tuition_{grade.pk}', '').strip().replace(',', '')
                     if not gross_raw:
                         continue
                     try:
-                        entrance     = Decimal(request.POST.get(f'entrance_exam_{grade.pk}', '0').strip() or '0')
-                        registration = Decimal(request.POST.get(f'registration_{grade.pk}', '0').strip() or '0')
-                        gross        = Decimal(gross_raw)
+                        entrance     = _d(request.POST.get(f'entrance_exam_{grade.pk}', '0'))
+                        registration = _d(request.POST.get(f'registration_{grade.pk}', '0'))
+                        gross        = _d(gross_raw)
                         per_grade_raw = request.POST.get(f'group_discount_{grade.pk}', '').strip()
-                        discount_pct  = Decimal(per_grade_raw) if per_grade_raw else global_discount
+                        discount_pct  = _d(per_grade_raw) if per_grade_raw else global_discount
                         net_tuition   = (gross * (1 - discount_pct / 100)).quantize(Decimal('0.01'))
+                        down          = _d(request.POST.get(f'down_payment_{grade.pk}', '0'))
                         bundle_name   = f'{structure_name_base} — {grade.name}'
+
+                        # Calculate installment splits (mirrors JS logic in the form)
+                        remaining = max(Decimal('0'), net_tuition - down)
+                        splits    = max(1, n_inst - 1)
+                        inst_base = remaining / Decimal(splits)
+                        inst1 = (inst_base * 100).to_integral_value(rounding='ROUND_FLOOR') / 100
+                        inst2 = inst1 if n_inst > 2 else Decimal('0')
+                        if n_inst > 3:
+                            inst3 = (remaining - inst1 - inst2).quantize(Decimal('0.01'))
+                        elif n_inst == 3:
+                            inst3 = (remaining - inst1 * 2).quantize(Decimal('0.01'))
+                        else:
+                            inst3 = Decimal('0')
 
                         structure, _ = FeeStructure.objects.update_or_create(
                             academic_year=year,
@@ -477,6 +505,29 @@ def fee_structure_form(request, pk=None):
                             structure=structure, fee_type=ft_tuition,
                             defaults={'amount': net_tuition},
                         )
+                        if down > 0:
+                            ft_res = _get_fee_type(FeeType.RESERVATION, 'Reservation / Down Payment')
+                            FeeStructureItem.objects.update_or_create(
+                                structure=structure, fee_type=ft_res,
+                                defaults={'amount': down},
+                            )
+                        ft_i1 = _get_fee_type(FeeType.OTHER, '1st Installment')
+                        FeeStructureItem.objects.update_or_create(
+                            structure=structure, fee_type=ft_i1,
+                            defaults={'amount': inst1},
+                        )
+                        if inst2 > 0:
+                            ft_i2 = _get_fee_type(FeeType.OTHER, '2nd Installment')
+                            FeeStructureItem.objects.update_or_create(
+                                structure=structure, fee_type=ft_i2,
+                                defaults={'amount': inst2},
+                            )
+                        if inst3 > 0:
+                            ft_i3 = _get_fee_type(FeeType.OTHER, '3rd Installment')
+                            FeeStructureItem.objects.update_or_create(
+                                structure=structure, fee_type=ft_i3,
+                                defaults={'amount': inst3},
+                            )
                         created_count += 1
                     except Exception as exc:
                         messages.error(request, f'Error saving {grade.name}: {exc}')

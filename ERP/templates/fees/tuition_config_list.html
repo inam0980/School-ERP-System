@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Tuition Fee Structures — Al-Kawthar{% endblock %}
 
 {% block content %}
@@ -106,13 +106,13 @@
           {% endif %}
         </td>
         <td class="px-4 py-3 text-right font-mono text-slate-700">
-          SAR {{ cfg.gross_tuition_fee|floatformat:2 }}
+          SAR {{ cfg.gross_tuition_fee|money }}
         </td>
         <td class="px-4 py-3 text-right font-mono font-semibold text-green-700">
-          SAR {{ cfg.net_tuition_fee|floatformat:2 }}
+          SAR {{ cfg.net_tuition_fee|money }}
         </td>
         <td class="px-4 py-3 text-right font-mono text-blue-700">
-          SAR {{ cfg.final_net_non_saudi|floatformat:2 }}
+          SAR {{ cfg.final_net_non_saudi|money }}
         </td>
         <td class="px-4 py-3 text-center">
           {% with errs=cfg.validate_installments %}

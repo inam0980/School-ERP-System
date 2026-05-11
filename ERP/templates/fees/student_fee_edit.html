@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Edit Student Fee — Al-Kawthar{% endblock %}
 
 {% block content %}
@@ -20,8 +20,8 @@
         <p class="font-semibold text-slate-700">{{ fee.student.full_name }}</p>
         <p class="text-slate-500">{{ fee.student.student_id }} · {{ fee.student.current_section }}</p>
         <p class="text-slate-500">Fee: <strong>{{ fee.fee_structure.fee_type.name }}</strong></p>
-        <p class="text-slate-500">Original Amount: <strong>SAR {{ fee.amount|floatformat:2 }}</strong></p>
-        <p class="text-slate-500">Current Net (after discount + VAT): <strong>SAR {{ fee.net_amount|floatformat:2 }}</strong></p>
+        <p class="text-slate-500">Original Amount: <strong>SAR {{ fee.amount|money }}</strong></p>
+        <p class="text-slate-500">Current Net (after discount + VAT): <strong>SAR {{ fee.net_amount|money }}</strong></p>
     </div>
 
     <form method="post" class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">

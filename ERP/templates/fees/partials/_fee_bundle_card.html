@@ -1,4 +1,4 @@
-<details class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group">
+﻿<details class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group">
     <summary class="flex flex-col p-4 cursor-pointer select-none hover:bg-slate-50/60 transition list-none relative">
         
         {# Title and Meta #}
@@ -78,7 +78,7 @@
             <div class="flex flex-wrap gap-1">
                 {% for it in s.items.all %}
                 <span class="text-[9px] bg-white border border-slate-200 px-1.5 py-0.5 rounded-sm text-slate-500 whitespace-nowrap">
-                    {{ it.fee_type.name|truncatechars:10 }}: <span class="font-bold text-slate-700">{{ it.amount|floatformat:0 }}</span>
+                    {{ it.fee_type.name|truncatechars:10 }}: <span class="font-bold text-slate-700">{{ it.amount|money:0 }}</span>
                 </span>
                 {% endfor %}
             </div>

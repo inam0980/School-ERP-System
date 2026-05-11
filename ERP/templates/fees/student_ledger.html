@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Student Ledger — {{ student.full_name }} — Al-Kawthar{% endblock %}
 
 {% block content %}
@@ -40,15 +40,15 @@
         <div class="flex gap-5 ml-auto flex-wrap">
             <div class="text-center">
                 <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Total Assigned</p>
-                <p class="text-xl font-bold text-slate-700">SAR {{ total_net|floatformat:2 }}</p>
+                <p class="text-xl font-bold text-slate-700">SAR {{ total_net|money }}</p>
             </div>
             <div class="text-center">
                 <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Total Paid</p>
-                <p class="text-xl font-bold text-green-600">SAR {{ total_paid|floatformat:2 }}</p>
+                <p class="text-xl font-bold text-green-600">SAR {{ total_paid|money }}</p>
             </div>
             <div class="text-center">
                 <p class="text-xs text-red-400 uppercase tracking-wide mb-0.5">Balance Due</p>
-                <p class="text-xl font-bold text-red-600">SAR {{ total_balance|floatformat:2 }}</p>
+                <p class="text-xl font-bold text-red-600">SAR {{ total_balance|money }}</p>
             </div>
         </div>
     </div>
@@ -70,12 +70,12 @@
                 </span>
             </div>
             <div class="text-right text-sm">
-                <span class="text-slate-500">Net: SAR {{ sf.net_amount|floatformat:2 }}</span>
+                <span class="text-slate-500">Net: SAR {{ sf.net_amount|money }}</span>
                 <span class="mx-2 text-slate-300">|</span>
-                <span class="text-green-600">Paid: SAR {{ sf.amount_paid|floatformat:2 }}</span>
+                <span class="text-green-600">Paid: SAR {{ sf.amount_paid|money }}</span>
                 <span class="mx-2 text-slate-300">|</span>
                 <span class="font-bold {% if sf.balance > 0 %}text-red-600{% else %}text-green-600{% endif %}">
-                    Bal: SAR {{ sf.balance|floatformat:2 }}
+                    Bal: SAR {{ sf.balance|money }}
                 </span>
             </div>
         </div>
@@ -101,7 +101,7 @@
                     <td class="px-5 py-2.5 text-slate-600">{{ pmt.payment_date|date:"d M Y" }}</td>
                     <td class="px-5 py-2.5 text-slate-600">{{ pmt.get_payment_method_display }}</td>
                     <td class="px-5 py-2.5 text-slate-400 text-xs">{{ pmt.transaction_ref|default:"—" }}</td>
-                    <td class="px-5 py-2.5 text-right font-semibold text-green-600">SAR {{ pmt.paid_amount|floatformat:2 }}</td>
+                    <td class="px-5 py-2.5 text-right font-semibold text-green-600">SAR {{ pmt.paid_amount|money }}</td>
                     <td class="px-5 py-2.5 text-slate-500 text-xs">{{ pmt.collected_by.full_name }}</td>
                     <td class="px-5 py-2.5 text-right">
                         <a href="{% url 'fees:receipt_print' pmt.pk %}" target="_blank"
@@ -140,9 +140,9 @@
                 <tr class="hover:bg-slate-50/50">
                     <td class="px-5 py-2.5 font-mono text-xs">{{ inv.invoice_number }}</td>
                     <td class="px-5 py-2.5 text-slate-600">{{ inv.date|date:"d M Y" }}</td>
-                    <td class="px-5 py-2.5 text-right">SAR {{ inv.subtotal|floatformat:2 }}</td>
-                    <td class="px-5 py-2.5 text-right text-orange-600">SAR {{ inv.tax_amount|floatformat:2 }}</td>
-                    <td class="px-5 py-2.5 text-right font-bold">SAR {{ inv.total|floatformat:2 }}</td>
+                    <td class="px-5 py-2.5 text-right">SAR {{ inv.subtotal|money }}</td>
+                    <td class="px-5 py-2.5 text-right text-orange-600">SAR {{ inv.tax_amount|money }}</td>
+                    <td class="px-5 py-2.5 text-right font-bold">SAR {{ inv.total|money }}</td>
                     <td class="px-5 py-2.5">
                         <span class="text-xs px-2 py-0.5 rounded-full
                             {% if inv.status == 'ISSUED' %}bg-green-100 text-green-700

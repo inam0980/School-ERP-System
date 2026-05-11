@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Payroll — Al-Kawthar{% endblock %}
 
 {% block content %}
@@ -55,7 +55,7 @@
 <div class="grid grid-cols-3 gap-4 mb-6">
     <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
         <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Net Payroll</p>
-        <p class="text-xl font-bold text-slate-700">SAR {{ total_net|floatformat:2 }}</p>
+        <p class="text-xl font-bold text-slate-700">SAR {{ total_net|money }}</p>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
         <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Paid</p>
@@ -63,7 +63,7 @@
     </div>
     <div class="bg-white rounded-xl border border-red-100 px-5 py-4">
         <p class="text-xs text-red-400 uppercase tracking-wide mb-1">Pending Payment</p>
-        <p class="text-xl font-bold text-red-600">SAR {{ unpaid_net|floatformat:2 }}</p>
+        <p class="text-xl font-bold text-red-600">SAR {{ unpaid_net|money }}</p>
     </div>
 </div>
 
@@ -92,12 +92,12 @@
                     <p class="text-xs text-slate-400">{{ sal.staff.username }}</p>
                 </td>
                 <td class="px-4 py-3 text-slate-600">{{ sal.month|date:"F Y" }}</td>
-                <td class="px-4 py-3 text-right text-slate-600">{{ sal.basic|floatformat:2 }}</td>
-                <td class="px-4 py-3 text-right text-slate-600">{{ sal.housing|floatformat:2 }}</td>
-                <td class="px-4 py-3 text-right text-slate-600">{{ sal.transport|floatformat:2 }}</td>
-                <td class="px-4 py-3 text-right text-slate-600">{{ sal.other_allowances|floatformat:2 }}</td>
-                <td class="px-4 py-3 text-right text-red-500">{{ sal.deductions|floatformat:2 }}</td>
-                <td class="px-4 py-3 text-right font-bold text-slate-800">SAR {{ sal.net_salary|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right text-slate-600">{{ sal.basic|money }}</td>
+                <td class="px-4 py-3 text-right text-slate-600">{{ sal.housing|money }}</td>
+                <td class="px-4 py-3 text-right text-slate-600">{{ sal.transport|money }}</td>
+                <td class="px-4 py-3 text-right text-slate-600">{{ sal.other_allowances|money }}</td>
+                <td class="px-4 py-3 text-right text-red-500">{{ sal.deductions|money }}</td>
+                <td class="px-4 py-3 text-right font-bold text-slate-800">SAR {{ sal.net_salary|money }}</td>
                 <td class="px-4 py-3">
                     {% if sal.is_paid %}
                     <div>

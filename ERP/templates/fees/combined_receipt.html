@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -193,21 +193,21 @@
                     {{ line.description }}
                     {% if line.note %}<div class="text-xs text-slate-400 mt-0.5">{{ line.note }}</div>{% endif %}
                 </td>
-                <td class="border border-slate-300 px-2 py-2 text-right">{{ line.gross|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ line.gross|money }}</td>
                 <td class="border border-slate-300 px-2 py-2 text-right {% if line.discount %}text-green-700{% endif %}">
-                    {{ line.discount|floatformat:2 }}
+                    {{ line.discount|money }}
                 </td>
-                <td class="border border-slate-300 px-2 py-2 text-right">{{ line.net|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ line.net|money }}</td>
                 <td class="border border-slate-300 px-2 py-2 text-center
                     {% if line.vat_pct == 0 %}text-green-700 font-semibold{% else %}text-orange-700 font-semibold{% endif %}">
                     {{ line.vat_pct }}%
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right
                     {% if line.vat_pct == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
-                    {{ line.vat|floatformat:2 }}
+                    {{ line.vat|money }}
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right font-bold">
-                    {{ line.paid|floatformat:2 }}
+                    {{ line.paid|money }}
                 </td>
             </tr>
             {% endfor %}
@@ -219,15 +219,15 @@
                     إجمالي هذه الدفعة / Total This Transaction
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right font-semibold">
-                    {{ total_net_before_vat|floatformat:2 }}
+                    {{ total_net_before_vat|money }}
                 </td>
                 <td class="border border-slate-300 px-2 py-2"></td>
                 <td class="border border-slate-300 px-2 py-2 text-right font-semibold text-orange-700">
-                    {{ total_vat|floatformat:2 }}
+                    {{ total_vat|money }}
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right font-bold text-base"
                     style="color:#1e3a5f;">
-                    SAR {{ total_paid|floatformat:2 }}
+                    SAR {{ total_paid|money }}
                 </td>
             </tr>
         </tfoot>
@@ -256,9 +256,9 @@
             <tr style="background:{% cycle '#ffffff' '#fff5f5' %};">
                 <td class="border border-slate-300 px-2 py-2 text-center">{{ forloop.counter }}</td>
                 <td class="border border-slate-300 px-2 py-2">{{ f.fee_structure.fee_type.name }}</td>
-                <td class="border border-slate-300 px-2 py-2 text-right">{{ f.net_amount|floatformat:2 }}</td>
-                <td class="border border-slate-300 px-2 py-2 text-right text-green-700">{{ f.amount_paid|floatformat:2 }}</td>
-                <td class="border border-slate-300 px-2 py-2 text-right font-bold text-red-600">{{ f.balance|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ f.net_amount|money }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right text-green-700">{{ f.amount_paid|money }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right font-bold text-red-600">{{ f.balance|money }}</td>
                 <td class="border border-slate-300 px-2 py-2 text-center">{{ f.due_date|date:"d/m/Y" }}</td>
                 <td class="border border-slate-300 px-2 py-2 text-center text-xs font-semibold
                     {% if f.status == 'OVERDUE' %}text-red-700{% elif f.status == 'PARTIAL' %}text-orange-600{% else %}text-slate-500{% endif %}">
@@ -274,7 +274,7 @@
                     إجمالي المتبقي / Total Outstanding
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right font-bold text-red-700 text-base" colspan="3">
-                    SAR {{ total_outstanding|floatformat:2 }}
+                    SAR {{ total_outstanding|money }}
                 </td>
             </tr>
         </tfoot>
@@ -306,7 +306,7 @@
                             <span style="direction:ltr;display:block;text-align:left;color:#64748b;">Net Before VAT</span>
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-semibold">
-                            SAR {{ total_net_before_vat|floatformat:2 }}
+                            SAR {{ total_net_before_vat|money }}
                         </td>
                     </tr>
                     <tr>
@@ -316,7 +316,7 @@
                             <span style="direction:ltr;display:block;text-align:left;color:#64748b;">VAT Amount</span>
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-semibold text-orange-700">
-                            SAR {{ total_vat|floatformat:2 }}
+                            SAR {{ total_vat|money }}
                         </td>
                     </tr>
                     <tr style="background:#e8f0fe;">
@@ -327,7 +327,7 @@
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-bold text-lg"
                             style="color:#1e3a5f;">
-                            SAR {{ total_paid|floatformat:2 }}
+                            SAR {{ total_paid|money }}
                         </td>
                     </tr>
                     <tr style="background:#fef2f2;">
@@ -337,7 +337,7 @@
                             <span style="direction:ltr;display:block;text-align:left;">Total Still Outstanding</span>
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-bold text-red-700 text-lg">
-                            SAR {{ total_outstanding|floatformat:2 }}
+                            SAR {{ total_outstanding|money }}
                         </td>
                     </tr>
                 </table>

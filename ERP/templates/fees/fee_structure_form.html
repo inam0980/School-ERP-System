@@ -452,8 +452,8 @@
             </label>
             <div class="relative">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
-                <input type="number" id="global-entrance" step="0.01" min="0" placeholder="0.00"
-                       class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                <input type="text" inputmode="decimal" id="global-entrance" placeholder="0.00"
+                       class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none">
             </div>
         </div>
         <div>
@@ -462,8 +462,8 @@
             </label>
             <div class="relative">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
-                <input type="number" id="global-registration" step="0.01" min="0" placeholder="0.00"
-                       class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                <input type="text" inputmode="decimal" id="global-registration" placeholder="0.00"
+                       class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none">
             </div>
         </div>
         <div>
@@ -472,18 +472,19 @@
             </label>
             <div class="relative">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
-                <input type="number" id="global-downpayment" step="0.01" min="0" placeholder="0.00"
-                       class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                <input type="text" inputmode="decimal" id="global-downpayment" placeholder="0.00"
+                       class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none">
             </div>
         </div>
     </div>
     <!-- Row 4: Code + Description -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Structure Code <span class="text-slate-400 font-normal">(optional)</span></label>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Structure Code <span class="text-red-500">*</span></label>
             <input type="text" name="structure_code" id="create-structure-code"
                    value="{{ post_data.structure_code|default:'' }}"
                    placeholder="e.g. AM-REG-2526"
+                   required
                    class="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-primary/40 focus:outline-none">
         </div>
         <div class="md:col-span-2">
@@ -626,14 +627,25 @@
     const CALC_SAR = 'text-right font-mono text-green-800 px-2 py-1 whitespace-nowrap';
     const CALC_AMB = 'text-right font-mono text-amber-800 px-2 py-1 whitespace-nowrap';
 
-    function fmt(v) { return isNaN(v) ? '—' : v.toFixed(2); }
+    function _commas(s) { return s.replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function fmt(v) {
+        if (isNaN(v)) return '—';
+        const r = Math.round(v * 100) / 100;
+        return r % 1 === 0 ? _commas(Math.round(r).toString()) : _commas(r.toFixed(2));
+    }
+    function fmtInput(v) {
+        if (isNaN(v) || v === '') return '';
+        const r = Math.round(v * 100) / 100;
+        return r % 1 === 0 ? _commas(Math.round(r).toString()) : _commas(r.toFixed(2));
+    }
+    function parseVal(id) { return parseFloat((document.getElementById(id).value || '').replace(/,/g, '')) || 0; }
 
     function recalc(pk) {
-        const entrance  = parseFloat(document.getElementById('en_'+pk).value)   || 0;
-        const reg       = parseFloat(document.getElementById('reg_'+pk).value)  || 0;
-        const gross     = parseFloat(document.getElementById('gt_'+pk).value)   || 0;
-        const disc      = parseFloat(document.getElementById('gd_'+pk).value)   || 0;
-        const down      = parseFloat(document.getElementById('dp_'+pk).value)   || 0;
+        const entrance  = parseVal('en_'+pk);
+        const reg       = parseVal('reg_'+pk);
+        const gross     = parseVal('gt_'+pk);
+        const disc      = parseVal('gd_'+pk);
+        const down      = parseVal('dp_'+pk);
         const nInst     = parseInt(document.getElementById('create-installments') && document.getElementById('create-installments').value || '3', 10) || 3;
         const vatPctEl  = document.getElementById('vat-pct');
         const V         = 1 + (parseFloat(vatPctEl ? vatPctEl.value : '15') || 0) / 100;
@@ -677,11 +689,11 @@
             tr.innerHTML =
                 '<td class="border border-slate-200 px-1 py-2 font-semibold text-slate-700 text-center">' + g.name + '</td>' +
                 // ── Col 2: inputs ────────────────────────────────────────────
-                '<td class="border border-slate-200 p-1"><input id="en_'+g.pk+'"  type="number" name="entrance_exam_'+g.pk+'"  step="0.01" min="0" placeholder="0.00" class="'+INP+'"></td>' +
-                '<td class="border border-slate-200 p-1"><input id="reg_'+g.pk+'" type="number" name="registration_'+g.pk+'"   step="0.01" min="0" placeholder="0.00" class="'+INP+'"></td>' +
-                '<td class="border border-slate-200 p-1"><input id="gt_'+g.pk+'"  type="number" name="gross_tuition_'+g.pk+'"  step="0.01" min="0" placeholder="0.00" class="'+INP+'"></td>' +
-                '<td class="border border-slate-200 p-1"><input id="gd_'+g.pk+'"  type="number" name="group_discount_'+g.pk+'" step="0.01" min="0" max="100" placeholder="0" class="'+INP+'"></td>' +
-                '<td class="border border-slate-200 p-1"><input id="dp_'+g.pk+'"  type="number" name="down_payment_'+g.pk+'"   step="0.01" min="0" placeholder="0.00" class="'+INP+'"></td>' +
+                '<td class="border border-slate-200 p-1"><input id="en_'+g.pk+'"  type="text" inputmode="decimal" name="entrance_exam_'+g.pk+'"  placeholder="0.00" class="'+INP+'"></td>' +
+                '<td class="border border-slate-200 p-1"><input id="reg_'+g.pk+'" type="text" inputmode="decimal" name="registration_'+g.pk+'"   placeholder="0.00" class="'+INP+'"></td>' +
+                '<td class="border border-slate-200 p-1"><input id="gt_'+g.pk+'"  type="text" inputmode="decimal" name="gross_tuition_'+g.pk+'"  placeholder="0.00" class="'+INP+'"></td>' +
+                '<td class="border border-slate-200 p-1"><input id="gd_'+g.pk+'"  type="text" inputmode="decimal" name="group_discount_'+g.pk+'"  placeholder="0" class="'+INP+'"></td>' +
+                '<td class="border border-slate-200 p-1"><input id="dp_'+g.pk+'"  type="text" inputmode="decimal" name="down_payment_'+g.pk+'"   placeholder="0.00" class="'+INP+'"></td>' +
                 // ── Col 3: Saudi (calculated) ─────────────────────────────────
                 '<td class="border border-slate-200 bg-green-50/40 '+CALC_SAR+'" id="s_en_'+g.pk+'">—</td>' +
                 '<td class="border border-slate-200 bg-green-50/40 '+CALC_SAR+'" id="s_reg_'+g.pk+'">—</td>' +
@@ -700,16 +712,32 @@
                 '<td class="border border-slate-200 bg-amber-50/40 '+CALC_AMB+' font-bold" id="n_net_'+g.pk+'">—</td>';
             tbody.appendChild(tr);
             ['en_','reg_','gt_','gd_','dp_'].forEach(function(pfx) {
-                document.getElementById(pfx + g.pk).addEventListener('input', function() { recalc(g.pk); });
+                const inp = document.getElementById(pfx + g.pk);
+                inp.addEventListener('input', function() { recalc(g.pk); });
+                inp.addEventListener('focus', function() { this.value = this.value.replace(/,/g, ''); });
+                inp.addEventListener('blur', function() {
+                    const v = parseFloat(this.value.replace(/,/g, ''));
+                    if (!isNaN(v) && this.value.trim() !== '') this.value = fmtInput(v);
+                    recalc(g.pk);
+                });
+                inp.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const allInputs = Array.from(tbody.querySelectorAll('input[type="text"]'));
+                        const idx = allInputs.indexOf(this);
+                        const next = allInputs[idx + 5];
+                        if (next) next.focus();
+                    }
+                });
             });
             // Pre-fill from global price defaults if already set
             const gEn  = document.getElementById('global-entrance');
             const gReg = document.getElementById('global-registration');
             const gDp  = document.getElementById('global-downpayment');
             const gDisc = document.getElementById('global-discount');
-            if (gEn  && gEn.value)  document.getElementById('en_'  + g.pk).value = gEn.value;
-            if (gReg && gReg.value) document.getElementById('reg_' + g.pk).value = gReg.value;
-            if (gDp  && gDp.value)  document.getElementById('dp_'  + g.pk).value = gDp.value;
+            if (gEn  && gEn.value)  document.getElementById('en_'  + g.pk).value = fmtInput(parseFloat(gEn.value));
+            if (gReg && gReg.value) document.getElementById('reg_' + g.pk).value = fmtInput(parseFloat(gReg.value));
+            if (gDp  && gDp.value)  document.getElementById('dp_'  + g.pk).value = fmtInput(parseFloat(gDp.value));
             if (gDisc && gDisc.value) document.getElementById('gd_' + g.pk).value = gDisc.value;
             recalc(g.pk);
         });
@@ -766,9 +794,9 @@
         const globalInp = document.getElementById(globalId);
         if (!globalInp) return;
         globalInp.addEventListener('input', function() {
-            const val = this.value;
+            const raw = parseFloat(this.value.replace(/,/g, ''));
             tbody.querySelectorAll('input[name^="' + namePrefix + '"]').forEach(function(inp) {
-                inp.value = val;
+                inp.value = isNaN(raw) ? '' : fmtInput(raw);
                 const pk = inp.id.replace(inputPrefix, '');
                 recalc(pk);
             });
@@ -777,6 +805,27 @@
     makeGlobalPriceFiller('global-entrance',     'en_',  'entrance_exam_');
     makeGlobalPriceFiller('global-registration', 'reg_', 'registration_');
     makeGlobalPriceFiller('global-downpayment',  'dp_',  'down_payment_');
+
+    // Blur/focus formatting for the global quick-fill inputs
+    ['global-entrance', 'global-registration', 'global-downpayment'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('focus', function() { this.value = this.value.replace(/,/g, ''); });
+        el.addEventListener('blur', function() {
+            const v = parseFloat(this.value.replace(/,/g, ''));
+            if (!isNaN(v) && this.value.trim() !== '') this.value = fmtInput(v);
+        });
+    });
+
+    // Strip commas from formatted inputs before form submission so server receives plain numbers
+    const gradeForm = divSel.closest('form');
+    if (gradeForm) {
+        gradeForm.addEventListener('submit', function() {
+            tbody.querySelectorAll('input[type="text"]').forEach(function(inp) {
+                inp.value = inp.value.replace(/,/g, '');
+            });
+        });
+    }
 
     // On page load (e.g. validation error re-render): restore table
     if (divSel.value) buildTable(divSel.value);
