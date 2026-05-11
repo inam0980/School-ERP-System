@@ -125,17 +125,19 @@
         </div>
 
         <div id="panel-search" class="tab-panel p-5">
-            <form method="get" class="flex gap-3">
-                <input type="text" name="q" value="{{ query|default:'' }}"
-                       placeholder="Enter student name or student ID…"
+            <div class="relative">
+                <input type="text" id="liveSearchInput"
+                       value="{{ query|default:'' }}"
+                       placeholder="Type student name or ID to search…"
                        autofocus
-                       class="flex-1 border border-slate-300 rounded-lg px-4 py-2.5 text-sm
+                       autocomplete="off"
+                       class="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm pr-10
                               focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
-                <button type="submit"
-                        class="bg-primary text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-light transition">
-                    Search
-                </button>
-            </form>
+                <!-- spinner -->
+                <span id="searchSpinner"
+                      class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
+            </div>
+            <p class="mt-2 text-xs text-slate-400">Results appear as you type — click a name to select</p>
         </div>
 
         <div id="panel-browse" class="tab-panel p-5">
@@ -174,6 +176,12 @@
                 </div>
             </form>
         </div>
+    </div>
+
+    <!-- Live search dropdown — rendered OUTSIDE overflow-hidden card so it isn't clipped -->
+    <div id="searchDropdown"
+         class="hidden fixed z-[9999] bg-white border border-slate-200 rounded-xl shadow-xl overflow-y-auto"
+         style="max-height:320px;">
     </div>
 
     {% if students %}
@@ -903,5 +911,121 @@ function syncModeCards() {
         }
     });
 }
+
+// ── Live student search ──────────────────────────────────────────────
+(function () {
+    const inp      = document.getElementById('liveSearchInput');
+    const dropdown = document.getElementById('searchDropdown');
+    const spinner  = document.getElementById('searchSpinner');
+    if (!inp || !dropdown) return;
+
+    let timer = null;
+
+    function positionDropdown() {
+        const r = inp.getBoundingClientRect();
+        dropdown.style.top   = (r.bottom + window.scrollY + 4) + 'px';
+        dropdown.style.left  = (r.left  + window.scrollX) + 'px';
+        dropdown.style.width = r.width + 'px';
+    }
+
+    function openDropdown() {
+        positionDropdown();
+        dropdown.classList.remove('hidden');
+    }
+
+    function closeDropdown() {
+        dropdown.classList.add('hidden');
+        dropdown.innerHTML = '';
+    }
+
+    function buildItem(s) {
+        const a = document.createElement('a');
+        a.href = '?student_id=' + s.pk;
+        a.style.cssText = 'display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid #f1f5f9;text-decoration:none;transition:background .15s;';
+        a.onmouseenter = () => a.style.background = 'rgba(var(--color-primary-rgb,30,64,175),.05)';
+        a.onmouseleave = () => { if (!a.classList.contains('kbd-active')) a.style.background = ''; };
+        a.innerHTML = `
+            <div style="width:36px;height:36px;border-radius:50%;background:rgba(30,64,175,.1);color:#1e40af;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">
+                ${s.initial}
+            </div>
+            <div style="flex:1;min-width:0;">
+                <p style="font-weight:500;color:#1e293b;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    ${s.full_name}
+                    ${s.arabic_name ? '<span style="color:#94a3b8;font-weight:400;font-size:12px;margin-left:6px;">' + s.arabic_name + '</span>' : ''}
+                </p>
+                <p style="font-size:12px;color:#64748b;margin-top:1px;">
+                    ${s.student_id} &nbsp;·&nbsp; <strong style="color:#475569;">${s.division}</strong> &nbsp;·&nbsp; ${s.grade} / Sec ${s.section}
+                    ${s.iqama_number ? '&nbsp;·&nbsp; <span style="font-family:monospace;color:#475569;">Iqama: ' + s.iqama_number + '</span>' : ''}
+                </p>
+            </div>
+            <svg width="16" height="16" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>`;
+        return a;
+    }
+
+    async function doSearch(q) {
+        spinner.classList.remove('hidden');
+        try {
+            const res  = await fetch('{% url "fees:student_search_api" %}?q=' + encodeURIComponent(q));
+            const data = await res.json();
+            dropdown.innerHTML = '';
+            if (!data.results.length) {
+                dropdown.innerHTML = '<p style="padding:12px 20px;font-size:14px;color:#94a3b8;">No students found matching "' + q + '"</p>';
+            } else {
+                data.results.forEach(s => dropdown.appendChild(buildItem(s)));
+            }
+            openDropdown();
+        } finally {
+            spinner.classList.add('hidden');
+        }
+    }
+
+    inp.addEventListener('input', function () {
+        clearTimeout(timer);
+        const q = inp.value.trim();
+        if (q.length === 0) { closeDropdown(); return; }
+        timer = setTimeout(() => doSearch(q), 200);
+    });
+
+    // Reposition on scroll/resize so dropdown tracks the input
+    window.addEventListener('scroll', () => { if (!dropdown.classList.contains('hidden')) positionDropdown(); }, true);
+    window.addEventListener('resize', () => { if (!dropdown.classList.contains('hidden')) positionDropdown(); });
+
+    // Close when clicking outside
+    document.addEventListener('click', function (e) {
+        if (!inp.contains(e.target) && !dropdown.contains(e.target)) closeDropdown();
+    });
+
+    // Keyboard navigation
+    inp.addEventListener('keydown', function (e) {
+        const items = dropdown.querySelectorAll('a');
+        if (!items.length) return;
+        const active = dropdown.querySelector('a.kbd-active');
+        let idx = Array.from(items).indexOf(active);
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (active) { active.classList.remove('kbd-active'); active.style.background = ''; }
+            idx = (idx + 1) % items.length;
+            items[idx].classList.add('kbd-active');
+            items[idx].style.background = 'rgba(30,64,175,.08)';
+            items[idx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (active) { active.classList.remove('kbd-active'); active.style.background = ''; }
+            idx = (idx - 1 + items.length) % items.length;
+            items[idx].classList.add('kbd-active');
+            items[idx].style.background = 'rgba(30,64,175,.08)';
+            items[idx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+            if (active) { e.preventDefault(); active.click(); }
+        } else if (e.key === 'Escape') {
+            closeDropdown();
+        }
+    });
+
+    // If page loaded with existing query, search immediately
+    if (inp.value.trim().length > 0) doSearch(inp.value.trim());
+})();
 </script>
 {% endblock %}

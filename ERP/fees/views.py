@@ -75,6 +75,41 @@ def api_fees_summary(request):
     return JsonResponse(data)
 
 
+@login_required
+def student_search_api(request):
+    """Live search: returns up to 20 students whose name starts with `q`."""
+    q = request.GET.get('q', '').strip()
+    if len(q) < 1:
+        return JsonResponse({'results': []})
+    qs = (
+        Student.objects
+        .filter(
+            Q(full_name__istartswith=q) |
+            Q(arabic_name__istartswith=q) |
+            Q(student_id__icontains=q) |
+            Q(iqama_number__istartswith=q),
+            is_active=True,
+        )
+        .select_related('grade', 'section', 'division')
+        .order_by('full_name')[:20]
+    )
+    results = [
+        {
+            'pk':          s.pk,
+            'full_name':   s.full_name,
+            'arabic_name': s.arabic_name or '',
+            'student_id':  s.student_id,
+            'iqama_number': s.iqama_number or '',
+            'division':    str(s.division) if s.division else '',
+            'grade':       s.grade.name if s.grade else '',
+            'section':     s.section.name if s.section else '',
+            'initial':     (s.full_name or '?')[0].upper(),
+        }
+        for s in qs
+    ]
+    return JsonResponse({'results': results})
+
+
 # ════════════════════════════════════════════════════════════════
 #  FEE TYPE CRUD
 # ════════════════════════════════════════════════════════════════

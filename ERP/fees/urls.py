@@ -68,6 +68,7 @@ urlpatterns = [
 
     # JSON API
     path('api/summary/',                  views.api_fees_summary,      name='api_summary'),
+    path('api/student-search/',           views.student_search_api,    name='student_search_api'),
 
     # Installment Payment Plans (per student fee)
     path('payment-plan/<int:student_fee_pk>/setup/', views.setup_payment_plan, name='payment_plan_setup'),
