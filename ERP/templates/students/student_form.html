@@ -81,7 +81,26 @@
                     </div>
 
                     {% include 'students/_field.html' with field=form.national_id %}
-                    {% include 'students/_field.html' with field=form.iqama_number %}
+                    <!-- Iqama Number — 10-digit counter -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 mb-1.5" for="{{ form.iqama_number.id_for_label }}">
+                            {{ form.iqama_number.label }} <span class="text-red-400">*</span>
+                        </label>
+                        <div class="relative">
+                            {{ form.iqama_number }}
+                            <span id="iqamaCounter"
+                                  class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-semibold pointer-events-none select-none px-1.5 py-0.5 rounded"
+                                  style="background:rgba(241,245,249,.9)">
+                                0/10
+                            </span>
+                        </div>
+                        {% if form.iqama_number.errors %}
+                            {% for e in form.iqama_number.errors %}
+                                <p class="mt-1 text-xs text-red-500">{{ e }}</p>
+                            {% endfor %}
+                        {% endif %}
+                        <p class="mt-1 text-xs text-slate-400">Exactly 10 digits — Iqama / رقم الإقامة</p>
+                    </div>
                     {% include 'students/_field.html' with field=form.passport_number %}
                     {% include 'students/_field.html' with field=form.religion %}
                     {% include 'students/_field.html' with field=form.birth_place %}
@@ -143,7 +162,22 @@
                 {% include 'students/_field.html' with field=form.arabic_father rtl=True %}
                 {% include 'students/_field.html' with field=form.father_nationality %}
                 {% include 'students/_field.html' with field=form.father_family_book_no %}
-                {% include 'students/_field.html' with field=form.father_national_id %}
+                <!-- Father ID/Iqama — 10-digit counter -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5" for="{{ form.father_national_id.id_for_label }}">
+                        {{ form.father_national_id.label }}{% if form.father_national_id.field.required %} <span class="text-red-400">*</span>{% endif %}
+                    </label>
+                    <div class="relative">
+                        {{ form.father_national_id }}
+                        <span id="fatherIdCounter"
+                              class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-semibold pointer-events-none select-none px-1.5 py-0.5 rounded"
+                              style="background:rgba(241,245,249,.9)">0/10</span>
+                    </div>
+                    {% if form.father_national_id.errors %}
+                        {% for e in form.father_national_id.errors %}<p class="mt-1 text-xs text-red-500">{{ e }}</p>{% endfor %}
+                    {% endif %}
+                    <p class="mt-1 text-xs text-slate-400">Exactly 10 digits — ID / Iqama / رقم الإقامة</p>
+                </div>
                 {% include 'students/_field.html' with field=form.father_occupation %}
                 {% include 'students/_field.html' with field=form.father_employer %}
                 {% include 'students/_field.html' with field=form.father_business_phone %}
@@ -170,7 +204,22 @@
                 {% include 'students/_field.html' with field=form.arabic_mother rtl=True %}
                 {% include 'students/_field.html' with field=form.mother_nationality %}
                 {% include 'students/_field.html' with field=form.mother_family_book_no %}
-                {% include 'students/_field.html' with field=form.mother_national_id %}
+                <!-- Mother ID/Iqama — 10-digit counter -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1.5" for="{{ form.mother_national_id.id_for_label }}">
+                        {{ form.mother_national_id.label }}{% if form.mother_national_id.field.required %} <span class="text-red-400">*</span>{% endif %}
+                    </label>
+                    <div class="relative">
+                        {{ form.mother_national_id }}
+                        <span id="motherIdCounter"
+                              class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-semibold pointer-events-none select-none px-1.5 py-0.5 rounded"
+                              style="background:rgba(241,245,249,.9)">0/10</span>
+                    </div>
+                    {% if form.mother_national_id.errors %}
+                        {% for e in form.mother_national_id.errors %}<p class="mt-1 text-xs text-red-500">{{ e }}</p>{% endfor %}
+                    {% endif %}
+                    <p class="mt-1 text-xs text-slate-400">Exactly 10 digits — ID / Iqama / رقم الإقامة</p>
+                </div>
                 {% include 'students/_field.html' with field=form.mother_occupation %}
                 {% include 'students/_field.html' with field=form.mother_employer %}
                 {% include 'students/_field.html' with field=form.mother_business_phone %}
@@ -499,6 +548,31 @@
 
 {% block extra_scripts %}
 <script>
+// ── 10-digit ID counters (Iqama / Father / Mother) ──────────────────
+(function () {
+    function initCounter(inputId, counterId) {
+        const inp     = document.getElementById(inputId);
+        const counter = document.getElementById(counterId);
+        if (!inp || !counter) return;
+
+        function update() {
+            inp.value = inp.value.replace(/\D/g, '').slice(0, 10);
+            const len = inp.value.length;
+            counter.textContent = len + '/10';
+            counter.style.color = len === 10 ? '#16a34a'
+                                : len >= 8   ? '#d97706'
+                                :              '#94a3b8';
+        }
+
+        update();
+        inp.addEventListener('input', update);
+    }
+
+    initCounter('id_iqama_number',       'iqamaCounter');
+    initCounter('id_father_national_id', 'fatherIdCounter');
+    initCounter('id_mother_national_id', 'motherIdCounter');
+})();
+
 // ── Citizenship picker ──────────────────────────────────────────────
 const nationalityInput = document.getElementById('{{ form.nationality.id_for_label }}');
 
