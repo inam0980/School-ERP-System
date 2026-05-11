@@ -199,3 +199,61 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    const divisionSel   = document.getElementById('{{ form.division.id_for_label }}');
+    const gradeSel      = document.getElementById('{{ form.grade.id_for_label }}');
+    const sectionSel    = document.getElementById('{{ form.section.id_for_label }}');
+    const selectedGrade   = "{{ form.grade.value|default:'' }}";
+    const selectedSection = "{{ form.section.value|default:'' }}";
+
+    async function loadGrades(divisionId, preserveGrade) {
+        gradeSel.innerHTML   = '<option value="">---------</option>';
+        sectionSel.innerHTML = '<option value="">---------</option>';
+        if (!divisionId) return;
+
+        const res  = await fetch(`/api/grades/?division_id=${divisionId}`);
+        const data = await res.json();
+        data.grades.forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g.id;
+            opt.textContent = g.name;
+            if (preserveGrade && String(g.id) === String(preserveGrade)) opt.selected = true;
+            gradeSel.appendChild(opt);
+        });
+
+        if (preserveGrade) loadSections(preserveGrade, selectedSection);
+    }
+
+    async function loadSections(gradeId, preserveSection) {
+        sectionSel.innerHTML = '<option value="">---------</option>';
+        if (!gradeId) return;
+
+        const res  = await fetch(`/api/sections/?grade_id=${gradeId}`);
+        const data = await res.json();
+        data.sections.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s.name;
+            if (preserveSection && String(s.id) === String(preserveSection)) opt.selected = true;
+            sectionSel.appendChild(opt);
+        });
+    }
+
+    divisionSel.addEventListener('change', function () {
+        loadGrades(this.value, null);
+    });
+
+    gradeSel.addEventListener('change', function () {
+        loadSections(this.value, null);
+    });
+
+    // On page load: restore cascaded dropdowns if filters were already applied.
+    if (divisionSel.value) {
+        loadGrades(divisionSel.value, selectedGrade);
+    }
+})();
+</script>
+{% endblock %}
