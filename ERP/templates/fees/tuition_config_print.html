@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
@@ -127,51 +127,51 @@
       <tr>
         <td>1</td>
         <td>Entrance Exam Fee</td>
-        <td class="right">{{ config.entrance_exam_fee|floatformat:2 }}</td>
+        <td class="right">{{ config.entrance_exam_fee|money }}</td>
         <td>One-time (new applicants)</td>
       </tr>
       <tr>
         <td>2</td>
         <td>Registration Fee</td>
-        <td class="right">{{ config.registration_fee|floatformat:2 }}</td>
+        <td class="right">{{ config.registration_fee|money }}</td>
         <td>One-time</td>
       </tr>
       <tr>
         <td>3</td>
         <td>Reservation Fee (Down Payment / حجز مقعد)</td>
-        <td class="right">{{ config.reservation_fee|floatformat:2 }}</td>
+        <td class="right">{{ config.reservation_fee|money }}</td>
         <td>Deducted from 1st installment</td>
       </tr>
       <tr>
         <td>4</td>
         <td><strong>Gross Tuition Fee</strong></td>
-        <td class="right"><strong>{{ config.gross_tuition_fee|floatformat:2 }}</strong></td>
+        <td class="right"><strong>{{ config.gross_tuition_fee|money }}</strong></td>
         <td>{% if config.includes_books %}Includes books{% else %}Excludes books{% endif %}</td>
       </tr>
       <tr class="{% if config.group_discount_enabled %}amber-row{% endif %}">
         <td>5</td>
         <td>Group Discount {% if config.group_discount_enabled %}({{ config.group_discount_pct }}%){% endif %}</td>
         <td class="right">
-          {% if config.group_discount_enabled %}({{ config.group_discount_amount|floatformat:2 }}){% else %}—{% endif %}
+          {% if config.group_discount_enabled %}({{ config.group_discount_amount|money }}){% else %}—{% endif %}
         </td>
         <td>{% if config.group_discount_enabled %}Applied{% else %}Not applicable{% endif %}</td>
       </tr>
       <tr class="green-row">
         <td>6</td>
         <td><strong>Net Tuition Fee — Saudi Nationals</strong></td>
-        <td class="right"><strong>{{ config.net_tuition_fee|floatformat:2 }}</strong></td>
+        <td class="right"><strong>{{ config.net_tuition_fee|money }}</strong></td>
         <td>VAT zero-rated (National ID holders)</td>
       </tr>
       <tr>
         <td>7</td>
         <td>VAT ({{ config.vat_pct }}%)</td>
-        <td class="right">+ {{ config.vat_amount_non_saudi|floatformat:2 }}</td>
+        <td class="right">+ {{ config.vat_amount_non_saudi|money }}</td>
         <td>Non-Saudi students only (ZATCA)</td>
       </tr>
       <tr class="blue-row">
         <td>8</td>
         <td><strong>Final Net Tuition — Non-Saudi Students</strong></td>
-        <td class="right"><strong>{{ config.final_net_non_saudi|floatformat:2 }}</strong></td>
+        <td class="right"><strong>{{ config.final_net_non_saudi|money }}</strong></td>
         <td>Includes {{ config.vat_pct }}% VAT</td>
       </tr>
     </tbody>
@@ -192,16 +192,16 @@
     <tbody>
       <tr class="green-row">
         <td>Saudi Nationals (هوية وطنية)</td>
-        <td class="right">{{ config.net_tuition_fee|floatformat:2 }}</td>
+        <td class="right">{{ config.net_tuition_fee|money }}</td>
         <td class="right">0.00</td>
-        <td class="right">{{ config.net_tuition_fee|floatformat:2 }}</td>
+        <td class="right">{{ config.net_tuition_fee|money }}</td>
         <td>VAT zero-rated</td>
       </tr>
       <tr class="blue-row">
         <td>Non-Saudi (Iqama / Passport)</td>
-        <td class="right">{{ config.net_tuition_fee|floatformat:2 }}</td>
-        <td class="right">{{ config.vat_amount_non_saudi|floatformat:2 }}</td>
-        <td class="right">{{ config.final_net_non_saudi|floatformat:2 }}</td>
+        <td class="right">{{ config.net_tuition_fee|money }}</td>
+        <td class="right">{{ config.vat_amount_non_saudi|money }}</td>
+        <td class="right">{{ config.final_net_non_saudi|money }}</td>
         <td>{{ config.vat_pct }}% VAT applies</td>
       </tr>
     </tbody>
@@ -223,14 +223,14 @@
       {% for inst in installments %}
       <tr {% if inst.installment_type == 'RESERVATION' %}class="amber-row"{% endif %}>
         <td>{{ inst.get_installment_type_display }}</td>
-        <td class="right"><strong>{{ inst.amount|floatformat:2 }}</strong></td>
+        <td class="right"><strong>{{ inst.amount|money }}</strong></td>
         <td>{{ inst.due_date|default:"—" }}</td>
         <td>{{ inst.notes|default:"" }}</td>
       </tr>
       {% endfor %}
       <tr class="total-row">
         <td><strong>TOTAL INSTALLMENTS</strong></td>
-        <td class="right"><strong>{{ config.installments_total|floatformat:2 }}</strong></td>
+        <td class="right"><strong>{{ config.installments_total|money }}</strong></td>
         <td colspan="2">
           {% if not validation_errors %}
           <span class="badge badge-green">✓ Matches Net Tuition</span>
@@ -251,19 +251,19 @@
   <div class="summary-grid">
     <div class="summary-card">
       <div class="label">Entrance Exam</div>
-      <div class="value" style="color:#475569;">SAR {{ config.entrance_exam_fee|floatformat:0 }}</div>
+      <div class="value" style="color:#475569;">SAR {{ config.entrance_exam_fee|money:0 }}</div>
     </div>
     <div class="summary-card">
       <div class="label">Registration</div>
-      <div class="value" style="color:#475569;">SAR {{ config.registration_fee|floatformat:0 }}</div>
+      <div class="value" style="color:#475569;">SAR {{ config.registration_fee|money:0 }}</div>
     </div>
     <div class="summary-card" style="border-color:#86efac;">
       <div class="label" style="color:#16a34a;">Saudi Tuition</div>
-      <div class="value" style="color:#166534;">SAR {{ config.net_tuition_fee|floatformat:0 }}</div>
+      <div class="value" style="color:#166534;">SAR {{ config.net_tuition_fee|money:0 }}</div>
     </div>
     <div class="summary-card" style="border-color:#93c5fd;">
       <div class="label" style="color:#2563eb;">Non-Saudi Tuition</div>
-      <div class="value" style="color:#1d4ed8;">SAR {{ config.final_net_non_saudi|floatformat:0 }}</div>
+      <div class="value" style="color:#1d4ed8;">SAR {{ config.final_net_non_saudi|money:0 }}</div>
     </div>
   </div>
 

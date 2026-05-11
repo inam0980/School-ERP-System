@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% block title %}{{ student.full_name }} — Student Profile{% endblock %}
 {% block page_title %}Student Profile / ملف الطالب{% endblock %}
 
@@ -146,18 +146,18 @@
         <div class="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
             <div class="px-5 py-4 text-center">
                 <p class="text-xs text-slate-400 mb-1">Total Charged</p>
-                <p class="text-lg font-bold text-slate-800">{{ total_charged|floatformat:2 }}</p>
+                <p class="text-lg font-bold text-slate-800">{{ total_charged|money }}</p>
                 <p class="text-xs text-slate-400">SAR</p>
             </div>
             <div class="px-5 py-4 text-center">
                 <p class="text-xs text-slate-400 mb-1">Total Paid</p>
-                <p class="text-lg font-bold text-emerald-600">{{ total_paid|floatformat:2 }}</p>
+                <p class="text-lg font-bold text-emerald-600">{{ total_paid|money }}</p>
                 <p class="text-xs text-slate-400">SAR</p>
             </div>
             <div class="px-5 py-4 text-center">
                 <p class="text-xs text-slate-400 mb-1">Balance Due</p>
                 <p class="text-lg font-bold {% if balance_due > 0 %}text-red-600{% else %}text-emerald-600{% endif %}">
-                    {{ balance_due|floatformat:2 }}
+                    {{ balance_due|money }}
                 </p>
                 <p class="text-xs text-slate-400">SAR</p>
             </div>
@@ -188,11 +188,11 @@
                     {% for fee in fees %}
                     <tr class="hover:bg-slate-50">
                         <td class="px-4 py-2 text-slate-700 font-medium">{{ fee.fee_structure.fee_type.name }}</td>
-                        <td class="px-4 py-2 text-right text-slate-600">{{ fee.net_amount|floatformat:2 }}</td>
-                        <td class="px-4 py-2 text-right text-emerald-600">{{ fee.amount_paid|floatformat:2 }}</td>
+                        <td class="px-4 py-2 text-right text-slate-600">{{ fee.net_amount|money }}</td>
+                        <td class="px-4 py-2 text-right text-emerald-600">{{ fee.amount_paid|money }}</td>
                         <td class="px-4 py-2 text-right font-semibold
                             {% if fee.balance > 0 %}text-red-600{% else %}text-slate-400{% endif %}">
-                            {{ fee.balance|floatformat:2 }}
+                            {{ fee.balance|money }}
                         </td>
                         <td class="px-4 py-2 text-center text-slate-500">{{ fee.due_date|date:"Y-m-d" }}</td>
                         <td class="px-4 py-2 text-center">
@@ -243,9 +243,9 @@
                     {% for p in admission_payments %}
                     <tr class="hover:bg-green-50/50">
                         <td class="px-4 py-2 text-slate-700">{{ p.fee_description }}</td>
-                        <td class="px-4 py-2 text-right text-slate-600">{{ p.amount|floatformat:2 }}</td>
-                        <td class="px-4 py-2 text-right text-slate-400">{{ p.vat_amount|floatformat:2 }}</td>
-                        <td class="px-4 py-2 text-right font-semibold text-slate-800">{{ p.total|floatformat:2 }}</td>
+                        <td class="px-4 py-2 text-right text-slate-600">{{ p.amount|money }}</td>
+                        <td class="px-4 py-2 text-right text-slate-400">{{ p.vat_amount|money }}</td>
+                        <td class="px-4 py-2 text-right font-semibold text-slate-800">{{ p.total|money }}</td>
                         <td class="px-4 py-2 text-center text-slate-500">{{ p.payment_date|date:"Y-m-d" }}</td>
                         <td class="px-4 py-2 text-center">
                             <span class="px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded-full font-semibold">Paid</span>

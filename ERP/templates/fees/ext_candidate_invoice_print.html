@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -145,18 +145,18 @@
                 <td class="border border-slate-300 px-2 py-2 text-center">{{ forloop.counter }}</td>
                 <td class="border border-slate-300 px-2 py-2">{{ item.description }}</td>
                 <td class="border border-slate-300 px-2 py-2 text-center">{{ item.qty|default:1 }}</td>
-                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.gross_amount|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.gross_amount|money }}</td>
                 <td class="border border-slate-300 px-2 py-2 text-right">0.00</td>
-                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.net_before_vat|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{ item.net_before_vat|money }}</td>
                 <td class="border border-slate-300 px-2 py-2 text-center font-semibold
                     {% if item.vat_rate == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
                     {{ item.vat_rate|default:0 }}
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right
                     {% if item.vat_rate == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
-                    {{ item.vat|floatformat:2 }}
+                    {{ item.vat|money }}
                 </td>
-                <td class="border border-slate-300 px-2 py-2 text-right font-semibold">{{ item.total|floatformat:2 }}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right font-semibold">{{ item.total|money }}</td>
             </tr>
             {% empty %}
             <tr>
@@ -196,7 +196,7 @@
                             <span style="direction:ltr;display:block;text-align:left;color:#64748b;">Net Amount Before VAT</span>
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-semibold">
-                            {{ subtotal|floatformat:2 }}
+                            {{ subtotal|money }}
                         </td>
                     </tr>
                     <tr>
@@ -206,7 +206,7 @@
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-semibold
                             {% if tax_amount == 0 %}text-green-700{% else %}text-orange-700{% endif %}">
-                            {{ tax_amount|floatformat:2 }}
+                            {{ tax_amount|money }}
                         </td>
                     </tr>
                     <tr style="background:#f8fafc;">
@@ -215,7 +215,7 @@
                             <span style="direction:ltr;display:block;text-align:left;">Total Amount with VAT</span>
                         </td>
                         <td class="border border-slate-300 px-3 py-2 text-right font-bold text-base" style="color:#1e3a5f;">
-                            {{ grand_total|floatformat:2 }}
+                            {{ grand_total|money }}
                         </td>
                     </tr>
                 </table>

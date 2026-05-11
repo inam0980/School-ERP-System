@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Reservation/Entrance Invoice PDF — Al-Kawthar{% endblock %}
 
 {% block content %}
@@ -50,9 +50,9 @@
                     {{ sf.fee_structure.fee_type.name }}<br>
                     <span style="font-size:0.9em;color:#64748b;">{{ sf.fee_structure.fee_type.get_category_display }}</span>
                 </td>
-                <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;">{{ sf.amount|floatformat:2 }}</td>
-                <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;">{{ sf.discount|floatformat:2 }}</td>
-                <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;font-weight:bold;">{{ sf.net_amount|floatformat:2 }}</td>
+                <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;">{{ sf.amount|money }}</td>
+                <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;">{{ sf.discount|money }}</td>
+                <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:right;font-weight:bold;">{{ sf.net_amount|money }}</td>
                 <td style="padding:8px 6px;border:1px solid #e5e7eb;text-align:center;">
                     {{ sf.get_status_display }}
                 </td>

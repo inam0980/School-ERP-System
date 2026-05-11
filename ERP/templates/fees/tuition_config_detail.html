@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Fee Structure — {{ config }} — Al-Kawthar{% endblock %}
 
 {% block content %}
@@ -136,25 +136,25 @@
         <tr>
           <td class="px-5 py-3 text-slate-400">1</td>
           <td class="px-5 py-3 font-medium text-slate-700">Entrance Exam Fee</td>
-          <td class="px-5 py-3 text-right font-mono text-slate-800">{{ config.entrance_exam_fee|floatformat:2 }}</td>
+          <td class="px-5 py-3 text-right font-mono text-slate-800">{{ config.entrance_exam_fee|money }}</td>
           <td class="px-5 py-3 text-slate-500 text-xs">One-time (new applicants)</td>
         </tr>
         <tr class="bg-slate-50">
           <td class="px-5 py-3 text-slate-400">2</td>
           <td class="px-5 py-3 font-medium text-slate-700">Registration Fee</td>
-          <td class="px-5 py-3 text-right font-mono text-slate-800">{{ config.registration_fee|floatformat:2 }}</td>
+          <td class="px-5 py-3 text-right font-mono text-slate-800">{{ config.registration_fee|money }}</td>
           <td class="px-5 py-3 text-slate-500 text-xs">One-time</td>
         </tr>
         <tr>
           <td class="px-5 py-3 text-slate-400">3</td>
           <td class="px-5 py-3 font-medium text-slate-700">Reservation Fee <span class="text-xs text-slate-400">(Down Payment)</span></td>
-          <td class="px-5 py-3 text-right font-mono text-slate-800">{{ config.reservation_fee|floatformat:2 }}</td>
+          <td class="px-5 py-3 text-right font-mono text-slate-800">{{ config.reservation_fee|money }}</td>
           <td class="px-5 py-3 text-slate-500 text-xs">Deducted from 1st installment</td>
         </tr>
         <tr class="bg-slate-50">
           <td class="px-5 py-3 text-slate-400">4</td>
           <td class="px-5 py-3 font-medium text-slate-700">Gross Tuition Fee</td>
-          <td class="px-5 py-3 text-right font-mono font-semibold text-slate-800">{{ config.gross_tuition_fee|floatformat:2 }}</td>
+          <td class="px-5 py-3 text-right font-mono font-semibold text-slate-800">{{ config.gross_tuition_fee|money }}</td>
           <td class="px-5 py-3 text-slate-500 text-xs">
             {% if config.includes_books %}Includes books{% else %}Excludes books{% endif %}
           </td>
@@ -172,7 +172,7 @@
           <td class="px-5 py-3 text-right font-mono
             {% if config.group_discount_enabled %}text-red-600{% else %}text-slate-400{% endif %}">
             {% if config.group_discount_enabled %}
-            − {{ config.group_discount_amount|floatformat:2 }}
+            − {{ config.group_discount_amount|money }}
             {% else %}
             0.00
             {% endif %}
@@ -184,19 +184,19 @@
         <tr class="bg-green-50 font-semibold">
           <td class="px-5 py-3 text-slate-400">6</td>
           <td class="px-5 py-3 text-green-800">Net Tuition Fee <span class="font-normal text-xs text-green-600">(Saudi students)</span></td>
-          <td class="px-5 py-3 text-right font-mono text-green-800">{{ config.net_tuition_fee|floatformat:2 }}</td>
+          <td class="px-5 py-3 text-right font-mono text-green-800">{{ config.net_tuition_fee|money }}</td>
           <td class="px-5 py-3 text-green-600 text-xs font-normal">No VAT (zero-rated for Saudi nationals)</td>
         </tr>
         <tr>
           <td class="px-5 py-3 text-slate-400">7</td>
           <td class="px-5 py-3 font-medium text-slate-700">VAT ({{ config.vat_pct }}%)</td>
-          <td class="px-5 py-3 text-right font-mono text-blue-700">+ {{ config.vat_amount_non_saudi|floatformat:2 }}</td>
+          <td class="px-5 py-3 text-right font-mono text-blue-700">+ {{ config.vat_amount_non_saudi|money }}</td>
           <td class="px-5 py-3 text-slate-500 text-xs">Applied to non-Saudi students only (ZATCA)</td>
         </tr>
         <tr class="bg-blue-50 font-bold">
           <td class="px-5 py-3 text-slate-400">8</td>
           <td class="px-5 py-3 text-blue-800">Final Net Tuition <span class="font-normal text-xs text-blue-600">(Non-Saudi students)</span></td>
-          <td class="px-5 py-3 text-right font-mono text-blue-800 text-base">{{ config.final_net_non_saudi|floatformat:2 }}</td>
+          <td class="px-5 py-3 text-right font-mono text-blue-800 text-base">{{ config.final_net_non_saudi|money }}</td>
           <td class="px-5 py-3 text-blue-600 text-xs font-normal">Includes 15% VAT</td>
         </tr>
       </tbody>
@@ -228,11 +228,11 @@
             🇸🇦 Saudi Nationals
           </td>
           <td class="px-5 py-3 text-right font-mono font-bold text-green-800">
-            SAR {{ config.net_tuition_fee|floatformat:2 }}
+            SAR {{ config.net_tuition_fee|money }}
           </td>
           <td class="px-5 py-3 text-right font-mono text-slate-400">0.00</td>
           <td class="px-5 py-3 text-right font-mono font-bold text-green-800">
-            SAR {{ config.net_tuition_fee|floatformat:2 }}
+            SAR {{ config.net_tuition_fee|money }}
           </td>
           <td class="px-5 py-3 text-xs text-green-700">VAT zero-rated (National ID)</td>
         </tr>
@@ -241,13 +241,13 @@
             🌍 Non-Saudi (Iqama / Passport)
           </td>
           <td class="px-5 py-3 text-right font-mono text-blue-700">
-            SAR {{ config.net_tuition_fee|floatformat:2 }}
+            SAR {{ config.net_tuition_fee|money }}
           </td>
           <td class="px-5 py-3 text-right font-mono text-blue-700">
-            + SAR {{ config.vat_amount_non_saudi|floatformat:2 }}
+            + SAR {{ config.vat_amount_non_saudi|money }}
           </td>
           <td class="px-5 py-3 text-right font-mono font-bold text-blue-800">
-            SAR {{ config.final_net_non_saudi|floatformat:2 }}
+            SAR {{ config.final_net_non_saudi|money }}
           </td>
           <td class="px-5 py-3 text-xs text-blue-700">15% VAT applies (ZATCA)</td>
         </tr>
@@ -291,12 +291,12 @@
             {% endif %}
           </td>
           <td class="px-5 py-3 text-right font-mono font-semibold text-slate-800">
-            {{ inst.amount|floatformat:2 }}
+            {{ inst.amount|money }}
           </td>
           <td class="px-5 py-3 text-right font-mono text-blue-700">
             {# Proportional VAT for installment #}
             {% if inst.installment_type != 'RESERVATION' and config.vat_pct %}
-            {% with vat_part=inst.amount|floatformat:2 %}
+            {% with vat_part=inst.amount|money %}
             —
             {% endwith %}
             {% else %}
@@ -313,7 +313,7 @@
         <tr class="bg-slate-100 font-bold">
           <td class="px-5 py-3 text-slate-700">TOTAL INSTALLMENTS</td>
           <td class="px-5 py-3 text-right font-mono text-slate-800">
-            {{ config.installments_total|floatformat:2 }}
+            {{ config.installments_total|money }}
           </td>
           <td class="px-5 py-3" colspan="3"></td>
         </tr>
@@ -325,7 +325,7 @@
           </td>
           <td class="px-5 py-3 text-right font-mono text-sm
             {% if validation_errors %}text-red-600{% else %}text-green-700{% endif %}">
-            {{ config.net_tuition_fee|floatformat:2 }}
+            {{ config.net_tuition_fee|money }}
           </td>
           <td class="px-5 py-3 text-xs
             {% if validation_errors %}text-red-600{% else %}text-green-600{% endif %}"
@@ -356,19 +356,19 @@
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
   <div class="bg-white border border-slate-200 rounded-xl p-4 text-center">
     <p class="text-xs text-slate-400 mb-1">Entrance Exam</p>
-    <p class="text-lg font-bold text-slate-700">SAR {{ config.entrance_exam_fee|floatformat:0 }}</p>
+    <p class="text-lg font-bold text-slate-700">SAR {{ config.entrance_exam_fee|money:0 }}</p>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4 text-center">
     <p class="text-xs text-slate-400 mb-1">Registration</p>
-    <p class="text-lg font-bold text-slate-700">SAR {{ config.registration_fee|floatformat:0 }}</p>
+    <p class="text-lg font-bold text-slate-700">SAR {{ config.registration_fee|money:0 }}</p>
   </div>
   <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
     <p class="text-xs text-green-600 mb-1">Tuition – Saudi</p>
-    <p class="text-xl font-bold text-green-800">SAR {{ config.net_tuition_fee|floatformat:0 }}</p>
+    <p class="text-xl font-bold text-green-800">SAR {{ config.net_tuition_fee|money:0 }}</p>
   </div>
   <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
     <p class="text-xs text-blue-600 mb-1">Tuition – Non-Saudi</p>
-    <p class="text-xl font-bold text-blue-800">SAR {{ config.final_net_non_saudi|floatformat:0 }}</p>
+    <p class="text-xl font-bold text-blue-800">SAR {{ config.final_net_non_saudi|money:0 }}</p>
   </div>
 </div>
 {% endblock %}

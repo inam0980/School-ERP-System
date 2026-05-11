@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Defaulters List — Al-Kawthar{% endblock %}
 
 {% block content %}
@@ -50,7 +50,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
     </svg>
     <div>
-        <p class="font-semibold text-red-700">Total Overdue Balance: SAR {{ total_overdue|floatformat:2 }}</p>
+        <p class="font-semibold text-red-700">Total Overdue Balance: SAR {{ total_overdue|money }}</p>
         <p class="text-xs text-red-500">{{ fees|length }} overdue record(s) flagged</p>
     </div>
 </div>
@@ -81,9 +81,9 @@
                 </td>
                 <td class="px-4 py-3 text-slate-600">{{ sf.student.grade.name }} / {{ sf.student.section.name }}</td>
                 <td class="px-4 py-3 text-slate-600">{{ sf.fee_structure.fee_type.name }}</td>
-                <td class="px-4 py-3 text-right font-medium">SAR {{ sf.net_amount|floatformat:2 }}</td>
-                <td class="px-4 py-3 text-right text-green-600">SAR {{ sf.amount_paid|floatformat:2 }}</td>
-                <td class="px-4 py-3 text-right font-bold text-red-600">SAR {{ sf.balance|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right font-medium">SAR {{ sf.net_amount|money }}</td>
+                <td class="px-4 py-3 text-right text-green-600">SAR {{ sf.amount_paid|money }}</td>
+                <td class="px-4 py-3 text-right font-bold text-red-600">SAR {{ sf.balance|money }}</td>
                 <td class="px-4 py-3 text-slate-600">{{ sf.due_date|date:"d M Y" }}</td>
                 <td class="px-4 py-3 text-right">
                     {% with days=sf.due_date|timesince %}

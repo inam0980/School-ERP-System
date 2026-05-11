@@ -45,62 +45,63 @@ def _logo_base64():
 
 def _build_row(structure, fee_types_map):
     """
-    Given a FeeStructure and a {category: FeeType} map,
-    build a dict with computed amounts for each column.
+    Build a dict with computed amounts for each PDF column from a FeeStructure.
+    Installments are stored as OTHER-category fee types named '1st/2nd/3rd Installment'.
     """
-    items = {item.fee_type.category: item.amount
-             for item in structure.items.select_related('fee_type').all()}
+    items_by_cat  = {}
+    items_by_name = {}
+    for item in structure.items.select_related('fee_type').all():
+        items_by_cat[item.fee_type.category] = item.amount
+        items_by_name[item.fee_type.name]    = item.amount
 
-    entrance    = items.get(_CAT_ENTRANCE,    Decimal('0.00'))
-    registration = items.get(_CAT_REGISTRATION, Decimal('0.00'))
-    reservation  = items.get(_CAT_RESERVATION,  Decimal('0.00'))
-    gross_tuition = items.get(_CAT_TUITION,     Decimal('0.00'))
+    entrance      = items_by_cat.get(_CAT_ENTRANCE,     Decimal('0.00'))
+    registration  = items_by_cat.get(_CAT_REGISTRATION, Decimal('0.00'))
+    reservation   = items_by_cat.get(_CAT_RESERVATION,  Decimal('0.00'))
+    gross_tuition = items_by_cat.get(_CAT_TUITION,      Decimal('0.00'))
 
-    # Detect installment amounts — any fee type whose name contains keywords
-    # Alternatively, look for fee types named like "1st Installment" etc.
-    # We'll grab them by order from remaining amounts
-    other_items = [
-        (ft_cat, amt) for ft_cat, amt in items.items()
-        if ft_cat not in (_CAT_ENTRANCE, _CAT_REGISTRATION, _CAT_RESERVATION, _CAT_TUITION)
-    ]
+    first_inst  = items_by_name.get('1st Installment', Decimal('0.00'))
+    second_inst = items_by_name.get('2nd Installment', Decimal('0.00'))
+    third_inst  = items_by_name.get('3rd Installment', Decimal('0.00'))
 
-    # Sort by fee type name to get consistent order
-    installments = sorted(other_items, key=lambda x: str(x[0]))
-
-    first_inst  = installments[0][1] if len(installments) > 0 else Decimal('0.00')
-    second_inst = installments[1][1] if len(installments) > 1 else Decimal('0.00')
-    third_inst  = installments[2][1] if len(installments) > 2 else Decimal('0.00')
-
-    # For gross: if no separate gross tuition, use all non-entrance/registration amounts combined
-    if gross_tuition == Decimal('0.00'):
-        gross_tuition = sum(
-            amt for cat, amt in items.items()
-            if cat not in (_CAT_ENTRANCE, _CAT_REGISTRATION, _CAT_RESERVATION)
-        )
-
-    # Net tuition = gross (no group discount tracked in FeeStructure)
     net_tuition = gross_tuition
 
-    # Non-Saudi = net + 15% VAT on tuition
+    # Fallback: if installments were never saved, calculate 2 equal splits from remaining
+    if first_inst == Decimal('0.00') and net_tuition > Decimal('0.00'):
+        remaining   = max(Decimal('0.00'), net_tuition - reservation)
+        half        = (remaining / 2 * 100).to_integral_value(rounding='ROUND_FLOOR') / 100
+        first_inst  = half
+        second_inst = (remaining - half).quantize(Decimal('0.01'))
+
     vat_amount    = (net_tuition * VAT_RATE).quantize(Decimal('0.01'))
     non_saudi_net = (net_tuition + vat_amount).quantize(Decimal('0.01'))
+    V = Decimal('1') + VAT_RATE
+
+    def _vat(v):
+        return (v * V).quantize(Decimal('0.01'))
 
     return {
+        # Saudi amounts (no VAT)
         'grade':          structure.grade.name,
         'entrance_exam':  entrance,
         'registration':   registration,
         'gross_tuition':  gross_tuition,
-        'group_disc_amt': Decimal('0.00'),   # group discount not stored in FeeStructure
-        'tuition_net':    net_tuition,        # ← matches template's r.tuition_net
+        'group_disc_amt': Decimal('0.00'),
+        'tuition_net':    net_tuition,
         'reservation':    reservation,
         'first_inst':     first_inst,
         'second_inst':    second_inst,
         'third_inst':     third_inst,
-        # Saudi = net tuition (VAT zero-rated)
         'saudi_net':      net_tuition,
-        # Non-Saudi = net tuition + VAT
-        'vat_amount':     vat_amount,
-        'non_saudi_net':  non_saudi_net,
+        # Non-Saudi amounts (with VAT applied to every column)
+        'n_entrance_exam': _vat(entrance),
+        'n_registration':  _vat(registration),
+        'n_gross_tuition': _vat(gross_tuition),
+        'n_tuition_net':   _vat(net_tuition),
+        'n_reservation':   _vat(reservation),
+        'n_first_inst':    _vat(first_inst),
+        'n_second_inst':   _vat(second_inst),
+        'n_third_inst':    _vat(third_inst),
+        'non_saudi_net':   non_saudi_net,
     }
 
 
@@ -178,25 +179,32 @@ def fee_structure_export_group_pdf(request):
     # Compute header-level registration/entrance/reservation from first row
     first_row = rows[0] if rows else {}
 
+    first_structure  = structures.first()
+    structure_name   = first_structure.name if first_structure else ''
+    if ' — ' in structure_name:
+        structure_name = structure_name.rsplit(' — ', 1)[0]
+    study_mode_label = str(first_structure.study_mode) if first_structure and first_structure.study_mode else '—'
+
     context = {
-        'division':        division,
-        'year':            year_label,
-        'structure_type':  type_label,
-        'description':     description,
-        'group_discount':  'NO',
-        'group_disc_pct':  Decimal('0.00'),
-        'num_payments':    num_payments,
-        'registration_fee': first_row.get('registration', Decimal('0.00')),
-        'reservation_fee':  first_row.get('reservation', Decimal('0.00')),
-        'entrance_exam':    first_row.get('entrance_exam', Decimal('0.00')),
-        'includes_books':  'NO',
-        'from_year':       year_label,
-        'to_year':         None,
-        'vat_pct':         Decimal('15.00'),
-        'rows':            rows,
-        'has_third':       has_third,
-        'now':             timezone.now().strftime('%d-%b-%Y %I:%M %p'),
-        'logo_src':        _logo_base64(),
+        'division':         division,
+        'year':             year_label,
+        'structure_type':   type_label,
+        'structure_name':   structure_name,
+        'study_mode':       study_mode_label,
+        'description':      description,
+        'vat_pct':          Decimal('15.00'),
+        'max_num_payments': num_payments,
+        'group_discount':   'NO',
+        'group_disc_pct':   '—',
+        'includes_books':   'NO',
+        'divide_reservation': 'NO',
+        'entrance_exam':    first_row.get('entrance_exam',  Decimal('0.00')),
+        'registration_fee': first_row.get('registration',   Decimal('0.00')),
+        'reservation_fee':  first_row.get('reservation',    Decimal('0.00')),
+        'rows':             rows,
+        'has_third':        has_third,
+        'now':              timezone.now().strftime('%d-%b-%Y %I:%M %p'),
+        'logo_src':         _logo_base64(),
     }
 
     html = render_to_string('fees/fee_structure_group_pdf.html', context)

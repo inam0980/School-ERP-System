@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% block title %}{{ candidate.full_name }} — External Candidate{% endblock %}
 {% block page_title %}External Candidate Detail{% endblock %}
 
@@ -150,9 +150,9 @@
                     <tr class="hover:bg-slate-50 transition">
                         <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ p.receipt_number }}</td>
                         <td class="px-4 py-3 text-slate-800">{{ p.fee_description }}</td>
-                        <td class="px-4 py-3 text-right text-slate-600">{{ p.amount|floatformat:2 }}</td>
-                        <td class="px-4 py-3 text-right text-slate-400">{{ p.vat_amount|floatformat:2 }}</td>
-                        <td class="px-4 py-3 text-right font-semibold text-slate-800">{{ p.total|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-right text-slate-600">{{ p.amount|money }}</td>
+                        <td class="px-4 py-3 text-right text-slate-400">{{ p.vat_amount|money }}</td>
+                        <td class="px-4 py-3 text-right font-semibold text-slate-800">{{ p.total|money }}</td>
                         <td class="px-4 py-3 text-center">
                             <span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full">{{ p.get_payment_method_display }}</span>
                         </td>
@@ -164,7 +164,7 @@
                 <tfoot>
                     <tr class="bg-slate-50 font-semibold text-sm">
                         <td colspan="4" class="px-4 py-3 text-right text-slate-600">Total Paid:</td>
-                        <td class="px-4 py-3 text-right text-primary">SAR {{ total_paid|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-right text-primary">SAR {{ total_paid|money }}</td>
                         <td colspan="2"></td>
                     </tr>
                 </tfoot>

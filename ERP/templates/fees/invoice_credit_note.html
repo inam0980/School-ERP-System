@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Invoice Tax Credit Note — Al-Kawthar{% endblock %}
 
 {% block extra_head %}
@@ -99,9 +99,9 @@
             <div class="grid grid-cols-12 px-5 py-3 items-center text-sm hover:bg-slate-50">
                 <div class="col-span-3 font-mono font-semibold text-slate-800">{{ inv.invoice_number }}</div>
                 <div class="col-span-2 text-slate-500">{{ inv.date|date:"d/m/Y" }}</div>
-                <div class="col-span-2 text-right text-slate-600">{{ inv.subtotal|floatformat:2 }}</div>
-                <div class="col-span-2 text-right text-orange-600">{{ inv.tax_amount|floatformat:2 }}</div>
-                <div class="col-span-2 text-right font-bold text-slate-800">{{ inv.total|floatformat:2 }}</div>
+                <div class="col-span-2 text-right text-slate-600">{{ inv.subtotal|money }}</div>
+                <div class="col-span-2 text-right text-orange-600">{{ inv.tax_amount|money }}</div>
+                <div class="col-span-2 text-right font-bold text-slate-800">{{ inv.total|money }}</div>
                 <div class="col-span-1 text-right">
                     <a href="?student_id={{ student.pk }}&invoice_id={{ inv.pk }}"
                        class="text-xs bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg transition">
@@ -125,7 +125,7 @@
             <div>
                 <span class="text-xs text-rose-500 uppercase font-semibold">Original Invoice</span>
                 <p class="font-mono font-bold text-rose-800 mt-0.5">{{ original.invoice_number }}</p>
-                <p class="text-rose-600 text-xs mt-0.5">{{ original.date|date:"d/m/Y" }} — Total: SAR {{ original.total|floatformat:2 }}</p>
+                <p class="text-rose-600 text-xs mt-0.5">{{ original.date|date:"d/m/Y" }} — Total: SAR {{ original.total|money }}</p>
             </div>
             <a href="?student_id={{ student.pk }}" class="text-xs text-rose-400 hover:underline">Change invoice</a>
         </div>
@@ -165,7 +165,7 @@
                     </div>
                     <div class="col-span-3">
                         <input type="number" name="item_net[]" step="0.01" min="0"
-                               value="{{ item.net_before_vat|floatformat:2 }}"
+                               value="{{ item.net_before_vat|money }}"
                                class="text-right" oninput="calcRow(this)">
                     </div>
                     <div class="col-span-2">
@@ -173,7 +173,7 @@
                                value="{{ item.vat_rate|default:0 }}"
                                class="text-right" oninput="calcRow(this)">
                     </div>
-                    <div class="col-span-1 text-right text-sm font-semibold text-slate-700 row-total">{{ item.total|floatformat:2 }}</div>
+                    <div class="col-span-1 text-right text-sm font-semibold text-slate-700 row-total">{{ item.total|money }}</div>
                     <div class="col-span-1 text-right">
                         <button type="button" onclick="removeRow(this)" class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
                     </div>

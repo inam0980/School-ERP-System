@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Fee Default Risk — Al-Kawthar AI{% endblock %}
 
 {% block content %}
@@ -77,7 +77,7 @@
                     <td class="px-4 py-3 font-medium text-slate-800">{{ item.student.full_name }}</td>
                     <td class="px-4 py-3 text-slate-500 text-xs">{{ item.student.grade.name }} / {{ item.student.section.name }}</td>
                     <td class="px-4 py-3 text-slate-700">{{ item.overdue_count }}</td>
-                    <td class="px-4 py-3 font-semibold text-red-600">SAR {{ item.total_balance|floatformat:2 }}</td>
+                    <td class="px-4 py-3 font-semibold text-red-600">SAR {{ item.total_balance|money }}</td>
                     <td class="px-4 py-3 text-slate-500">{{ item.days_overdue }} day(s)</td>
                     <td class="px-4 py-3">
                         {% if item.risk == 'HIGH' %}

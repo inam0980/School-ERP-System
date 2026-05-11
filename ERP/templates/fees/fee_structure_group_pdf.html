@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -25,12 +25,12 @@
     }
     .header-logo {
       display: table-cell;
-      width: 55px;
+      width: 90px;
       vertical-align: middle;
     }
     .header-logo img {
-      width: 50px;
-      height: 50px;
+      width: 80px;
+      height: 80px;
     }
     .header-title {
       display: table-cell;
@@ -169,7 +169,7 @@
     </div>
   </div>
 
-  <!-- ══ INFO GRID ════════════════════════════════════════════════ -->
+  <!-- ══ STRUCTURE DETAILS ════════════════════════════════════════ -->
   <table class="info-table">
     <tr>
       <td class="lbl">Academic Year</td>
@@ -180,34 +180,34 @@
       <td class="val">{{ structure_type }}</td>
     </tr>
     <tr>
+      <td class="lbl">Structure Name</td>
+      <td class="val">{{ structure_name }}</td>
       <td class="lbl">Division</td>
       <td class="val">{{ division }}</td>
+      <td class="lbl">Study Mode</td>
+      <td class="val">{{ study_mode }}</td>
+      <td class="lbl">Number of Payments</td>
+      <td class="val">{{ max_num_payments }}</td>
+    </tr>
+    <tr>
       <td class="lbl">Group Discount</td>
       <td class="val">{{ group_discount }}</td>
       <td class="lbl">Group Discount&nbsp;%</td>
-      <td class="val">{% if group_discount == 'YES' %}{{ group_disc_pct }}{% else %}—{% endif %}</td>
-      <td class="lbl">Number of Payments</td>
-      <td class="val">{{ num_payments }}</td>
-    </tr>
-    <tr>
-      <td class="lbl">Entrance Exam Fee</td>
-      <td class="val">{{ entrance_exam|floatformat:2 }}</td>
-      <td class="lbl">Registration Fee</td>
-      <td class="val">{{ registration_fee|floatformat:2 }}</td>
-      <td class="lbl">Reservation Fee (Down Payment)</td>
-      <td class="val">{{ reservation_fee|floatformat:2 }}</td>
-      <td class="lbl">Divide Reservation</td>
-      <td class="val">NO</td>
-    </tr>
-    <tr>
+      <td class="val">{{ group_disc_pct }}</td>
       <td class="lbl">VAT Percent&nbsp;%</td>
       <td class="val">{{ vat_pct }}</td>
       <td class="lbl">Tuition Fee Include Books</td>
       <td class="val">{{ includes_books }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Entrance Exam Fee</td>
+      <td class="val">{% if entrance_exam %}SAR {{ entrance_exam|money }}{% else %}—{% endif %}</td>
+      <td class="lbl">Registration Fee</td>
+      <td class="val">{% if registration_fee %}SAR {{ registration_fee|money }}{% else %}—{% endif %}</td>
+      <td class="lbl">Reservation Fee (Down Payment)</td>
+      <td class="val">{% if reservation_fee %}SAR {{ reservation_fee|money }}{% else %}0{% endif %}</td>
       <td class="lbl">Divide Reservation</td>
-      <td class="val">NO</td>
-      <td class="lbl">&nbsp;</td>
-      <td class="val">&nbsp;</td>
+      <td class="val">{{ divide_reservation }}</td>
     </tr>
   </table>
 
@@ -235,18 +235,18 @@
       {% for r in rows %}
       <tr>
         <td class="grade-col">{{ r.grade }}</td>
-        <td>{{ r.entrance_exam|floatformat:2 }}</td>
-        <td>{{ r.registration|floatformat:2 }}</td>
-        <td>{{ r.gross_tuition|floatformat:2 }}</td>
-        <td>{% if r.group_disc_amt %}{{ r.group_disc_amt|floatformat:2 }}{% else %}—{% endif %}</td>
-        <td class="highlight">{{ r.tuition_net|floatformat:2 }}</td>
-        <td>{{ r.reservation|floatformat:2 }}</td>
-        <td>{{ r.first_inst|floatformat:2 }}</td>
-        <td>{{ r.second_inst|floatformat:2 }}</td>
+        <td>{{ r.entrance_exam|money }}</td>
+        <td>{{ r.registration|money }}</td>
+        <td>{{ r.gross_tuition|money }}</td>
+        <td>{% if r.group_disc_amt %}{{ r.group_disc_amt|money }}{% else %}—{% endif %}</td>
+        <td class="highlight">{{ r.tuition_net|money }}</td>
+        <td>{{ r.reservation|money }}</td>
+        <td>{{ r.first_inst|money }}</td>
+        <td>{{ r.second_inst|money }}</td>
         {% if max_num_payments >= 3 %}
-        <td>{{ r.third_inst|floatformat:2 }}</td>
+        <td>{{ r.third_inst|money }}</td>
         {% endif %}
-        <td><strong>{{ r.saudi_net|floatformat:2 }}</strong></td>
+        <td><strong>{{ r.saudi_net|money }}</strong></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -276,18 +276,18 @@
       {% for r in rows %}
       <tr>
         <td class="grade-col">{{ r.grade }}</td>
-        <td>{{ r.entrance_exam|floatformat:2 }}</td>
-        <td>{{ r.registration|floatformat:2 }}</td>
-        <td>{{ r.gross_tuition|floatformat:2 }}</td>
-        <td>{% if r.group_disc_amt %}{{ r.group_disc_amt|floatformat:2 }}{% else %}—{% endif %}</td>
-        <td class="highlight">{{ r.tuition_net|floatformat:2 }}</td>
-        <td>{{ r.reservation|floatformat:2 }}</td>
-        <td>{{ r.first_inst|floatformat:2 }}</td>
-        <td>{{ r.second_inst|floatformat:2 }}</td>
+        <td>{{ r.n_entrance_exam|money }}</td>
+        <td>{{ r.n_registration|money }}</td>
+        <td>{{ r.n_gross_tuition|money }}</td>
+        <td>—</td>
+        <td class="highlight">{{ r.n_tuition_net|money }}</td>
+        <td>{{ r.n_reservation|money }}</td>
+        <td>{{ r.n_first_inst|money }}</td>
+        <td>{{ r.n_second_inst|money }}</td>
         {% if max_num_payments >= 3 %}
-        <td>{{ r.third_inst|floatformat:2 }}</td>
+        <td>{{ r.n_third_inst|money }}</td>
         {% endif %}
-        <td><strong>{{ r.non_saudi_net|floatformat:2 }}</strong></td>
+        <td><strong>{{ r.non_saudi_net|money }}</strong></td>
       </tr>
       {% endfor %}
     </tbody>

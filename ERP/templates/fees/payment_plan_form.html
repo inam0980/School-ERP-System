@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Installment Plan — {{ sf.fee_structure.fee_type.name }}{% endblock %}
 
 {% block content %}
@@ -21,7 +21,7 @@
             <p class="text-sm text-slate-500 mt-0.5">
                 <span class="font-medium text-slate-700">{{ sf.student.full_name }}</span>
                 · {{ sf.fee_structure.fee_type.name }}
-                · Balance: <span class="font-semibold text-red-600">SAR {{ sf.balance|floatformat:2 }}</span>
+                · Balance: <span class="font-semibold text-red-600">SAR {{ sf.balance|money }}</span>
             </p>
         </div>
 
@@ -95,7 +95,7 @@
                         Equal split (no down payment)
                     </button>
                 </div>
-                <p class="text-xs text-slate-500">Total balance: <strong>SAR {{ sf.balance|floatformat:2 }}</strong> · Installment #1 = down payment, #2 onwards = equal split of remainder.</p>
+                <p class="text-xs text-slate-500">Total balance: <strong>SAR {{ sf.balance|money }}</strong> · Installment #1 = down payment, #2 onwards = equal split of remainder.</p>
             </div>
             <span id="remainingBadge" class="text-xs font-medium px-2 py-0.5 rounded-full"></span>
 

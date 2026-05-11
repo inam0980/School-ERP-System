@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}Outstanding Fees Report — Al-Kawthar{% endblock %}
 
 {% block content %}
@@ -46,15 +46,15 @@
 <div class="grid grid-cols-3 gap-4 mb-6">
     <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
         <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Assigned</p>
-        <p class="text-xl font-bold text-slate-700">SAR {{ net_total|floatformat:2 }}</p>
+        <p class="text-xl font-bold text-slate-700">SAR {{ net_total|money }}</p>
     </div>
     <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
         <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Collected</p>
-        <p class="text-xl font-bold text-green-600">SAR {{ paid_total|floatformat:2 }}</p>
+        <p class="text-xl font-bold text-green-600">SAR {{ paid_total|money }}</p>
     </div>
     <div class="bg-white rounded-xl border border-red-100 px-5 py-4">
         <p class="text-xs text-red-400 uppercase tracking-wide mb-1">Outstanding Balance</p>
-        <p class="text-xl font-bold text-red-600">SAR {{ balance_total|floatformat:2 }}</p>
+        <p class="text-xl font-bold text-red-600">SAR {{ balance_total|money }}</p>
     </div>
 </div>
 
@@ -87,9 +87,9 @@
                     <span class="text-xs text-slate-400">{{ sf.student.current_section }}</span>
                 </td>
                 <td class="px-4 py-3 text-slate-600">{{ sf.fee_structure.fee_type.name }}</td>
-                <td class="px-4 py-3 text-right font-medium">SAR {{ sf.net_amount|floatformat:2 }}</td>
-                <td class="px-4 py-3 text-right text-green-600">SAR {{ sf.amount_paid|floatformat:2 }}</td>
-                <td class="px-4 py-3 text-right font-bold text-red-600">SAR {{ sf.balance|floatformat:2 }}</td>
+                <td class="px-4 py-3 text-right font-medium">SAR {{ sf.net_amount|money }}</td>
+                <td class="px-4 py-3 text-right text-green-600">SAR {{ sf.amount_paid|money }}</td>
+                <td class="px-4 py-3 text-right font-bold text-red-600">SAR {{ sf.balance|money }}</td>
                 <td class="px-4 py-3 text-slate-600">{{ sf.due_date|date:"d M Y" }}</td>
                 <td class="px-4 py-3">
                     <span class="text-xs font-medium px-2.5 py-1 rounded-full
