@@ -246,8 +246,10 @@ class AuthorizedPickupForm(forms.ModelForm):
 class StudentFilterForm(forms.Form):
     q        = forms.CharField(required=False,
                                widget=forms.TextInput(attrs={
+                                   'id': 'studentSearchQ',
                                    'class': _INPUT,
-                                   'placeholder': 'Name, ID, or Arabic name / الاسم أو الرقم',
+                                   'placeholder': 'Name, ID, Iqama, or Arabic name…',
+                                   'autocomplete': 'off',
                                }))
     division = forms.ModelChoiceField(queryset=Division.objects.all(), required=False, empty_label="All Divisions",
                                       widget=forms.Select(attrs={'class': _INPUT}))

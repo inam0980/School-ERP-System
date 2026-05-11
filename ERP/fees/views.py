@@ -1073,14 +1073,15 @@ def fee_collection(request):
                     )
                     continue
 
-                # Record payment against the parent StudentFee
+                # Record payment against the parent StudentFee, linked to this installment
                 payment = Payment.objects.create(
                     student_fee     = inst.plan.student_fee,
+                    installment     = inst,
                     paid_amount     = amount,
                     payment_date    = payment_date,
                     payment_method  = payment_method,
                     transaction_ref = transaction_ref,
-                    notes           = f"Installment {inst.installment_no}" + (f" — {notes}" if notes else ""),
+                    notes           = f"Sem {inst.semester} · Installment {inst.installment_no}" + (f" — {notes}" if notes else ""),
                     collected_by    = request.user,
                 )
                 # Update installment paid amount & status
@@ -1251,6 +1252,7 @@ def receipt_print(request, payment_pk):
             'student_fee__student', 'student_fee__fee_structure__fee_type',
             'student_fee__student__grade', 'student_fee__student__section',
             'student_fee__student__division',
+            'installment__plan',
             'collected_by',
         ),
         pk=payment_pk,
@@ -1272,11 +1274,30 @@ def receipt_print(request, payment_pk):
 
     vat_pct = int(vat_rate * 100)  # 0 or 15
 
+    # ── Semester-level summary (if this payment is for an installment) ──
+    semester_info = None
+    if payment.installment_id:
+        inst = payment.installment
+        plan = inst.plan
+        sem_installments = plan.installments.filter(semester=inst.semester)
+        sem_total      = sum((i.amount for i in sem_installments), Decimal('0'))
+        sem_paid       = sum((i.paid_amount for i in sem_installments), Decimal('0'))
+        sem_balance    = (sem_total - sem_paid).quantize(Decimal('0.01'))
+        semester_info  = {
+            'semester':       inst.semester,
+            'installment_no': inst.installment_no,
+            'total_installments': plan.installments.count(),
+            'semester_total':   sem_total,
+            'semester_paid':    sem_paid,
+            'semester_balance': sem_balance,
+        }
+
     return render(request, 'fees/receipt_print.html', {
         'payment':        payment,
         'paid_before_vat': paid_before_vat,
         'paid_vat':        paid_vat,
         'vat_pct':         vat_pct,
+        'semester_info':   semester_info,
     })
 
 
@@ -2070,6 +2091,9 @@ def setup_payment_plan(request, student_fee_pk):
 
     existing_plan = getattr(sf, 'payment_plan', None)
 
+    # Total balance is split evenly between 2 semesters
+    semester_target = (sf.balance / Decimal('2')).quantize(Decimal('0.01'))
+
     if request.method == 'POST':
         count_str = request.POST.get('installment_count', '2')
         try:
@@ -2079,11 +2103,13 @@ def setup_payment_plan(request, student_fee_pk):
 
         amounts   = []
         due_dates = []
+        semesters = []
         errors    = []
 
         for i in range(1, count + 1):
             amt_raw = request.POST.get(f'inst_amount_{i}', '').strip()
             due_raw = request.POST.get(f'inst_due_{i}', '').strip()
+            sem_raw = request.POST.get(f'inst_semester_{i}', '1').strip()
             try:
                 amt = Decimal(amt_raw)
                 if amt <= 0:
@@ -2096,15 +2122,49 @@ def setup_payment_plan(request, student_fee_pk):
             except Exception:
                 errors.append(f"Installment {i}: enter a valid due date.")
                 due = timezone.localdate()
+            try:
+                sem = int(sem_raw)
+                if sem not in (1, 2):
+                    raise ValueError
+            except Exception:
+                errors.append(f"Installment {i}: invalid semester.")
+                sem = 1
             amounts.append(amt)
             due_dates.append(due)
+            semesters.append(sem)
 
         total_inst = sum(amounts)
-        if abs(total_inst - sf.balance) > Decimal('0.01'):
+        if abs(total_inst - sf.balance) > Decimal('1.00'):
             errors.append(
                 f"Installments total SAR {total_inst:,.2f} does not match "
                 f"outstanding balance SAR {sf.balance:,.2f}."
             )
+
+        # Validate each semester totals balance/2 (±1 SAR rounding tolerance)
+        sem1_total = sum(a for a, s in zip(amounts, semesters) if s == 1)
+        sem2_total = sum(a for a, s in zip(amounts, semesters) if s == 2)
+        if not any(s == 1 for s in semesters):
+            errors.append("At least one installment must belong to Semester 1.")
+        if not any(s == 2 for s in semesters):
+            errors.append("At least one installment must belong to Semester 2.")
+        if abs(sem1_total - semester_target) > Decimal('1.00'):
+            errors.append(
+                f"Semester 1 total SAR {sem1_total:,.2f} must equal half the balance "
+                f"(SAR {semester_target:,.2f})."
+            )
+        if abs(sem2_total - semester_target) > Decimal('1.00'):
+            errors.append(
+                f"Semester 2 total SAR {sem2_total:,.2f} must equal half the balance "
+                f"(SAR {semester_target:,.2f})."
+            )
+        # Installments must not jump back from semester 2 to semester 1
+        for i in range(1, len(semesters)):
+            if semesters[i] < semesters[i-1]:
+                errors.append(
+                    f"Installment {i+1} cannot go back to Semester {semesters[i]} "
+                    f"after Semester {semesters[i-1]}."
+                )
+                break
 
         if errors:
             for e in errors:
@@ -2118,16 +2178,17 @@ def setup_payment_plan(request, student_fee_pk):
                 notes=request.POST.get('notes', '').strip(),
                 created_by=request.user,
             )
-            for idx, (amt, due) in enumerate(zip(amounts, due_dates), start=1):
+            for idx, (amt, due, sem) in enumerate(zip(amounts, due_dates, semesters), start=1):
                 PaymentPlanInstallment.objects.create(
                     plan=plan,
                     installment_no=idx,
+                    semester=sem,
                     amount=amt,
                     due_date=due,
                 )
             messages.success(
                 request,
-                f"Installment plan saved — {count} installments for "
+                f"Installment plan saved — {count} installments across 2 semesters for "
                 f"{sf.fee_structure.fee_type.name}."
             )
             from django.urls import reverse
@@ -2135,9 +2196,10 @@ def setup_payment_plan(request, student_fee_pk):
 
     from django.urls import reverse
     return render(request, 'fees/payment_plan_form.html', {
-        'sf':            sf,
-        'existing_plan': existing_plan,
-        'back_url':      reverse('fees:collection') + f"?student_id={sf.student_id}",
+        'sf':              sf,
+        'existing_plan':   existing_plan,
+        'semester_target': semester_target,
+        'back_url':        reverse('fees:collection') + f"?student_id={sf.student_id}",
     })
 
 

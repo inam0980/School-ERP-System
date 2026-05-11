@@ -266,6 +266,13 @@ class Payment(models.Model):
 
     student_fee    = models.ForeignKey(StudentFee, on_delete=models.CASCADE,
                                        related_name='payments')
+    installment    = models.ForeignKey(
+        'PaymentPlanInstallment',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='payments',
+        help_text='Set if this payment is allocated to a specific installment.'
+    )
     paid_amount    = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date   = models.DateField(default=timezone.localdate)
     payment_method = models.CharField(max_length=15, choices=PAYMENT_METHODS, default=CREDIT_CARD)
@@ -597,9 +604,18 @@ class PaymentPlanInstallment(models.Model):
         (OVERDUE, 'Overdue'),
     ]
 
+    SEMESTER_CHOICES = [
+        (1, 'Semester 1'),
+        (2, 'Semester 2'),
+    ]
+
     plan           = models.ForeignKey(
         PaymentPlan, on_delete=models.CASCADE, related_name='installments')
     installment_no = models.PositiveSmallIntegerField()
+    semester       = models.PositiveSmallIntegerField(
+        choices=SEMESTER_CHOICES, default=1,
+        help_text='Which semester this installment belongs to (1 or 2).'
+    )
     amount         = models.DecimalField(max_digits=10, decimal_places=2)
     due_date       = models.DateField()
     paid_amount    = models.DecimalField(
@@ -612,7 +628,7 @@ class PaymentPlanInstallment(models.Model):
         unique_together = ['plan', 'installment_no']
 
     def __str__(self):
-        return (f"Installment {self.installment_no} — "
+        return (f"Sem {self.semester} · Installment {self.installment_no} — "
                 f"{self.plan.student_fee.student} — SAR {self.amount:,.2f}")
 
     @property
