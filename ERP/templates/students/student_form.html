@@ -425,15 +425,15 @@
         </div>
 
         <!-- Submit -->
-        <div class="flex gap-3 pb-2">
-            <button type="submit"
-                    class="px-6 py-2.5 bg-[#1e3a5f] text-white text-sm font-semibold rounded-lg hover:bg-[#2a5298] transition shadow-sm">
-                Save Student / حفظ بيانات الطالب
-            </button>
+        <div class="flex items-center justify-end gap-3 pb-2">
             <a href="{% if student %}{% url 'students:detail' student.pk %}{% else %}{% url 'students:list' %}{% endif %}"
                class="px-6 py-2.5 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg hover:bg-slate-200 transition">
                 Cancel
             </a>
+            <button type="submit"
+                    class="px-8 py-3 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 active:scale-95 transition shadow-md ring-2 ring-green-300 ring-offset-1">
+                ✓ &nbsp;Save Student / حفظ بيانات الطالب
+            </button>
         </div>
     </form>
 

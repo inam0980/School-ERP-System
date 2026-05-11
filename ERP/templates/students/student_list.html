@@ -255,5 +255,18 @@
         loadGrades(divisionSel.value, selectedGrade);
     }
 })();
+
+// ── Debounced auto-submit for search field ───────────────────────
+(function () {
+    const searchInput = document.getElementById('studentSearchQ');
+    const filterForm  = searchInput ? searchInput.closest('form') : null;
+    if (!searchInput || !filterForm) return;
+
+    let timer = null;
+    searchInput.addEventListener('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(() => filterForm.submit(), 400);
+    });
+})();
 </script>
 {% endblock %}

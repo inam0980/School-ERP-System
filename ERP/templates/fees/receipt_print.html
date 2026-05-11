@@ -205,6 +205,22 @@
                 <td class="border border-slate-300 px-2 py-2 text-center">1</td>
                 <td class="border border-slate-300 px-2 py-2">
                     {{ payment.student_fee.fee_structure.fee_type.name }}
+                    {% if semester_info %}
+                    <div class="text-xs mt-1">
+                        <span class="inline-block px-2 py-0.5 rounded font-semibold mr-1
+                            {% if semester_info.semester == 2 %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                            Semester {{ semester_info.semester }}
+                        </span>
+                        <span class="text-slate-600">
+                            Installment {{ semester_info.installment_no }} of {{ semester_info.total_installments }}
+                        </span>
+                    </div>
+                    <div class="text-xs text-slate-500 mt-0.5">
+                        Semester {{ semester_info.semester }} Total: SAR {{ semester_info.semester_total|money }}
+                        &nbsp;·&nbsp; Paid so far: SAR {{ semester_info.semester_paid|money }}
+                        &nbsp;·&nbsp; <strong class="text-red-600">Remaining: SAR {{ semester_info.semester_balance|money }}</strong>
+                    </div>
+                    {% endif %}
                 </td>
                 <td class="border border-slate-300 px-2 py-2 text-right">
                     {{ payment.student_fee.amount|money }}

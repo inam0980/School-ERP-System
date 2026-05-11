@@ -279,13 +279,18 @@
                     <input type="checkbox" name="selected_installments" value="{{ inst.pk }}"
                            class="fee-checkbox w-5 h-5 accent-primary cursor-pointer rounded flex-shrink-0" checked
                            onchange="onCheckChange(this)">
-                    <div class="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center text-base flex-shrink-0">📋</div>
+                    <div class="w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0
+                        {% if inst.semester == 2 %}bg-emerald-100{% else %}bg-amber-100{% endif %}">📋</div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 flex-wrap">
                             <p class="font-semibold text-slate-800 text-sm">
                                 Installment {{ inst.installment_no }}
                                 <span class="text-xs font-normal text-slate-400">of {{ sf.payment_plan.installments.count }}</span>
                             </p>
+                            <span class="text-xs px-2 py-0.5 rounded-full font-semibold
+                                {% if inst.semester == 2 %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                                Semester {{ inst.semester }}
+                            </span>
                             <span class="text-xs px-2 py-0.5 rounded-full font-medium
                                 {% if inst.status == 'OVERDUE' %}bg-red-100 text-red-600
                                 {% elif inst.status == 'PARTIAL' %}bg-yellow-100 text-yellow-700
