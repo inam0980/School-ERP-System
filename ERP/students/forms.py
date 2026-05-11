@@ -146,8 +146,19 @@ class StudentForm(forms.ModelForm):
         self.fields['study_mode'].queryset    = StudyMode.objects.filter(is_active=True)
         self.fields['study_mode'].required    = False
         self.fields['study_mode'].empty_label = '— Select Study Mode / اختر نمط الدراسة —'
-        # Iqama number is compulsory
+        # Iqama / national ID fields: exactly 10 digits
         self.fields['iqama_number'].required = True
+        for fname, placeholder in (
+            ('iqama_number',       'Enter 10-digit Iqama number'),
+            ('father_national_id', 'Enter 10-digit ID / Iqama number'),
+            ('mother_national_id', 'Enter 10-digit ID / Iqama number'),
+        ):
+            self.fields[fname].widget.attrs.update({
+                'maxlength': '10',
+                'inputmode': 'numeric',
+                'autocomplete': 'off',
+                'placeholder': placeholder,
+            })
         # Nationality dropdowns
         for fname in ('nationality', 'father_nationality', 'mother_nationality'):
             self.fields[fname].widget.choices = COUNTRY_CHOICES
@@ -155,6 +166,26 @@ class StudentForm(forms.ModelForm):
         current = AcademicYear.objects.filter(is_current=True).first()
         if current and not self.instance.pk:
             self.fields['academic_year'].initial = current
+
+    def _validate_10digit(self, field_name, label):
+        val = self.cleaned_data.get(field_name, '').strip()
+        if val:
+            if not val.isdigit():
+                raise forms.ValidationError(f'{label} must contain digits only — no letters or spaces.')
+            if len(val) != 10:
+                raise forms.ValidationError(
+                    f'{label} must be exactly 10 digits (you entered {len(val)}).'
+                )
+        return val
+
+    def clean_iqama_number(self):
+        return self._validate_10digit('iqama_number', 'Iqama number')
+
+    def clean_father_national_id(self):
+        return self._validate_10digit('father_national_id', 'Father ID / Iqama number')
+
+    def clean_mother_national_id(self):
+        return self._validate_10digit('mother_national_id', 'Mother ID / Iqama number')
 
     def clean_photo(self):
         f = self.cleaned_data.get('photo')

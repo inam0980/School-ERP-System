@@ -48,8 +48,8 @@
             <!-- Quick stats -->
             <div class="mt-3 flex flex-wrap gap-4">
                 <div class="text-sm text-slate-600"><span class="font-medium">Division:</span> {{ student.division }}</div>
-                <div class="text-sm text-slate-600"><span class="font-medium">Grade:</span> {{ student.grade }}</div>
-                <div class="text-sm text-slate-600"><span class="font-medium">Section:</span> {{ student.section }}</div>
+                <div class="text-sm text-slate-600"><span class="font-medium">Grade:</span> {{ student.grade.name }}</div>
+                <div class="text-sm text-slate-600"><span class="font-medium">Section:</span> {{ student.section.name }}</div>
                 <div class="text-sm text-slate-600"><span class="font-medium">Roll #:</span> {{ student.roll_number|default:"—" }}</div>
                 <div class="text-sm text-slate-600"><span class="font-medium">Year:</span> {{ student.academic_year }}</div>
             </div>
@@ -94,11 +94,11 @@
             </div>
             <div class="flex items-center justify-between gap-3">
                 <span class="text-xs text-slate-400 w-36 flex-shrink-0">Grade / الصف</span>
-                <span class="text-sm font-semibold text-slate-800 text-right">{{ student.grade }}</span>
+                <span class="text-sm font-semibold text-slate-800 text-right">{{ student.grade.name }}</span>
             </div>
             <div class="flex items-center justify-between gap-3">
                 <span class="text-xs text-slate-400 w-36 flex-shrink-0">Section / الفصل</span>
-                <span class="text-sm font-semibold text-slate-800 text-right">{{ student.section }}</span>
+                <span class="text-sm font-semibold text-slate-800 text-right">{{ student.section.name }}</span>
             </div>
             <div class="flex items-center justify-between gap-3">
                 <span class="text-xs text-slate-400 w-36 flex-shrink-0">Academic Year / السنة الدراسية</span>
