@@ -1533,6 +1533,7 @@ def outstanding_report(request):
         section = data.get('section')
         status  = data.get('status')
         ftype   = data.get('fee_type')
+        q       = (data.get('q') or '').strip()
 
         if year:
             qs = qs.filter(fee_structure__structure__academic_year=year)
@@ -1546,6 +1547,14 @@ def outstanding_report(request):
             qs = qs.filter(status=status)
         if ftype:
             qs = qs.filter(fee_structure__fee_type=ftype)
+        if q:
+            qs = qs.filter(
+                Q(student__full_name__icontains=q) |
+                Q(student__arabic_name__icontains=q) |
+                Q(student__student_id__icontains=q) |
+                Q(student__national_id__icontains=q) |
+                Q(student__iqama_number__icontains=q)
+            )
         as_of = data.get('as_of_date')
         if as_of:
             qs = qs.filter(due_date__lte=as_of)

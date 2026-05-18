@@ -80,26 +80,40 @@
                         {% include 'students/_field.html' with field=form.nationality %}
                     </div>
 
-                    {% include 'students/_field.html' with field=form.national_id %}
-                    <!-- Iqama Number — 10-digit counter -->
-                    <div>
-                        <label class="block text-sm font-medium text-slate-600 mb-1.5" for="{{ form.iqama_number.id_for_label }}">
-                            {{ form.iqama_number.label }} <span class="text-red-400">*</span>
+                    <!-- Combined ID / Iqama Number — 10-digit counter -->
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-slate-600 mb-1.5" for="id_combined_id_input">
+                            <span id="combinedIdLabel">ID / Iqama Number / رقم الهوية أو الإقامة</span>
+                            <span class="text-red-400">*</span>
                         </label>
                         <div class="relative">
-                            {{ form.iqama_number }}
+                            <input type="text" id="id_combined_id_input"
+                                   class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30 focus:border-[#1e3a5f] transition bg-white"
+                                   inputmode="numeric" maxlength="10"
+                                   placeholder="Enter 10-digit National ID or Iqama">
                             <span id="iqamaCounter"
                                   class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono font-semibold pointer-events-none select-none px-1.5 py-0.5 rounded"
                                   style="background:rgba(241,245,249,.9)">
                                 0/10
                             </span>
                         </div>
+                        <p id="combinedIdLiveError" class="mt-1 text-xs text-red-500 hidden"></p>
+                        <!-- Hidden Django fields — value routed by JS based on citizenship -->
+                        <div class="hidden">
+                            {{ form.national_id }}
+                            {{ form.iqama_number }}
+                        </div>
+                        {% if form.national_id.errors %}
+                            {% for e in form.national_id.errors %}
+                                <p class="mt-1 text-xs text-red-500">{{ e }}</p>
+                            {% endfor %}
+                        {% endif %}
                         {% if form.iqama_number.errors %}
                             {% for e in form.iqama_number.errors %}
                                 <p class="mt-1 text-xs text-red-500">{{ e }}</p>
                             {% endfor %}
                         {% endif %}
-                        <p class="mt-1 text-xs text-slate-400">Exactly 10 digits — Iqama / رقم الإقامة</p>
+                        <p class="mt-1 text-xs text-slate-400">Exactly 10 digits — National ID for Saudis, Iqama for Non-Saudis</p>
                     </div>
                     {% include 'students/_field.html' with field=form.passport_number %}
                     {% include 'students/_field.html' with field=form.religion %}
@@ -356,8 +370,15 @@
                                         class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-500"></td>
                                     <td class="py-1.5 pr-3"><input type="text" name="sibling_school[]" value="{{ sib.current_school }}"
                                         class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-500"></td>
-                                    <td class="py-1.5 pr-3"><input type="text" name="sibling_level[]" value="{{ sib.educational_level }}"
-                                        class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-500"></td>
+                                    <td class="py-1.5 pr-3">
+                                        <select name="sibling_level[]"
+                                                class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-500 bg-white">
+                                            <option value="">—</option>
+                                            {% for lvl in EDUCATION_LEVELS %}
+                                            <option value="{{ lvl }}" {% if sib.educational_level == lvl %}selected{% endif %}>{{ lvl }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
                                     <td class="py-1.5"><button type="button" onclick="removeSiblingRow(this)"
                                         class="text-red-400 hover:text-red-600 transition p-1 rounded hover:bg-red-50">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -404,8 +425,15 @@
                                 <tr class="pickup-row">
                                     <td class="py-1.5 pr-3"><input type="text" name="pickup_full_name[]" value="{{ p.full_name }}" required
                                         class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-500"></td>
-                                    <td class="py-1.5 pr-3"><input type="text" name="pickup_relation[]" value="{{ p.relation }}" required
-                                        class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-500" placeholder="e.g. Uncle"></td>
+                                    <td class="py-1.5 pr-3">
+                                        <select name="pickup_relation[]" required
+                                                class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-500 bg-white">
+                                            <option value="">—</option>
+                                            {% for rel in PICKUP_RELATIONS %}
+                                            <option value="{{ rel }}" {% if p.relation == rel %}selected{% endif %}>{{ rel }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
                                     <td class="py-1.5 pr-3"><input type="text" name="pickup_phone[]" value="{{ p.phone }}" required
                                         class="w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-500"></td>
                                     <td class="py-1.5"><button type="button" onclick="removePickupRow(this)"
@@ -568,9 +596,83 @@
         inp.addEventListener('input', update);
     }
 
-    initCounter('id_iqama_number',       'iqamaCounter');
+    initCounter('id_combined_id_input',  'iqamaCounter');
     initCounter('id_father_national_id', 'fatherIdCounter');
     initCounter('id_mother_national_id', 'motherIdCounter');
+})();
+
+// ── Combined ID / Iqama Number routing ─────────────────────────────
+(function () {
+    const combined    = document.getElementById('id_combined_id_input');
+    const nationalId  = document.getElementById('id_national_id');
+    const iqama       = document.getElementById('id_iqama_number');
+    const labelSpan   = document.getElementById('combinedIdLabel');
+    const chkSaudi    = document.getElementById('check-saudi');
+    if (!combined || !nationalId || !iqama) return;
+
+    function isSaudiSelected() {
+        return chkSaudi && !chkSaudi.classList.contains('hidden');
+    }
+
+    const liveErr = document.getElementById('combinedIdLiveError');
+
+    function showError(msg) {
+        if (!liveErr) return;
+        if (msg) {
+            liveErr.textContent = msg;
+            liveErr.classList.remove('hidden');
+            combined.classList.add('border-red-400');
+        } else {
+            liveErr.classList.add('hidden');
+            combined.classList.remove('border-red-400');
+        }
+    }
+
+    function syncToFields() {
+        const value = combined.value.trim();
+        if (isSaudiSelected()) {
+            nationalId.value = value;
+            iqama.value      = '';
+            if (value && !value.startsWith('1')) {
+                showError('Saudi National ID must start with 1.');
+            } else {
+                showError('');
+            }
+        } else {
+            iqama.value      = value;
+            nationalId.value = '';
+            if (value && !value.startsWith('2')) {
+                showError('Iqama number must start with 2.');
+            } else {
+                showError('');
+            }
+        }
+    }
+
+    function updateLabel() {
+        if (isSaudiSelected()) {
+            labelSpan.textContent = 'National ID / رقم الهوية الوطنية';
+            combined.placeholder  = 'Enter 10-digit National ID';
+        } else {
+            labelSpan.textContent = 'Iqama Number / رقم الإقامة';
+            combined.placeholder  = 'Enter 10-digit Iqama number';
+        }
+    }
+
+    combined.addEventListener('input', syncToFields);
+
+    // On page load (edit): populate combined input from whichever hidden field has a value
+    combined.value = nationalId.value || iqama.value || '';
+    updateLabel();
+    // Trigger counter update
+    combined.dispatchEvent(new Event('input'));
+
+    // Re-sync whenever citizenship card changes
+    document.querySelectorAll('[onclick*="setCitizenship"]').forEach(el => {
+        el.addEventListener('click', function () {
+            setTimeout(() => { updateLabel(); syncToFields(); }, 0);
+        });
+    });
 })();
 
 // ── Citizenship picker ──────────────────────────────────────────────
@@ -742,6 +844,10 @@ if (enrollmentSel && feeCategorySel) {
 <script>
 // ── Sibling rows ──────────────────────────────────────────────────
 const _INPUT_CLS = 'w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-500';
+const _EDU_LEVEL_OPTIONS = `
+    <option value="">—</option>
+    {% for lvl in EDUCATION_LEVELS %}<option value="{{ lvl }}">{{ lvl }}</option>{% endfor %}
+`;
 
 function addSiblingRow() {
     const tbody = document.getElementById('siblingRows');
@@ -758,7 +864,9 @@ function addSiblingRow() {
         </td>
         <td class="py-1.5 pr-3"><input type="date" name="sibling_dob[]" class="${_INPUT_CLS}"></td>
         <td class="py-1.5 pr-3"><input type="text" name="sibling_school[]" placeholder="Current School" class="${_INPUT_CLS}"></td>
-        <td class="py-1.5 pr-3"><input type="text" name="sibling_level[]" placeholder="Educational Level" class="${_INPUT_CLS}"></td>
+        <td class="py-1.5 pr-3">
+            <select name="sibling_level[]" class="${_INPUT_CLS} bg-white">${_EDU_LEVEL_OPTIONS}</select>
+        </td>
         <td class="py-1.5"><button type="button" onclick="removeSiblingRow(this)"
             class="text-red-400 hover:text-red-600 transition p-1 rounded hover:bg-red-50">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -777,6 +885,10 @@ function removeSiblingRow(btn) {
 
 // ── Authorized Pickup rows ────────────────────────────────────────
 const _P_INPUT = 'w-full px-2.5 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-500';
+const _PICKUP_RELATION_OPTIONS = `
+    <option value="">—</option>
+    {% for rel in PICKUP_RELATIONS %}<option value="{{ rel }}">{{ rel }}</option>{% endfor %}
+`;
 
 function addPickupRow() {
     const tbody = document.getElementById('pickupRows');
@@ -784,7 +896,9 @@ function addPickupRow() {
     row.className = 'pickup-row';
     row.innerHTML = `
         <td class="py-1.5 pr-3"><input type="text" name="pickup_full_name[]" required placeholder="Full Name / الاسم" class="${_P_INPUT}"></td>
-        <td class="py-1.5 pr-3"><input type="text" name="pickup_relation[]"  required placeholder="e.g. Uncle / العلاقة" class="${_P_INPUT}"></td>
+        <td class="py-1.5 pr-3">
+            <select name="pickup_relation[]" required class="${_P_INPUT} bg-white">${_PICKUP_RELATION_OPTIONS}</select>
+        </td>
         <td class="py-1.5 pr-3"><input type="text" name="pickup_phone[]"     required placeholder="Phone / الهاتف" class="${_P_INPUT}"></td>
         <td class="py-1.5"><button type="button" onclick="removePickupRow(this)"
             class="text-red-400 hover:text-red-600 transition p-1 rounded hover:bg-red-50">
@@ -801,6 +915,60 @@ function removePickupRow(btn) {
         document.getElementById('pickupEmptyMsg').classList.remove('hidden');
     }
 }
+
+// ── Live sync of Study Mode dropdown across tabs ──────────────────
+(function () {
+    const studyModeSel = document.getElementById('id_study_mode');
+    if (!studyModeSel) return;
+
+    let lastRefreshAt = 0;
+    async function refreshStudyModes() {
+        // Debounce duplicate signals fired within 500ms of each other
+        const now = Date.now();
+        if (now - lastRefreshAt < 500) return;
+        lastRefreshAt = now;
+        const current = studyModeSel.value;
+        try {
+            const res  = await fetch('/api/study-modes/');
+            const data = await res.json();
+            const placeholder = studyModeSel.querySelector('option[value=""]');
+            studyModeSel.innerHTML = '';
+            if (placeholder) studyModeSel.appendChild(placeholder);
+            data.study_modes.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.name;
+                if (String(m.id) === String(current)) opt.selected = true;
+                studyModeSel.appendChild(opt);
+            });
+            // Brief visual flash so the user notices the update
+            studyModeSel.style.transition = 'background-color 0.4s';
+            studyModeSel.style.backgroundColor = '#fef3c7';
+            setTimeout(() => { studyModeSel.style.backgroundColor = ''; }, 800);
+        } catch (e) { /* ignore */ }
+    }
+
+    // 1) BroadcastChannel listener
+    if ('BroadcastChannel' in window) {
+        try {
+            const ch = new BroadcastChannel('study_modes');
+            ch.addEventListener('message', (ev) => {
+                if (ev.data && ev.data.type === 'study_modes_updated') refreshStudyModes();
+            });
+        } catch (e) {}
+    }
+
+    // 2) localStorage `storage` event listener — fires in OTHER same-origin tabs
+    //    whenever the broadcasting tab writes to localStorage.
+    window.addEventListener('storage', (ev) => {
+        if (ev.key === 'study_modes_updated_at') refreshStudyModes();
+    });
+
+    // 3) Refresh when this tab regains focus, as a final safety net
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') refreshStudyModes();
+    });
+})();
 </script>
 {% endblock %}
 {% endblock %}

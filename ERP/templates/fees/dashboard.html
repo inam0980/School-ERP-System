@@ -75,7 +75,12 @@
             <td class="px-5 py-3 font-mono text-xs text-primary">
                 <a href="{% url 'fees:receipt_print' payment_pk=p.pk %}" target="_blank">{{ p.receipt_number }}</a>
             </td>
-            <td class="px-5 py-3 font-medium text-slate-800">{{ p.student_fee.student.full_name }}</td>
+            <td class="px-5 py-3 font-medium">
+                <a href="{% url 'students:detail' p.student_fee.student.pk %}"
+                   class="text-slate-800 hover:text-[#1e3a5f] hover:underline transition">
+                    {{ p.student_fee.student.full_name }}
+                </a>
+            </td>
             <td class="px-5 py-3 text-slate-600">{{ p.student_fee.fee_structure.fee_type.name }}</td>
             <td class="px-5 py-3 text-right font-semibold text-green-700">SAR {{ p.paid_amount|money }}</td>
             <td class="px-5 py-3 text-slate-500">{{ p.get_payment_method_display }}</td>

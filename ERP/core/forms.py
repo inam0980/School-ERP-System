@@ -57,15 +57,42 @@ class GradeForm(TailwindMixin, forms.ModelForm):
 
 
 class SectionForm(TailwindMixin, forms.ModelForm):
+    division = forms.ModelChoiceField(
+        queryset=Division.objects.all(),
+        required=True,
+        empty_label='— Select Division —',
+    )
+
     class Meta:
         model  = Section
         fields = ['name', 'grade', 'class_teacher', 'capacity']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['class_teacher'].queryset  = User.objects.filter(role='TEACHER', is_active=True)
-        self.fields['class_teacher'].required  = False
+        self.fields['class_teacher'].queryset    = User.objects.filter(role='TEACHER', is_active=True)
+        self.fields['class_teacher'].required    = False
         self.fields['class_teacher'].empty_label = '— Unassigned —'
+
+        # Render order: Name, Division, Grade, Class Teacher, Capacity
+        self.order_fields(['name', 'division', 'grade', 'class_teacher', 'capacity'])
+
+        # Pre-populate Division from instance.grade on edit; resolve from POST data if submitting
+        division_id = None
+        if self.instance and self.instance.pk and self.instance.grade_id:
+            division_id = self.instance.grade.division_id
+            self.fields['division'].initial = division_id
+        if self.data.get('division'):
+            try:
+                division_id = int(self.data.get('division'))
+            except (TypeError, ValueError):
+                division_id = None
+
+        # Filter Grade queryset to the chosen Division (or empty until one is picked)
+        if division_id:
+            self.fields['grade'].queryset = Grade.objects.filter(division_id=division_id).order_by('order', 'name')
+        else:
+            self.fields['grade'].queryset = Grade.objects.none()
+
         self.apply_tailwind()
 
 

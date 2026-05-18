@@ -146,8 +146,7 @@ class StudentForm(forms.ModelForm):
         self.fields['study_mode'].queryset    = StudyMode.objects.filter(is_active=True)
         self.fields['study_mode'].required    = False
         self.fields['study_mode'].empty_label = '— Select Study Mode / اختر نمط الدراسة —'
-        # Iqama / national ID fields: exactly 10 digits
-        self.fields['iqama_number'].required = True
+        # ID / Iqama fields: exactly 10 digits (one of the two required — checked in clean())
         for fname, placeholder in (
             ('iqama_number',       'Enter 10-digit Iqama number'),
             ('father_national_id', 'Enter 10-digit ID / Iqama number'),
@@ -178,8 +177,17 @@ class StudentForm(forms.ModelForm):
                 )
         return val
 
+    def clean_national_id(self):
+        val = self._validate_10digit('national_id', 'National ID')
+        if val and not val.startswith('1'):
+            raise forms.ValidationError('Saudi National ID must start with 1.')
+        return val
+
     def clean_iqama_number(self):
-        return self._validate_10digit('iqama_number', 'Iqama number')
+        val = self._validate_10digit('iqama_number', 'Iqama number')
+        if val and not val.startswith('2'):
+            raise forms.ValidationError('Iqama number must start with 2.')
+        return val
 
     def clean_father_national_id(self):
         return self._validate_10digit('father_national_id', 'Father ID / Iqama number')
@@ -200,6 +208,12 @@ class StudentForm(forms.ModelForm):
         if enrollment_type and not study_mode:
             self.add_error('study_mode',
                            'Please select a Study Mode for this student.')
+        # Exactly one of National ID / Iqama must be provided
+        national_id = (cleaned.get('national_id') or '').strip()
+        iqama       = (cleaned.get('iqama_number') or '').strip()
+        if not national_id and not iqama:
+            self.add_error('iqama_number',
+                           'Please enter the student\'s ID / Iqama number.')
         return cleaned
 
 

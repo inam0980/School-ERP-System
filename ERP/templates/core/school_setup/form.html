@@ -62,3 +62,36 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    const divisionSel = document.getElementById('id_division');
+    const gradeSel    = document.getElementById('id_grade');
+    if (!divisionSel || !gradeSel) return;
+
+    const selectedGrade = gradeSel.value;  // preserve on edit / re-render
+
+    async function loadGrades(divisionId, preserveGrade) {
+        gradeSel.innerHTML = '<option value="">— Select Grade —</option>';
+        if (!divisionId) return;
+        const res  = await fetch(`/api/grades/?division_id=${divisionId}`);
+        const data = await res.json();
+        data.grades.forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g.id;
+            opt.textContent = g.name;
+            if (preserveGrade && String(g.id) === String(preserveGrade)) opt.selected = true;
+            gradeSel.appendChild(opt);
+        });
+    }
+
+    divisionSel.addEventListener('change', () => loadGrades(divisionSel.value, null));
+
+    // On initial render, if division is already selected, populate grades and re-select current grade
+    if (divisionSel.value) {
+        loadGrades(divisionSel.value, selectedGrade);
+    }
+})();
+</script>
+{% endblock %}

@@ -17,6 +17,14 @@ from core.models import Grade, Division, Board
 _ADMIN   = ('SUPER_ADMIN', 'ADMIN')
 _STAFF   = ('SUPER_ADMIN', 'ADMIN', 'TEACHER', 'ACCOUNTANT', 'STAFF')
 
+EDUCATION_LEVELS = [
+    'Nursery', 'KG1', 'KG2',
+    'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6',
+    'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12',
+]
+
+PICKUP_RELATIONS = ['Father', 'Mother', 'Brother', 'Sister', 'Uncle', 'Aunt', 'Grandfather', 'Grandmother', 'Other']
+
 
 # ────────────────────────── STUDENT HUB ──────────────────────────
 
@@ -246,7 +254,12 @@ def student_add(request):
 
         messages.success(request, f"Student {student.full_name} added (ID: {student.student_id}). Please upload identity documents (National ID / Iqama / Passport) below.")
         return redirect('students:detail', pk=student.pk)
-    return render(request, 'students/student_form.html', {'form': form, 'title': 'Add Student / إضافة طالب'})
+    return render(request, 'students/student_form.html', {
+        'form': form,
+        'title': 'Add Student / إضافة طالب',
+        'EDUCATION_LEVELS': EDUCATION_LEVELS,
+        'PICKUP_RELATIONS': PICKUP_RELATIONS,
+    })
 
 
 # ────────────────────────── DETAIL ──────────────────────────
@@ -334,6 +347,8 @@ def student_edit(request, pk):
         'existing_siblings': student.siblings.all(),
         'existing_pickups':  student.authorized_pickups.all(),
         'title': f'Edit: {student.full_name}',
+        'EDUCATION_LEVELS': EDUCATION_LEVELS,
+        'PICKUP_RELATIONS': PICKUP_RELATIONS,
     })
 
 

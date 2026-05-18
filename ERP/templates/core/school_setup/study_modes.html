@@ -78,3 +78,27 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Broadcast to any open Add/Edit Student tabs that study modes have changed.
+// Fires on every list page load — i.e. after the redirect from add / edit / delete.
+(function () {
+    const ts = Date.now();
+
+    // 1) BroadcastChannel (modern browsers, same-origin tabs)
+    if ('BroadcastChannel' in window) {
+        try {
+            const ch = new BroadcastChannel('study_modes');
+            ch.postMessage({ type: 'study_modes_updated', ts: ts });
+        } catch (e) {}
+    }
+
+    // 2) localStorage signal (fires `storage` event in other same-origin tabs).
+    //    Always update the key so the value actually changes (otherwise event won't fire).
+    try {
+        localStorage.setItem('study_modes_updated_at', String(ts));
+    } catch (e) {}
+})();
+</script>
+{% endblock %}

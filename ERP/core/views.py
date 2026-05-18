@@ -486,3 +486,12 @@ def api_sections(request):
     )
     return JsonResponse({'sections': sections})
 
+
+@login_required
+def api_study_modes(request):
+    modes = list(
+        StudyMode.objects.filter(is_active=True)
+        .values('id', 'name').order_by('order', 'name')
+    )
+    return JsonResponse({'study_modes': modes})
+

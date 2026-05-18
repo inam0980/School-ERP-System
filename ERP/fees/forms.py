@@ -195,6 +195,14 @@ class PaymentForm(forms.ModelForm):
 
 
 class FeeReportFilterForm(forms.Form):
+    q = forms.CharField(
+        required=False,
+        label='Search',
+        widget=forms.TextInput(attrs={
+            'class': _SMALL,
+            'placeholder': 'Search by student name, student ID, National ID, or Iqama…',
+        }),
+    )
     academic_year = forms.ModelChoiceField(
         queryset=AcademicYear.objects.all(),
         required=False,

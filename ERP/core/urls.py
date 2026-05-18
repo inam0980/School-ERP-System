@@ -50,7 +50,8 @@ urlpatterns = [
     path('school-setup/study-modes/<int:pk>/delete/', views.study_mode_delete, name='study_mode_delete'),
 
     # ── API endpoints ───────────────────────────────────────────
-    path('api/grades/',   views.api_grades,   name='api_grades'),
-    path('api/sections/', views.api_sections, name='api_sections'),
+    path('api/grades/',       views.api_grades,       name='api_grades'),
+    path('api/sections/',     views.api_sections,     name='api_sections'),
+    path('api/study-modes/',  views.api_study_modes,  name='api_study_modes'),
 ]
 
