@@ -6,8 +6,14 @@
   <title>Tuition Fee Structure — {{ config }}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; font-size: 11pt; }
-    .page { max-width: 900px; margin: 0 auto; padding: 20mm; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; font-size: 10.5pt; background: #f1f5f9; }
+    .page {
+      width: 8.27in; min-height: 11.69in;   /* A4 portrait — 210mm × 297mm */
+      margin: 10mm auto;
+      padding: 15mm;
+      background: #fff;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
     h1 { font-size: 18pt; font-weight: 700; color: #1e3a5f; margin-bottom: 2px; }
     h2 { font-size: 10pt; color: #475569; margin-bottom: 16px; }
     .section-title {
@@ -46,8 +52,63 @@
     .footer { margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px;
               font-size: 8pt; color: #94a3b8; display: flex; justify-content: space-between; }
     @media print {
-      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-      .no-print { display: none; }
+      /* A4 PORTRAIT — 8.27" × 11.69" (210mm × 297mm). Explicit dimensions
+         are honoured by more print drivers than the `A4 portrait` shorthand. */
+      @page {
+        size: 8.27in 11.69in;
+        margin: 8mm;
+      }
+      html, body {
+        background: #fff;
+        font-size: 7.5pt;
+        print-color-adjust: exact; -webkit-print-color-adjust: exact;
+      }
+      .page {
+        width: auto; min-height: 0;
+        margin: 0; padding: 0;
+        box-shadow: none;
+      }
+      .no-print { display: none !important; }
+      tr { page-break-inside: avoid; }
+
+      /* Compressed print typography */
+      h1 { font-size: 13pt !important; margin-bottom: 1px !important; }
+      h2 { font-size: 8pt  !important; margin-bottom: 6px !important; }
+
+      .section-title {
+        font-size: 7pt   !important;
+        padding: 3px 8px !important;
+      }
+      table { margin-bottom: 6px !important; }
+      th {
+        font-size: 6.8pt !important;
+        padding: 3px 5px !important;
+        border-bottom-width: 1px !important;
+      }
+      td {
+        font-size: 7pt    !important;
+        padding: 2px 5px  !important;
+      }
+      .summary-grid {
+        gap: 6px !important;
+        margin-bottom: 8px !important;
+      }
+      .summary-card { padding: 5px !important; }
+      .summary-card .label { font-size: 6pt !important; margin-bottom: 1px !important; }
+      .summary-card .value { font-size: 10pt !important; }
+
+      /* Tighter header area */
+      div[style*="border-bottom: 3px solid"] {
+        padding-bottom: 5px !important;
+        margin-bottom: 8px  !important;
+        border-bottom-width: 2px !important;
+      }
+
+      .footer {
+        margin-top: 8px !important;
+        padding-top: 4px !important;
+        font-size: 6.5pt !important;
+      }
     }
   </style>
 </head>

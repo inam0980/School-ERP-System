@@ -5,8 +5,8 @@
   <title>Alkawtharis Tuition Fee Structure</title>
   <style>
     @page {
-      size: A3 landscape;
-      margin: 7mm 7mm 7mm 7mm;
+      size: 8.27in 11.69in;          /* A4 portrait — 210mm × 297mm */
+      margin: 6mm 6mm 6mm 6mm;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -29,8 +29,8 @@
       vertical-align: middle;
     }
     .header-logo img {
-      width: 80px;
-      height: 80px;
+      width: 85px;
+      height: 85px;
     }
     .header-title {
       display: table-cell;
@@ -38,19 +38,19 @@
       text-align: center;
     }
     .header-title h1 {
-      font-size: 14pt;
+      font-size: 13pt;
       font-weight: bold;
       color: #1a1a1a;
       letter-spacing: 0.02em;
     }
     .header-meta {
       display: table-cell;
-      width: 120px;
+      width: 110px;
       vertical-align: middle;
       text-align: right;
       font-size: 6.5pt;
       color: #333;
-      line-height: 1.5;
+      line-height: 1.4;
     }
     .header-meta strong { color: #111; }
     .posted-badge {
@@ -80,7 +80,7 @@
       font-weight: bold;
       color: #333;
       white-space: nowrap;
-      width: 90px;
+      width: 85px;
     }
     .info-table .val {
       color: #111;
@@ -95,7 +95,7 @@
       font-weight: bold;
       text-align: center;
       padding: 3px 6px;
-      margin-top: 5px;
+      margin-top: 4px;
       margin-bottom: 0;
     }
 
@@ -104,6 +104,7 @@
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 3px;
+      table-layout: fixed;
     }
     .data-table th {
       background: #dce6f1;
@@ -113,8 +114,8 @@
       font-weight: bold;
       text-align: center;
       color: #111;
-      white-space: nowrap;
       line-height: 1.2;
+      word-wrap: break-word;
     }
     .data-table td {
       border: 1px solid #aaa;
@@ -143,10 +144,10 @@
 
     /* ── FOOTNOTE ────────────────────────────────────────────── */
     .footnote {
-      font-size: 7pt;
+      font-size: 6.5pt;
       color: #555;
       font-style: italic;
-      margin-top: 4px;
+      margin-top: 3px;
     }
   </style>
 </head>
