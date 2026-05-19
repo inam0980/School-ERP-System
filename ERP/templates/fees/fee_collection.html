@@ -252,8 +252,54 @@
 
             {% if dues %}
             <div class="divide-y divide-slate-100" id="feeRows">
-                {% for sf in dues %}
 
+                {# ── Other (non-tuition) fees: Entrance Exam, Registration, etc. ── #}
+                {% for sf in other_fees %}
+                    {% include 'fees/_fee_row.html' %}
+                {% endfor %}
+
+                {# ── Semester 1 collapsible section ── #}
+                {% if sem1_fees %}
+                <details open class="semester-block">
+                    <summary class="bg-amber-50/70 hover:bg-amber-100/60 cursor-pointer select-none px-5 py-3 border-l-4 border-amber-400 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="text-amber-700 font-bold text-base">Semester 1 Fees</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">{{ sem1_fees|length }} item{{ sem1_fees|length|pluralize }}</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-sm">
+                            <span class="text-slate-500">Total:</span>
+                            <span class="font-bold text-red-600">SAR {{ sem1_balance|money }}</span>
+                            <span class="text-amber-700 text-xs">▼</span>
+                        </div>
+                    </summary>
+                    {% for sf in sem1_fees %}
+                        {% include 'fees/_fee_row.html' %}
+                    {% endfor %}
+                </details>
+                {% endif %}
+
+                {# ── Semester 2 collapsible section ── #}
+                {% if sem2_fees %}
+                <details class="semester-block">
+                    <summary class="bg-emerald-50/70 hover:bg-emerald-100/60 cursor-pointer select-none px-5 py-3 border-l-4 border-emerald-400 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="text-emerald-700 font-bold text-base">Semester 2 Fees</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">{{ sem2_fees|length }} item{{ sem2_fees|length|pluralize }}</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-sm">
+                            <span class="text-slate-500">Total:</span>
+                            <span class="font-bold text-red-600">SAR {{ sem2_balance|money }}</span>
+                            <span class="text-emerald-700 text-xs">▼</span>
+                        </div>
+                    </summary>
+                    {% for sf in sem2_fees %}
+                        {% include 'fees/_fee_row.html' %}
+                    {% endfor %}
+                </details>
+                {% endif %}
+
+                {# ── Legacy payment-plan installments (only if any remain) ── #}
+                {% for sf in dues %}
                 {% if sf.payment_plan %}
                 <!-- Installment plan header -->
                 <div class="bg-indigo-50/50 px-5 py-3">
@@ -316,12 +362,8 @@
                 {% endfor %}
 
                 {% else %}
-                <!-- Normal fee row -->
-                <div class="fee-row flex flex-wrap items-center gap-3 px-5 py-4 hover:bg-slate-50 transition"
-                     data-balance="{{ sf.balance }}">
-                    <input type="checkbox" name="selected_fees" value="{{ sf.pk }}"
-                           class="fee-checkbox w-5 h-5 accent-primary cursor-pointer rounded flex-shrink-0" checked
-                           onchange="onCheckChange(this)">
+                {# Non-plan normal rows already rendered in the sections above. #}
+                {% comment %}begin-dead-block
                     <!-- Category icon -->
                     <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg flex-shrink-0
                                 {% if sf.fee_structure.fee_type.category == 'TRANSPORT' %}bg-blue-100
@@ -416,6 +458,7 @@
                                oninput="recalcTotal()">
                     </div>
                 </div>
+                end-dead-block{% endcomment %}
                 {% endif %}
                 {% endfor %}
             </div>

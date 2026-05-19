@@ -34,8 +34,8 @@
 
         <!-- Pick structure -->
         <div class="px-6 py-4 border-b border-slate-100">
-            <label class="block text-sm font-semibold text-slate-700 mb-2">1. Select Fee Structure</label>
-            <select name="structure_id" id="structureSel" required
+            <label class="block text-sm font-semibold text-slate-700 mb-2">1. Select Fee Structure <span class="text-xs font-normal text-slate-400">(optional if you only add Additional Fees below)</span></label>
+            <select name="structure_id" id="structureSel"
                     class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30">
                 <option value="">— Choose a fee structure —</option>
                 {% for s in eligible_structures %}
@@ -63,7 +63,7 @@
                         </div>
                         <div class="divide-y divide-slate-100">
                             {% for item in s.items.all %}
-                            {% if item.fee_type.name != 'Gross Tuition' %}
+                            {% if item.fee_type.name != 'Gross Tuition' and item.fee_type.name != 'Tuition Fee' %}
                             <label class="px-3 py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50 cursor-pointer">
                                 <div class="flex items-center gap-3">
                                     <input type="checkbox" name="item_ids" value="{{ item.pk }}"
@@ -88,13 +88,74 @@
             <p id="noStructureMsg" class="text-sm text-slate-400 italic">Select a fee structure above to see its items.</p>
         </div>
 
+        <!-- Additional / ad-hoc fees -->
+        <div class="px-6 py-4 border-b border-slate-100">
+            <div class="flex items-center justify-between mb-2">
+                <label class="text-sm font-semibold text-slate-700">3. Additional Fees (optional)</label>
+                <button type="button" id="addAdhocBtn"
+                        class="text-xs font-medium text-[#1e3a5f] hover:text-[#2a5298] inline-flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Row
+                </button>
+            </div>
+            <p class="text-xs text-slate-500 mb-2">
+                Use this for charges not part of the fee structure (e.g. ID card replacement, library fine, transport top-up).
+            </p>
+
+            <div id="adhocRows" class="space-y-2"></div>
+
+            <!-- Hidden template row used by JS to clone -->
+            <template id="adhocRowTemplate">
+                <div class="adhoc-row grid grid-cols-12 gap-2 items-end">
+                    <div class="col-span-5">
+                        <label class="block text-xs text-slate-500 mb-0.5">Fee Type</label>
+                        <select name="adhoc_fee_type[]"
+                                class="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30">
+                            <option value="">— Select fee type —</option>
+                            {% for ft in all_fee_types %}
+                            <option value="{{ ft.pk }}">{{ ft.name }}{% if ft.is_taxable %} (VAT){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-span-3">
+                        <label class="block text-xs text-slate-500 mb-0.5">Amount (SAR)</label>
+                        <input type="number" name="adhoc_amount[]" min="0.01" step="0.01" placeholder="0.00"
+                               class="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30">
+                    </div>
+                    <div class="col-span-3">
+                        <label class="block text-xs text-slate-500 mb-0.5">Note (optional)</label>
+                        <input type="text" name="adhoc_note[]" placeholder="e.g. Replacement ID"
+                               class="w-full px-2 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30">
+                    </div>
+                    <div class="col-span-1 flex justify-end">
+                        <button type="button" class="remove-adhoc-row text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
         <!-- Discount + Due date -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 px-6 py-4 border-b border-slate-100">
             <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-2">Discount % (optional)</label>
-                <input type="number" name="discount_pct" min="0" max="100" step="0.01" value="0"
+                <label class="block text-sm font-semibold text-slate-700 mb-2">
+                    Additional Discount % (optional)
+                </label>
+                <input type="number" name="discount_pct" id="discountPctInp" min="0" max="100" step="0.01"
+                       value="0" placeholder="0"
                        class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30">
-                <p class="text-xs text-slate-400 mt-1">Applied to every selected item.</p>
+                <p id="discountHint" class="text-xs text-slate-400 mt-1">Applied to every selected item.</p>
+                <p id="alreadyApplied" class="hidden text-xs text-green-700 font-medium mt-1 inline-flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    Already applied: <span id="appliedPct">0</span>% group discount on tuition.
+                </p>
             </div>
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-2">Due Date *</label>
@@ -121,11 +182,38 @@
 
 {% block extra_scripts %}
 <script>
+// Map of structure_pk → existing group discount % (already baked into tuition)
+const STRUCTURE_DISCOUNTS = {
+    {% for pk, pct in structure_discounts.items %}"{{ pk }}": {{ pct }}{% if not forloop.last %},{% endif %}{% endfor %}
+};
+
 (function () {
     const sel        = document.getElementById('structureSel');
     const blocks     = document.querySelectorAll('.structure-items');
     const emptyMsg   = document.getElementById('noStructureMsg');
+    const appliedBox = document.getElementById('alreadyApplied');
+    const appliedPct = document.getElementById('appliedPct');
+    const hint       = document.getElementById('discountHint');
+    const discountInp= document.getElementById('discountPctInp');
     if (!sel) return;
+
+    function refreshDiscountHint() {
+        const id  = sel.value;
+        const pct = id ? (STRUCTURE_DISCOUNTS[id] || 0) : 0;
+        if (pct > 0) {
+            appliedPct.textContent = pct;
+            appliedBox.classList.remove('hidden');
+            hint.textContent = 'Enter any EXTRA discount % to apply on top — leave 0 to use only the existing one.';
+            // Show the existing discount inside the input box as a placeholder
+            if (discountInp) {
+                discountInp.placeholder = `0 — ${pct}% already applied`;
+            }
+        } else {
+            appliedBox.classList.add('hidden');
+            hint.textContent = 'Applied to every selected item.';
+            if (discountInp) discountInp.placeholder = '0';
+        }
+    }
 
     sel.addEventListener('change', () => {
         const id = sel.value;
@@ -136,7 +224,9 @@
             if (match) shown = true;
         });
         emptyMsg.classList.toggle('hidden', shown);
+        refreshDiscountHint();
     });
+    refreshDiscountHint();
 
     // "Select all" checkbox per structure
     document.querySelectorAll('.select-all-items').forEach(master => {
@@ -144,6 +234,27 @@
             const block = e.target.closest('.structure-items');
             block.querySelectorAll('.item-cb').forEach(cb => { cb.checked = e.target.checked; });
         });
+    });
+})();
+
+// ── Additional (ad-hoc) fee rows ──────────────────────────────
+(function () {
+    const addBtn   = document.getElementById('addAdhocBtn');
+    const rowsBox  = document.getElementById('adhocRows');
+    const template = document.getElementById('adhocRowTemplate');
+    if (!addBtn || !rowsBox || !template) return;
+
+    function addRow() {
+        const clone = template.content.cloneNode(true);
+        rowsBox.appendChild(clone);
+        rowsBox.lastElementChild.querySelector('select').focus();
+    }
+
+    addBtn.addEventListener('click', addRow);
+
+    rowsBox.addEventListener('click', (e) => {
+        const btn = e.target.closest('.remove-adhoc-row');
+        if (btn) btn.closest('.adhoc-row').remove();
     });
 })();
 </script>

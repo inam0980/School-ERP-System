@@ -1,0 +1,82 @@
+{% load fee_pdf_filters %}
+{# One billable fee row, used by fee_collection.html for each section. #}
+<div class="fee-row flex flex-wrap items-center gap-3 px-5 py-4 hover:bg-slate-50 transition"
+     data-balance="{{ sf.balance }}">
+    <input type="checkbox" name="selected_fees" value="{{ sf.pk }}"
+           class="fee-checkbox w-5 h-5 accent-primary cursor-pointer rounded flex-shrink-0" checked
+           onchange="onCheckChange(this)">
+    <!-- Category icon -->
+    <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg flex-shrink-0
+                {% if sf.fee_structure.fee_type.category == 'TRANSPORT' %}bg-blue-100
+                {% elif sf.fee_structure.fee_type.category == 'LABORATORY' %}bg-purple-100
+                {% elif sf.fee_structure.fee_type.category == 'TUITION' %}bg-green-100
+                {% elif sf.fee_structure.fee_type.category == 'RESERVATION' %}bg-amber-100
+                {% elif sf.fee_structure.fee_type.category == 'EXAMINATION' %}bg-yellow-100
+                {% elif sf.fee_structure.fee_type.category == 'LIBRARY' %}bg-orange-100
+                {% elif sf.fee_structure.fee_type.category == 'SPORTS' %}bg-red-100
+                {% elif sf.fee_structure.fee_type.category == 'HOSTEL' %}bg-teal-100
+                {% elif sf.fee_structure.fee_type.category == 'UNIFORM' %}bg-pink-100
+                {% elif sf.fee_structure.fee_type.category == 'LATE_FEE' %}bg-red-100
+                {% else %}bg-slate-100{% endif %}">
+        {% if sf.fee_structure.fee_type.category == 'TRANSPORT' %}🚌
+        {% elif sf.fee_structure.fee_type.category == 'LABORATORY' %}🧪
+        {% elif sf.fee_structure.fee_type.category == 'TUITION' %}📚
+        {% elif sf.fee_structure.fee_type.category == 'RESERVATION' %}💼
+        {% elif sf.fee_structure.fee_type.category == 'EXAMINATION' %}📝
+        {% elif sf.fee_structure.fee_type.category == 'LIBRARY' %}📖
+        {% elif sf.fee_structure.fee_type.category == 'SPORTS' %}⚽
+        {% elif sf.fee_structure.fee_type.category == 'HOSTEL' %}🏠
+        {% elif sf.fee_structure.fee_type.category == 'UNIFORM' %}👕
+        {% elif sf.fee_structure.fee_type.category == 'BOOKS' %}📖
+        {% elif sf.fee_structure.fee_type.category == 'SMART_CLASS' %}💻
+        {% elif sf.fee_structure.fee_type.category == 'LATE_FEE' %}⏰
+        {% elif sf.fee_structure.fee_type.category == 'ANNUAL_FUNCTION' %}🎉
+        {% elif sf.fee_structure.fee_type.category == 'ADMISSION' %}📋
+        {% elif sf.fee_structure.fee_type.category == 'SECURITY_DEPOSIT' %}🔐
+        {% elif sf.fee_structure.fee_type.category == 'MESS' %}🍽️
+        {% else %}💰{% endif %}
+    </div>
+    <!-- Fee info -->
+    <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+            <p class="font-semibold text-slate-800 text-sm">{{ sf.fee_structure.fee_type.name }}</p>
+            <span class="text-xs font-medium
+                {% if sf.status == 'OVERDUE' %}text-red-500
+                {% elif sf.status == 'PARTIAL' %}text-yellow-600
+                {% else %}text-slate-400{% endif %}">
+                {{ sf.get_status_display }}
+            </span>
+        </div>
+        <div class="flex items-center gap-3 mt-0.5">
+            <p class="text-xs text-slate-400">Due: {{ sf.due_date|date:"d M Y" }}</p>
+            {% if sf.amount_paid > 0 %}<p class="text-xs text-slate-400">Paid: SAR {{ sf.amount_paid|money }}</p>{% endif %}
+        </div>
+    </div>
+    <!-- Discount -->
+    <div class="w-36 flex-shrink-0">
+        <label class="block text-xs text-slate-500 mb-1">Discount (%)</label>
+        <input type="number" name="discount_pct_{{ sf.pk }}"
+               min="0" max="100" step="0.01" placeholder="0.00"
+               {% if sf.discount %}value="{{ sf.discount_pct }}"{% endif %}
+               class="w-full border border-amber-300 bg-amber-50 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400"
+               oninput="onDiscountChange(this, '{{ sf.pk }}', {{ sf.balance }}, {{ sf.discount }}, {{ sf.amount }})"
+               data-prev-discount="{{ sf.discount }}">
+        <input type="text" name="discount_note_{{ sf.pk }}"
+               value="{{ sf.discount_note }}"
+               placeholder="Reason…"
+               class="w-full mt-1 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-300">
+    </div>
+    <!-- Balance -->
+    <div class="text-right w-28 flex-shrink-0">
+        <p class="text-xs text-slate-500">Balance</p>
+        <p class="font-bold text-red-600 text-base balance-cell" id="bal_{{ sf.pk }}">SAR {{ sf.balance|money }}</p>
+    </div>
+    <!-- Amount to pay -->
+    <div class="w-36 flex-shrink-0">
+        <label class="block text-xs text-slate-500 mb-1 text-right">Amount to Pay</label>
+        <input type="number" name="amount_{{ sf.pk }}" id="amt_{{ sf.pk }}"
+               min="0.01" max="{{ sf.balance }}" step="0.01" value="{{ sf.balance }}"
+               class="amount-input w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-right font-semibold focus:outline-none focus:ring-2 focus:ring-primary/40"
+               oninput="recalcTotal()">
+    </div>
+</div>

@@ -77,21 +77,34 @@ def api_fees_summary(request):
 
 @login_required
 def student_search_api(request):
-    """Live search: returns up to 20 students whose name starts with `q`."""
-    q = request.GET.get('q', '').strip()
-    if len(q) < 1:
+    """Live search: returns up to 20 students whose name starts with `q`.
+    Also supports filtering by division / grade / section for the Browse picker —
+    when these are provided, returns all students in that section (up to 100).
+    """
+    q          = request.GET.get('q', '').strip()
+    division_id= request.GET.get('division_id', '').strip()
+    grade_id   = request.GET.get('grade_id', '').strip()
+    section_id = request.GET.get('section_id', '').strip()
+
+    if not q and not (division_id or grade_id or section_id):
         return JsonResponse({'results': []})
-    qs = (
-        Student.objects
-        .filter(
+
+    qs = Student.objects.filter(is_active=True)
+    if q:
+        qs = qs.filter(
             Q(full_name__istartswith=q) |
             Q(arabic_name__istartswith=q) |
             Q(student_id__icontains=q) |
-            Q(iqama_number__istartswith=q),
-            is_active=True,
+            Q(iqama_number__istartswith=q)
         )
-        .select_related('grade', 'section', 'division')
-        .order_by('full_name')[:20]
+    if division_id:  qs = qs.filter(division_id=division_id)
+    if grade_id:     qs = qs.filter(grade_id=grade_id)
+    if section_id:   qs = qs.filter(section_id=section_id)
+
+    limit = 100 if (grade_id or section_id) else 20
+    qs = (
+        qs.select_related('grade', 'section', 'division')
+          .order_by('full_name')[:limit]
     )
     results = [
         {
@@ -887,8 +900,21 @@ def assign_student_fee(request, student_pk):
         due_date_raw = request.POST.get('due_date')
         discount_pct = Decimal(request.POST.get('discount_pct', '0') or '0')
 
-        if not structure_id or not item_ids:
-            messages.error(request, 'Please choose a fee structure and at least one fee item.')
+        # Additional (ad-hoc) fees rows
+        adhoc_type_ids   = request.POST.getlist('adhoc_fee_type[]')
+        adhoc_amounts    = request.POST.getlist('adhoc_amount[]')
+        adhoc_notes      = request.POST.getlist('adhoc_note[]')
+
+        has_structure_items = bool(structure_id and item_ids)
+        has_adhoc           = any(
+            (t and a.strip())
+            for t, a in zip(adhoc_type_ids, adhoc_amounts)
+        )
+
+        if not has_structure_items and not has_adhoc:
+            messages.error(request,
+                'Please choose a fee structure with at least one item, '
+                'OR add at least one Additional Fee.')
             return redirect('fees:assign_student_fee', student_pk=student.pk)
 
         try:
@@ -897,46 +923,132 @@ def assign_student_fee(request, student_pk):
         except ValueError:
             due_date = _date.today()
 
-        structure = get_object_or_404(FeeStructure, pk=structure_id, grade=student.grade)
-        # 'Gross Tuition' is for PDF display only — never assign it to a student.
-        items = list(
-            structure.items.filter(pk__in=item_ids)
-            .exclude(fee_type__name='Gross Tuition')
-            .select_related('fee_type')
-        )
+        created = skipped = adhoc_created = 0
 
-        created = skipped = 0
         with transaction.atomic():
-            for item in items:
-                discount_amt = (item.amount * discount_pct / 100).quantize(Decimal('0.01'))
-                obj, was_created = StudentFee.objects.get_or_create(
-                    student=student,
-                    fee_structure=item,
-                    defaults={
-                        'amount':        item.amount,
-                        'discount':      discount_amt,
-                        'discount_note': f'{discount_pct}% discount' if discount_pct > 0 else '',
-                        'due_date':      due_date,
-                        'assigned_by':   request.user,
-                    },
+            # ── 1. Structure-based items ───────────────────────────────
+            if has_structure_items:
+                structure = get_object_or_404(FeeStructure, pk=structure_id, grade=student.grade)
+                items = list(
+                    structure.items.filter(pk__in=item_ids)
+                    .exclude(fee_type__name__in=['Gross Tuition', 'Tuition Fee'])
+                    .select_related('fee_type')
                 )
-                if was_created:
-                    obj.save()  # triggers net_amount + VAT calc
-                    created += 1
-                else:
-                    skipped += 1
+                for item in items:
+                    discount_amt = (item.amount * discount_pct / 100).quantize(Decimal('0.01'))
+                    obj, was_created = StudentFee.objects.get_or_create(
+                        student=student,
+                        fee_structure=item,
+                        defaults={
+                            'amount':        item.amount,
+                            'discount':      discount_amt,
+                            'discount_note': f'{discount_pct}% discount' if discount_pct > 0 else '',
+                            'due_date':      due_date,
+                            'assigned_by':   request.user,
+                        },
+                    )
+                    if was_created:
+                        obj.save()
+                        created += 1
+                    else:
+                        skipped += 1
 
-        if created:
+            # ── 2. Additional (ad-hoc) fees ────────────────────────────
+            if has_adhoc:
+                # Sentinel structure shared by all ad-hoc charges (one per academic year)
+                academic_year = student.academic_year
+                from core.models import Division, Grade
+                sentinel_div, _ = Division.objects.get_or_create(
+                    name='__ADHOC__',
+                    defaults={'curriculum_type': 'CUSTOM', 'is_active': False},
+                )
+                sentinel_grade, _ = Grade.objects.get_or_create(
+                    name='Individual Charges', division=sentinel_div,
+                    defaults={'order': 9999},
+                )
+                adhoc_structure, _ = FeeStructure.objects.get_or_create(
+                    academic_year=academic_year,
+                    grade=sentinel_grade,
+                    structure_type=FeeStructure.TYPE_OTHER,
+                    study_mode=None,
+                    defaults={'name': 'Ad-hoc / Individual Charges'},
+                )
+
+                for type_id, amount_raw, note in zip(adhoc_type_ids, adhoc_amounts, adhoc_notes):
+                    type_id = (type_id or '').strip()
+                    amount_raw = (amount_raw or '').strip()
+                    if not type_id or not amount_raw:
+                        continue
+                    try:
+                        amount = Decimal(amount_raw)
+                        if amount <= 0:
+                            continue
+                    except Exception:
+                        continue
+                    try:
+                        fee_type = FeeType.objects.get(pk=type_id)
+                    except FeeType.DoesNotExist:
+                        continue
+
+                    item, _ = FeeStructureItem.objects.get_or_create(
+                        structure=adhoc_structure,
+                        fee_type=fee_type,
+                        defaults={'amount': amount},
+                    )
+                    # Keep the latest amount on the shared ad-hoc item
+                    if item.amount != amount:
+                        item.amount = amount
+                        item.save(update_fields=['amount'])
+
+                    discount_amt = (amount * discount_pct / 100).quantize(Decimal('0.01'))
+                    sf, was_created = StudentFee.objects.get_or_create(
+                        student=student,
+                        fee_structure=item,
+                        defaults={
+                            'amount':        amount,
+                            'discount':      discount_amt,
+                            'discount_note': (note.strip() or (f'{discount_pct}% discount' if discount_pct > 0 else '')),
+                            'due_date':      due_date,
+                            'assigned_by':   request.user,
+                        },
+                    )
+                    if was_created:
+                        sf.save()
+                        adhoc_created += 1
+                    else:
+                        skipped += 1
+
+        # Build summary message
+        parts = []
+        if created:       parts.append(f'{created} structure item(s)')
+        if adhoc_created: parts.append(f'{adhoc_created} additional fee(s)')
+        if parts:
             messages.success(request,
-                f'Assigned {created} fee item(s) to {student.full_name}.' +
+                f'Assigned {", ".join(parts)} to {student.full_name}.' +
                 (f' Skipped {skipped} already-assigned item(s).' if skipped else ''))
         else:
-            messages.warning(request, 'All selected fee items were already assigned to this student.')
+            messages.warning(request, 'All selected items were already assigned to this student.')
         return redirect('students:detail', pk=student.pk)
+
+    # Compute existing group-discount % per structure (from Gross vs Net tuition)
+    structure_discounts = {}
+    for s in eligible_structures:
+        gross = net = Decimal('0')
+        for it in s.items.all():
+            if it.fee_type.name == 'Gross Tuition':         gross = it.amount
+            if it.fee_type.category == FeeType.TUITION:     net   = it.amount
+        if gross > 0 and net > 0 and net < gross:
+            structure_discounts[s.pk] = (
+                (gross - net) / gross * 100
+            ).quantize(Decimal('0.01'))
+        else:
+            structure_discounts[s.pk] = Decimal('0')
 
     return render(request, 'fees/assign_student_fee.html', {
         'student':              student,
         'eligible_structures':  eligible_structures,
+        'all_fee_types':        FeeType.objects.all().order_by('category', 'name'),
+        'structure_discounts':  structure_discounts,
     })
 
 
@@ -974,10 +1086,11 @@ def bulk_assign_fees(request):
         discount_pct = form.cleaned_data['discount_pct']   # Decimal 0-100
         due_date     = form.cleaned_data['due_date']
 
-        # 'Gross Tuition' is stored for PDF rendering only — never billable.
+        # 'Gross Tuition' and 'Tuition Fee' are summaries — not billable as their
+        # own line. The student pays via Down Payment + Installments instead.
         items = list(
             structure.items.select_related('fee_type')
-            .exclude(fee_type__name='Gross Tuition')
+            .exclude(fee_type__name__in=['Gross Tuition', 'Tuition Fee'])
         )
         if not items:
             messages.warning(request, 'This fee structure has no fee-type items yet.')
@@ -1220,6 +1333,7 @@ def fee_collection(request):
         dues = list(
             StudentFee.objects.filter(student=student)
             .exclude(status__in=['WAIVED', 'PAID'])
+            .exclude(fee_structure__fee_type__name__in=['Tuition Fee', 'Gross Tuition'])
             .select_related('fee_structure', 'fee_structure__fee_type')
             .prefetch_related('payment_plan__installments')
             .order_by('due_date')
@@ -1229,6 +1343,37 @@ def fee_collection(request):
                 (sf.discount / sf.amount * 100).quantize(Decimal('0.01'))
                 if sf.amount else Decimal('0.00')
             )
+
+        # ── Group dues into Semester 1 / Semester 2 / Other ─────────
+        INST_NAMES = ['1st Installment', '2nd Installment', '3rd Installment', '4th Installment']
+        installments_in_dues = sorted(
+            [d for d in dues if d.fee_structure.fee_type.name in INST_NAMES],
+            key=lambda d: INST_NAMES.index(d.fee_structure.fee_type.name),
+        )
+        n_inst   = len(installments_in_dues)
+        sem1_cap = (n_inst + 1) // 2   # ceil(N/2) → first half goes to Sem 1
+
+        sem1_fees  = []
+        sem2_fees  = []
+        other_fees = []
+        inst_seen  = 0
+        for d in dues:
+            ft_name = d.fee_structure.fee_type.name
+            ft_cat  = d.fee_structure.fee_type.category
+            if ft_cat == 'RESERVATION':   # Reservation / Down Payment → Sem 1
+                sem1_fees.append(d)
+            elif ft_name in INST_NAMES:
+                if inst_seen < sem1_cap:
+                    sem1_fees.append(d)
+                else:
+                    sem2_fees.append(d)
+                inst_seen += 1
+            else:
+                other_fees.append(d)
+
+        # Per-semester subtotals
+        sem1_balance = sum((d.balance for d in sem1_fees), Decimal('0'))
+        sem2_balance = sum((d.balance for d in sem2_fees), Decimal('0'))
 
     # ── MULTI-FEE POST ──────────────────────────────────────────
     receipts = []
@@ -1376,6 +1521,11 @@ def fee_collection(request):
         'students':           students,
         'student':            student,
         'dues':               dues,
+        'sem1_fees':          sem1_fees       if student_pk else [],
+        'sem2_fees':          sem2_fees       if student_pk else [],
+        'other_fees':         other_fees      if student_pk else [],
+        'sem1_balance':       sem1_balance    if student_pk else Decimal('0'),
+        'sem2_balance':       sem2_balance    if student_pk else Decimal('0'),
         'receipts':           receipts,
         'payment_methods':    Payment.PAYMENT_METHODS,
         'today':              timezone.localdate().isoformat(),
@@ -1912,6 +2062,14 @@ def generate_invoice(request, student_pk):
         messages.warning(request, "No paid fees found for this student.")
         return redirect('fees:student_ledger', student_pk=student_pk)
 
+    # Invoice descriptions: show "Semester Fees" instead of "Installment"
+    SEMESTER_LABELS = {
+        '1st Installment': '1st Semester Fees',
+        '2nd Installment': '2nd Semester Fees',
+        '3rd Installment': '3rd Semester Fees',
+        '4th Installment': '4th Semester Fees',
+    }
+
     subtotal   = Decimal('0')
     tax_total  = Decimal('0')
     line_items = []
@@ -1923,8 +2081,9 @@ def generate_invoice(request, student_pk):
         tax  = (base * rate).quantize(Decimal('0.01'))
         subtotal  += base
         tax_total += tax
+        ft_name = f.fee_structure.fee_type.name
         line_items.append({
-            'description':    f.fee_structure.fee_type.name,
+            'description':    SEMESTER_LABELS.get(ft_name, ft_name),
             'qty':            1,
             'gross_amount':   float(f.amount),
             'discount':       float(f.discount),
