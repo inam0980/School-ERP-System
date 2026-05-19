@@ -267,6 +267,14 @@
         clearTimeout(timer);
         timer = setTimeout(() => filterForm.submit(), 400);
     });
+
+    // After the form auto-submits, the page reloads and focus is lost.
+    // Restore focus + cursor to the end so typing feels continuous.
+    if (searchInput.value) {
+        searchInput.focus();
+        const v = searchInput.value;
+        searchInput.setSelectionRange(v.length, v.length);
+    }
 })();
 </script>
 {% endblock %}

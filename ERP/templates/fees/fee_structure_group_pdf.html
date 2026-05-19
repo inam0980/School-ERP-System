@@ -280,7 +280,7 @@
         <td>{{ r.n_entrance_exam|money }}</td>
         <td>{{ r.n_registration|money }}</td>
         <td>{{ r.n_gross_tuition|money }}</td>
-        <td>—</td>
+        <td>{% if r.n_group_disc_amt %}{{ r.n_group_disc_amt|money }}{% else %}—{% endif %}</td>
         <td class="highlight">{{ r.n_tuition_net|money }}</td>
         <td>{{ r.n_reservation|money }}</td>
         <td>{{ r.n_first_inst|money }}</td>

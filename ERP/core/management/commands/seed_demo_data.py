@@ -242,6 +242,34 @@ class Command(BaseCommand):
             subjects.append(subj)
         return subjects
 
+    # ── Helpers for varied student fields ────────────────────────
+    def _rand_enrollment_type(self, i):
+        from students.models import Student
+        # Weighted: 50% Regular, 30% New, 20% Transfer
+        order = [Student.NEW, Student.REGULAR, Student.REGULAR, Student.REGULAR,
+                 Student.REGULAR, Student.REGULAR, Student.NEW, Student.NEW,
+                 Student.TRANSFER, Student.TRANSFER]
+        return order[i % len(order)]
+
+    def _rand_fee_category(self, i):
+        from students.models import Student
+        et = self._rand_enrollment_type(i)
+        return {
+            Student.NEW:      Student.FEE_CAT_NEW,
+            Student.REGULAR:  Student.FEE_CAT_REGULAR,
+            Student.TRANSFER: Student.FEE_CAT_TRANSFER,
+        }.get(et, Student.FEE_CAT_REGULAR)
+
+    def _rand_study_mode(self):
+        from core.models import StudyMode
+        if not hasattr(self, '_study_modes_cache'):
+            self._study_modes_cache = list(StudyMode.objects.filter(is_active=True))
+        modes = self._study_modes_cache
+        if not modes:
+            return None
+        import random as _random
+        return _random.choice(modes)
+
     def _create_students(self, data_rows, division, grade, section, year, admin):
         from students.models import Student
         import datetime
@@ -266,7 +294,16 @@ class Command(BaseCommand):
                 continue
 
             dob = dobs[i % len(dobs)]
+            # Build a deterministic, collision-free student_id for demo data so
+            # we don't depend on the 5-digit UUID slice in Student.save().
+            year_tag = year.name.replace('-', '')[:4]
+            div_tag  = division.name[:2].upper()
+            student_id = f"AKS-{year_tag}-{div_tag}-D{i:04d}"
+            # If a previous run already used this id, suffix until unique
+            while Student.objects.filter(student_id=student_id).exists():
+                student_id += 'x'
             s = Student.objects.create(
+                student_id=student_id,
                 full_name=full_name,
                 arabic_name=arabic_name,
                 dob=dob,
@@ -286,7 +323,9 @@ class Command(BaseCommand):
                 guardian_email=f"{full_name.split()[0].lower()}.guardian@gmail.com",
                 address=f"{random.randint(1,200)} Al-Nuzha Street, Jeddah",
                 arabic_address=f"شارع النزهة، رقم {random.randint(1,200)}، جدة",
-                enrollment_type='NEW',
+                enrollment_type=self._rand_enrollment_type(i),
+                study_mode=self._rand_study_mode(),
+                fee_category=self._rand_fee_category(i),
                 admission_date=year.start_date,
                 is_active=True,
                 created_by=admin,
@@ -390,63 +429,60 @@ class Command(BaseCommand):
         return created
 
     def _create_fees(self, fee_types, grade, division, year, students, admin):
-        from fees.models import FeeStructure, StudentFee, Payment
+        """Updated for the FeeStructure → FeeStructureItem → StudentFee schema."""
+        from fees.models import FeeStructure, FeeStructureItem, StudentFee, Payment
 
         due = year.start_date + datetime.timedelta(days=30)
 
+        # One container per grade per year (Regular structure)
+        structure, _ = FeeStructure.objects.get_or_create(
+            academic_year=year,
+            grade=grade,
+            structure_type=FeeStructure.TYPE_REGULAR,
+            study_mode=None,
+            defaults={
+                'name':      f"{grade.name} — Demo Fees",
+                'frequency': 'ANNUAL',
+            },
+        )
+
         for ft, amount in fee_types:
-            structure, _ = FeeStructure.objects.get_or_create(
-                academic_year=year,
-                grade=grade,
-                division=division,
+            # One line-item per fee type within the container
+            item, _ = FeeStructureItem.objects.get_or_create(
+                structure=structure,
                 fee_type=ft,
-                defaults={
-                    'amount': amount,
-                    'due_date': due,
-                    'frequency': 'ANNUAL',
-                },
+                defaults={'amount': amount},
             )
 
-            for student in students:
-                if StudentFee.objects.filter(student=student, fee_structure=structure).exists():
+            for idx, student in enumerate(students):
+                if StudentFee.objects.filter(student=student, fee_structure=item).exists():
                     continue
 
-                discount     = Decimal('0.00')
+                discount      = Decimal('0.00')
                 discount_note = ''
-                # 10% sibling discount for every 3rd student
-                if students.index(student) % 3 == 2:
+                if idx % 3 == 2:
                     discount = (amount * Decimal('0.10')).quantize(Decimal('0.01'))
                     discount_note = 'Sibling discount 10%'
 
-                tax = (amount * Decimal('0.15')).quantize(Decimal('0.01')) if ft.is_taxable else Decimal('0.00')
-                net = amount - discount + tax
-
-                # Randomly assign payment status
                 roll = random.random()
-                if roll < 0.40:
-                    status = 'PAID'
-                elif roll < 0.55:
-                    status = 'PARTIAL'
-                elif roll < 0.70:
-                    status = 'UNPAID'
-                else:
-                    status = 'OVERDUE'
+                if   roll < 0.40: status = 'PAID'
+                elif roll < 0.55: status = 'PARTIAL'
+                elif roll < 0.70: status = 'UNPAID'
+                else:             status = 'OVERDUE'
 
                 sf = StudentFee.objects.create(
                     student=student,
-                    fee_structure=structure,
+                    fee_structure=item,
                     amount=amount,
                     discount=discount,
                     discount_note=discount_note,
-                    net_amount=net,
                     due_date=due,
                     status=status,
                     assigned_by=admin,
                 )
 
-                # Add a payment for PAID and PARTIAL
                 if status in ('PAID', 'PARTIAL'):
-                    paid_amt = net if status == 'PAID' else (net * Decimal('0.50')).quantize(Decimal('0.01'))
+                    paid_amt = sf.net_amount if status == 'PAID' else (sf.net_amount * Decimal('0.50')).quantize(Decimal('0.01'))
                     Payment.objects.create(
                         student_fee=sf,
                         paid_amount=paid_amt,

@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+{% load fee_pdf_filters %}
+{% block title %}Assign Fees — {{ student.full_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-5">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <a href="{% url 'students:detail' student.pk %}"
+               class="text-xs text-slate-500 hover:text-slate-700 inline-flex items-center gap-1 mb-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                </svg>
+                Back to {{ student.full_name }}'s profile
+            </a>
+            <h1 class="text-xl font-bold text-slate-800">Assign Fees — {{ student.full_name }}</h1>
+            <p class="text-xs text-slate-500 mt-0.5">
+                {{ student.grade }} · Section {{ student.section.name }} · {{ student.student_id }}
+            </p>
+        </div>
+    </div>
+
+    {% if not eligible_structures %}
+    <div class="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-800">
+        No fee structures exist for <b>{{ student.grade }}</b> yet.
+        <a href="{% url 'fees:fee_structure_add' %}" class="underline">Create one first</a>.
+    </div>
+    {% else %}
+
+    <form method="POST" class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        {% csrf_token %}
+
+        <!-- Pick structure -->
+        <div class="px-6 py-4 border-b border-slate-100">
+            <label class="block text-sm font-semibold text-slate-700 mb-2">1. Select Fee Structure</label>
+            <select name="structure_id" id="structureSel" required
+                    class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30">
+                <option value="">— Choose a fee structure —</option>
+                {% for s in eligible_structures %}
+                <option value="{{ s.pk }}">
+                    {{ s.academic_year }} · {{ s.get_structure_type_display }}{% if s.study_mode %} · {{ s.study_mode.name }}{% endif %}{% if s.name %} · {{ s.name }}{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Items list (toggled per structure via JS) -->
+        <div class="px-6 py-4 border-b border-slate-100">
+            <label class="block text-sm font-semibold text-slate-700 mb-2">2. Select Fee Items to Assign</label>
+            <div id="itemsContainer" class="space-y-3">
+                {% for s in eligible_structures %}
+                <div class="structure-items hidden" data-structure="{{ s.pk }}">
+                    {% if s.items.all %}
+                    <div class="border border-slate-200 rounded-lg overflow-hidden">
+                        <div class="px-3 py-2 bg-slate-50 flex items-center justify-between">
+                            <label class="text-xs font-medium text-slate-600 inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" class="select-all-items">
+                                Select all
+                            </label>
+                            <span class="text-xs text-slate-400">{{ s.items.count }} item(s)</span>
+                        </div>
+                        <div class="divide-y divide-slate-100">
+                            {% for item in s.items.all %}
+                            {% if item.fee_type.name != 'Gross Tuition' %}
+                            <label class="px-3 py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50 cursor-pointer">
+                                <div class="flex items-center gap-3">
+                                    <input type="checkbox" name="item_ids" value="{{ item.pk }}"
+                                           class="item-cb w-4 h-4 rounded border-slate-300 text-[#1e3a5f]">
+                                    <span class="text-sm text-slate-700">{{ item.fee_type.name }}</span>
+                                    {% if item.fee_type.is_taxable %}
+                                    <span class="text-[10px] px-1.5 py-0.5 bg-orange-50 text-orange-600 rounded">VAT</span>
+                                    {% endif %}
+                                </div>
+                                <span class="text-sm font-semibold text-slate-800">SAR {{ item.amount|money }}</span>
+                            </label>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-slate-400 italic">This structure has no fee items.</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            <p id="noStructureMsg" class="text-sm text-slate-400 italic">Select a fee structure above to see its items.</p>
+        </div>
+
+        <!-- Discount + Due date -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 px-6 py-4 border-b border-slate-100">
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Discount % (optional)</label>
+                <input type="number" name="discount_pct" min="0" max="100" step="0.01" value="0"
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30">
+                <p class="text-xs text-slate-400 mt-1">Applied to every selected item.</p>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">Due Date *</label>
+                <input type="date" name="due_date" required
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30">
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="px-6 py-4 flex gap-3 bg-slate-50">
+            <button type="submit"
+                    class="px-5 py-2.5 bg-[#1e3a5f] text-white text-sm font-semibold rounded-lg hover:bg-[#2a5298] transition">
+                Assign Fees
+            </button>
+            <a href="{% url 'students:detail' student.pk %}"
+               class="px-5 py-2.5 bg-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-300 transition">
+                Cancel
+            </a>
+        </div>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+    const sel        = document.getElementById('structureSel');
+    const blocks     = document.querySelectorAll('.structure-items');
+    const emptyMsg   = document.getElementById('noStructureMsg');
+    if (!sel) return;
+
+    sel.addEventListener('change', () => {
+        const id = sel.value;
+        let shown = false;
+        blocks.forEach(b => {
+            const match = b.dataset.structure === id;
+            b.classList.toggle('hidden', !match);
+            if (match) shown = true;
+        });
+        emptyMsg.classList.toggle('hidden', shown);
+    });
+
+    // "Select all" checkbox per structure
+    document.querySelectorAll('.select-all-items').forEach(master => {
+        master.addEventListener('change', (e) => {
+            const block = e.target.closest('.structure-items');
+            block.querySelectorAll('.item-cb').forEach(cb => { cb.checked = e.target.checked; });
+        });
+    });
+})();
+</script>
+{% endblock %}

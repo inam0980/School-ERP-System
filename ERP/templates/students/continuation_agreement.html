@@ -1,0 +1,410 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <title>Continuation Agreement — {{ student.full_name }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            color: #111;
+            background: #e5e7eb;
+            font-size: 10.5pt;
+            line-height: 1.45;
+        }
+        .page {
+            width: 210mm; min-height: 297mm;
+            background: #fff;
+            margin: 12mm auto;
+            padding: 12mm 14mm;
+            box-shadow: 0 4px 20px rgba(0,0,0,.1);
+            position: relative;
+        }
+        /* ── Top banner ─────────────────────────────────────── */
+        .top-banner {
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 2px solid #111;
+            padding-bottom: 8px; margin-bottom: 14px;
+        }
+        .top-banner .logo  { width: 95px; }
+        .top-banner .logo img { width: 95px; height: 95px; object-fit: contain; }
+        .top-banner .title-block {
+            flex: 1; text-align: center; padding: 0 10px;
+        }
+        .top-banner .title-block .en {
+            font-size: 12.5pt; font-weight: bold; letter-spacing: 0.02em;
+        }
+        .top-banner .title-block .ar {
+            font-size: 11pt; font-weight: bold; margin: 1px 0;
+            font-family: 'Arial', sans-serif;
+        }
+        .top-banner .right-block {
+            width: 130px; text-align: right;
+        }
+        .top-banner .moe-logo {
+            height: 70px; max-width: 130px;
+            object-fit: contain;
+            display: block; margin-left: auto;
+        }
+        .top-banner .moe-caption {
+            font-size: 9pt; font-weight: bold;
+            color: #0f9bbf;
+            margin-top: 3px;
+            text-align: center;
+        }
+        /* ── H1 ─────────────────────────────────────────────── */
+        h1 {
+            text-align: center; font-size: 15pt; font-weight: bold;
+            margin: 10px 0 12px;
+        }
+        /* ── Body paragraphs ────────────────────────────────── */
+        p { margin: 5px 0; }
+        .red    { color: #c00; }
+        .center { text-align: center; }
+        .bold   { font-weight: bold; }
+
+        /* ── Decision boxes ─────────────────────────────────── */
+        .decision-box {
+            border: 1.5px solid #111; padding: 8px 10px;
+            margin: 10px 0; line-height: 1.7;
+        }
+        .decision-box .heading {
+            font-weight: bold; text-decoration: underline;
+            margin-bottom: 6px;
+        }
+        /* Generic input-style spans — apply everywhere (decision boxes + standalone) */
+        .underline-input {
+            display: inline-block;
+            border-bottom: 1px solid #111;
+            min-width: 220px;
+            padding: 0 4px;
+            font-weight: bold;
+        }
+        .small-input {
+            display: inline-block;
+            border-bottom: 1px solid #111;
+            min-width: 80px;
+            padding: 0 4px;
+            font-weight: bold;
+        }
+        .blank-input {
+            display: inline-block;
+            border-bottom: 1px solid #111;
+            min-width: 160px;
+            padding: 0 4px;
+            font-weight: bold;
+        }
+        /* ── Bullet list ────────────────────────────────────── */
+        ul.terms { margin: 8px 0 0 20px; }
+        ul.terms li { margin: 4px 0; font-size: 10pt; }
+
+        /* ── Footer partner logos ───────────────────────────── */
+        .footer-logos {
+            display: flex; align-items: center; justify-content: center;
+            gap: 24px; margin-top: 18px; padding-top: 10px;
+            border-top: 1px solid #cbd5e1;
+        }
+        .footer-logos img {
+            height: 48px; max-width: 140px;
+            object-fit: contain;
+        }
+        /* ── Guardian selection (no-print) ──────────────────── */
+        .guardian-picker {
+            background: #fef3c7; border: 1px dashed #d97706;
+            padding: 8px 10px; margin: 6px 0; border-radius: 6px;
+            font-size: 10pt;
+        }
+        .guardian-picker label { margin-right: 12px; cursor: pointer; }
+        .guardian-picker input[type="text"] {
+            border: 1px solid #d97706; padding: 3px 8px;
+            border-radius: 4px; font-size: 10pt; width: 220px;
+        }
+        /* ── Action buttons (no-print) ──────────────────────── */
+        .no-print-bar {
+            max-width: 210mm; margin: 12mm auto 0; display: flex; gap: 10px;
+        }
+        .btn {
+            padding: 8px 16px; font-size: 13px; font-weight: 600;
+            border-radius: 6px; cursor: pointer; border: none;
+            text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn-primary { background: #1e3a5f; color: #fff; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+
+        /* ── Print rules ─ matches the original PDF density ── */
+        @media print {
+            @page { size: 8.27in 11.69in; margin: 10mm 12mm; }
+            body { background: #fff; font-size: 10pt; line-height: 1.35; }
+            .page {
+                box-shadow: none; margin: 0; padding: 0;
+                width: auto; min-height: 0;
+                /* No automatic page break — handled by explicit divider below */
+            }
+            .page-break {
+                page-break-after: always;
+                height: 0; margin: 0; padding: 0; border: 0;
+            }
+            .no-print { display: none !important; }
+            .guardian-picker { display: none !important; }
+
+            /* Match the original PDF — dense, professional, fits comfortably */
+            h1 { font-size: 14pt !important; margin: 8px 0 10px !important; }
+            p  { margin: 4px 0 !important; }
+
+            .top-banner { padding-bottom: 6px !important; margin-bottom: 10px !important; }
+            .top-banner .logo  { width: 90px !important; }
+            .top-banner .logo img { width: 90px !important; height: 90px !important; }
+            .top-banner .title-block .en { font-size: 12pt !important; }
+            .top-banner .title-block .ar { font-size: 10.5pt !important; }
+            .top-banner .moe-logo { height: 65px !important; max-width: 120px !important; }
+            .top-banner .moe-caption { font-size: 8.5pt !important; margin-top: 2px !important; }
+
+            .decision-box {
+                padding: 7px 10px !important;
+                margin: 7px 0 !important;
+                line-height: 1.55 !important;
+            }
+            .decision-box .heading { margin-bottom: 4px !important; font-size: 10pt !important; }
+            .decision-box p { font-size: 10pt !important; }
+            .decision-box .underline-input { min-width: 200px !important; }
+            .decision-box .small-input     { min-width: 60px !important; }
+            .decision-box .blank-input     { min-width: 130px !important; }
+
+            ul.terms { margin-top: 7px !important; margin-left: 22px !important; }
+            ul.terms li {
+                font-size: 9.5pt !important;
+                margin: 3px 0 !important;
+                line-height: 1.35 !important;
+            }
+
+            .footer-logos {
+                margin-top: 8px !important;
+                padding-top: 5px !important;
+                gap: 22px !important;
+                page-break-inside: avoid;
+            }
+            .footer-logos img { height: 44px !important; max-width: 130px !important; }
+
+            /* Prevent splits within key blocks so they don't bleed to a new page */
+            .top-banner,
+            .decision-box,
+            h1 { page-break-inside: avoid !important; page-break-after: avoid !important; }
+            ul.terms li { page-break-inside: avoid !important; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Action bar (no print) -->
+<div class="no-print-bar no-print">
+    <button onclick="window.print()" class="btn btn-primary">🖨️ Print Agreement</button>
+    <a href="{% url 'students:detail' student.pk %}" class="btn btn-secondary">← Back to profile</a>
+</div>
+
+<div class="page">
+
+    <!-- Top banner -->
+    <div class="top-banner">
+        <div class="logo"><img src="{% static 'images/logo.png' %}" alt="School Logo"></div>
+        <div class="title-block">
+            <div class="en">LES ÉCOLES INTERNATIONALES AL-KAWTHAR</div>
+            <div class="ar">مـــــدارس الكـــــوثر العـــالــــمية</div>
+            <div class="en">AL-KAWTHAR INTERNATIONAL SCHOOLS</div>
+        </div>
+        <div class="right-block">
+            <img src="{% static 'images/boards/ministry_of_education.png' %}" alt="Ministry of Education" class="moe-logo">
+            <div class="moe-caption">Ministry of Education</div>
+        </div>
+    </div>
+
+    <!-- Title -->
+    <h1>Continuation Agreement for the Upcoming<br>Academic Year 1447/1448 (2026/2027)</h1>
+
+    <p>Dear Guardian,</p>
+    <p>
+        The administration of Al-Kawthar International Schools welcomes its students who wish to continue
+        their studies till the upcoming academic year 1447/1448 (2026/2027). We are pleased to announce
+        that registration for all levels is now open. Therefore, we kindly ask you to inform us of your
+        decision within one week from the date of this notice.
+    </p>
+    <p class="center">
+        Please confirm your response with (<span class="red">Yes</span> or <span class="red">No</span>)
+        before April 23<sup>rd</sup> of 2026.
+    </p>
+    <p class="center bold">
+        If no response is received by this date, the student's contract with the school will be
+        automatically renewed for the academic year 2026/2027
+    </p>
+
+    <!-- ── Guardian picker (no-print) ─────────────────────────────── -->
+    <div class="guardian-picker no-print">
+        <strong>Guardian type:</strong>
+        <label><input type="radio" name="gType" value="Father" checked> Father</label>
+        <label><input type="radio" name="gType" value="Mother"> Mother</label>
+        <label><input type="radio" name="gType" value="Other"> Other</label>
+        &nbsp; <strong>Guardian name (optional):</strong>
+        <input type="text" id="gName" placeholder="Type guardian's name…">
+        <small style="display:block; margin-top:4px; color:#92400e;">
+            These selections fill in below before printing. Guardian Name + Signature remain blank if name is empty.
+        </small>
+    </div>
+
+    <!-- ── Decision box 1: Continue ──────────────────────────────── -->
+    <div class="decision-box">
+        <div class="heading">Please fill the following information if you wish your son/daughter to <span class="red">continue</span> at KIS:</div>
+        <p>
+            I <span class="red">wish</span> for my son/daughter
+            <span class="underline-input">{{ student.full_name }}</span>
+            to continue their enrolment in grade
+            <span class="small-input">{{ student.grade.name }}</span>
+            for the upcoming academic year 2026/2027 at your institution. I hereby confirm that I have reviewed the
+            terms of this agreement and the policies of Al-Kawthar International Schools stated above. By signing
+            below, I fully commit to complying with these terms and policies and accept full responsibility.
+        </p>
+        <p style="margin-top: 10px;">
+            Guardian Name: <span class="blank-input" id="gNameOut1"></span>
+            &nbsp;&nbsp; Signature: <span class="blank-input"></span>
+            &nbsp;&nbsp; Date: <span class="small-input"></span> / <span class="small-input"></span> / <span class="small-input"></span>
+        </p>
+    </div>
+
+    <!-- ── Decision box 2: Not continue ──────────────────────────── -->
+    <div class="decision-box">
+        <div class="heading">Please fill the following information if you wish your son/daughter to <span class="red">not continue</span> at KIS:</div>
+        <p>
+            I <span class="red">do not wish</span> for my son/daughter
+            <span class="underline-input">{{ student.full_name }}</span>
+            to continue their enrolment in grade
+            <span class="small-input">{{ student.grade.name }}</span>
+            for the upcoming academic year 2026/2027 at your institution. I hereby confirm that I have reviewed the
+            terms of this agreement and the policies of Al-Kawthar International Schools stated above. By signing
+            below, I fully commit to complying with these terms and policies and accept full responsibility.
+        </p>
+        <p style="margin-top: 10px;">
+            Guardian Name: <span class="blank-input" id="gNameOut2"></span>
+            &nbsp;&nbsp; Signature: <span class="blank-input"></span>
+            &nbsp;&nbsp; Date: <span class="small-input"></span> / <span class="small-input"></span> / <span class="small-input"></span>
+        </p>
+    </div>
+
+    <!-- ── Terms ─────────────────────────────────────────────────── -->
+    <ul class="terms">
+        <li>For new students, full tuition fees must be paid after completing the registration process at KIS.
+            As for currently enrolled students, tuition must be paid prior to the start of the academic year.</li>
+        <li>Tuition fees <b>only</b> includes academic fees and registration fees.</li>
+        <li>After completing the required forms and finalizing registration process, a <b>non-refundable fee of 3500 SAR will be applicable.</b></li>
+        <li>Seat reservation fees are <b>non-refundable</b> under any circumstances, whether before or during the academic year.</li>
+        <li>Tuition fees and any other payments are <b>non-refundable</b> and <b>non-transferrable</b> in case of withdrawal from the registration or if the student leaves the school at any time and for any reason during the academic year.</li>
+        <li>The school reserves the right to adjust tuition and other fees as deemed appropriate, with prior notice to the guardians before the start of the academic year.</li>
+        <li><u>Seat reservation for currently enrolled students at KIS for the upcoming year is as follows:</u>
+            Guardians must pay a <b>non-refundable re-registration of 3500 SAR</b> which will be deducted from the annual tuition, before May 1<sup>st</sup> to reserve their seats for the next academic year.
+            <span class="red">(Note: Seat reservation fees are non-refundable and non-transferrable)</span></li>
+    </ul>
+
+    <div class="footer-logos">
+        <img src="{% static 'images/boards/pearson_edexcel.png'  %}" alt="Pearson Edexcel">
+        <img src="{% static 'images/boards/oxford_aqa.png'       %}" alt="Oxford AQA">
+        <img src="{% static 'images/boards/array.png'            %}" alt="Array Global Educational Services">
+        <img src="{% static 'images/boards/sat_collegeboard.png' %}" alt="SAT · College Board">
+        <img src="{% static 'images/boards/ib.png'               %}" alt="IB World School">
+    </div>
+</div>
+
+<!-- Explicit page break — only place where a new page starts -->
+<div class="page-break"></div>
+
+<!-- ───────────────────── PAGE 2 ───────────────────── -->
+<div class="page">
+    <!-- Top banner -->
+    <div class="top-banner">
+        <div class="logo"><img src="{% static 'images/logo.png' %}" alt="School Logo"></div>
+        <div class="title-block">
+            <div class="en">LES ÉCOLES INTERNATIONALES AL-KAWTHAR</div>
+            <div class="ar">مـــــدارس الكـــــوثر العـــالــــمية</div>
+            <div class="en">AL-KAWTHAR INTERNATIONAL SCHOOLS</div>
+        </div>
+        <div class="right-block">
+            <img src="{% static 'images/boards/ministry_of_education.png' %}" alt="Ministry of Education" class="moe-logo">
+            <div class="moe-caption">Ministry of Education</div>
+        </div>
+    </div>
+
+    <h1 style="color:#c00; font-size:13pt;">Important Notes for All Grades:</h1>
+    <ul class="terms">
+        <li><b>First Semester Payment:</b> The total tuition fees must be fully paid before first of September.</li>
+        <li><b>Second Semester Payment:</b> The remaining balance of the total tuition fees must be paid in full before first of December.</li>
+        <li>The school administration reserves the right to withhold all the academic documents including results if the guardian fails to settle any outstanding financial obligations, and to take appropriate actions to protect its rights.</li>
+        <li>The school administration or its representative reserves the right to pursue legal action to recover any outstanding balance owed by the guardian, along with any legal costs incurred due to non-compliance with the enrollment fees terms.</li>
+        <li>If the academic year ends and the guardian has not paid the full tuition fees, the student will not be allowed to attend the school at the beginning of the second academic year until the overdue amounts from the previous year are settled, unless the guardian has submitted a notice indicating that their child will not be returning for the next academic year.</li>
+        <li>The guardian is responsible for paying any material damages (if any) caused by the student to the school property.</li>
+        <li>If a student causes harm to another student, resulting in the need of medical treatment, the guardian of the responsible student will be obligated to cover the full cost of the injured student's medical expenses.</li>
+    </ul>
+
+    <div class="decision-box" style="margin-top: 14px; text-align:center;">
+        <div style="font-weight:bold;">Al-Kawthar International Schools <span style="color:#c00;">ALAHLI (SNB) Bank</span> Details:</div>
+        <div><b>Account Number:</b> 75400003464603</div>
+        <div><b>IBAN Number:</b> SA93-1000-0075-4000-0346-4603</div>
+    </div>
+
+    <p style="margin-top: 12px;">
+        I, the guardian of the student
+        <span class="underline-input">{{ student.full_name }}</span>,
+        commit to adhering to the agreed payment schedule outlined in this contract with the administration
+        of Al-Kawthar International Schools for Educational and Parental Services. If I fail to make the
+        payments on time, the discount will be revoked and becomes invalid and I will no longer be entitled
+        to any benefit from it. The school administration reserves the right to pursue legal action against me
+        to recover any outstanding and I will be responsible for covering all associated legal fees.
+    </p>
+    <p style="margin-top: 8px;">
+        This contract will automatically renew unless I submit an official request to transfer the student to
+        another school, along with an acceptance letter, before the end of the academic year. I acknowledge
+        that fees may vary from year to year, and I release the school administration from any responsibility
+        once I am notified of the tuition fees for the new academic year before its commencement. The
+        student's continued enrolment at the school will be regarded as my approval to renew and update the contract.
+    </p>
+
+    <p style="margin-top: 14px;">
+        Guardian Name: <span class="blank-input" id="gNameOut3"></span>
+        &nbsp;&nbsp; Signature: <span class="blank-input"></span>
+        &nbsp;&nbsp; Date: <span class="small-input"></span> / <span class="small-input"></span> / <span class="small-input"></span>
+    </p>
+
+    <div class="footer-logos">
+        <img src="{% static 'images/boards/pearson_edexcel.png'  %}" alt="Pearson Edexcel">
+        <img src="{% static 'images/boards/oxford_aqa.png'       %}" alt="Oxford AQA">
+        <img src="{% static 'images/boards/array.png'            %}" alt="Array Global Educational Services">
+        <img src="{% static 'images/boards/sat_collegeboard.png' %}" alt="SAT · College Board">
+        <img src="{% static 'images/boards/ib.png'               %}" alt="IB World School">
+    </div>
+</div>
+
+<script>
+(function () {
+    const gNameInp = document.getElementById('gName');
+    const radios   = document.querySelectorAll('input[name="gType"]');
+    const outs     = [document.getElementById('gNameOut1'),
+                      document.getElementById('gNameOut2'),
+                      document.getElementById('gNameOut3')];
+
+    // Try to pre-fill guardian name from student data
+    const father = "{{ student.father_name|escapejs }}";
+    const mother = "{{ student.mother_name|escapejs }}";
+
+    function render() {
+        const typ = document.querySelector('input[name="gType"]:checked').value;
+        let name  = gNameInp.value.trim();
+        if (!name) {
+            if (typ === 'Father') name = father;
+            else if (typ === 'Mother') name = mother;
+        }
+        outs.forEach(el => { if (el) el.textContent = name; });
+    }
+
+    gNameInp.addEventListener('input', render);
+    radios.forEach(r => r.addEventListener('change', render));
+    render();
+})();
+</script>
+</body>
+</html>

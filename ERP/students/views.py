@@ -17,6 +17,16 @@ from core.models import Grade, Division, Board
 _ADMIN   = ('SUPER_ADMIN', 'ADMIN')
 _STAFF   = ('SUPER_ADMIN', 'ADMIN', 'TEACHER', 'ACCOUNTANT', 'STAFF')
 
+# Shared column list for blank-template / export / import — keep all three in sync.
+STUDENT_CSV_COLUMNS = [
+    'Student ID', 'Full Name', 'Arabic Name', 'Gender', 'Date of Birth',
+    'Nationality', 'ID Type', 'National ID', 'Iqama Number', 'Passport Number',
+    'Religion', 'Birth Place',
+    'Division', 'Grade', 'Section', 'Academic Year', 'Roll No.',
+    'Enrollment Type', 'Study Mode', 'Fee Category', 'Admission Date', 'Active',
+    'Father Name', 'Mother Name', 'Guardian Phone', 'Guardian Email', 'Address',
+]
+
 EDUCATION_LEVELS = [
     'Nursery', 'KG1', 'KG2',
     'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6',
@@ -144,20 +154,19 @@ def student_export_csv(request):
     response.write('\ufeff')  # BOM for Excel UTF-8 compatibility
 
     writer = csv.writer(response)
-    writer.writerow([
-        'Student ID', 'Full Name', 'Arabic Name', 'Gender', 'Date of Birth',
-        'Nationality', 'ID Type', 'National ID', 'Division', 'Grade', 'Section',
-        'Academic Year', 'Roll No.', 'Enrollment Type', 'Admission Date', 'Active',
-        'Father Name', 'Mother Name', 'Guardian Phone', 'Guardian Email',
-        'Address',
-    ])
+    writer.writerow(STUDENT_CSV_COLUMNS)
     for s in qs:
         writer.writerow([
             s.student_id, s.full_name, s.arabic_name,
             s.get_gender_display(), s.dob,
-            s.nationality, s.get_id_type_display(), s.national_id,
+            s.nationality, s.get_id_type_display(),
+            s.national_id, s.iqama_number, s.passport_number,
+            s.get_religion_display() if s.religion else '', s.birth_place,
             s.division, s.grade, s.section, s.academic_year,
-            s.roll_number, s.get_enrollment_type_display(), s.admission_date,
+            s.roll_number, s.get_enrollment_type_display(),
+            s.study_mode.name if s.study_mode else '',
+            s.get_fee_category_display(),
+            s.admission_date,
             'Yes' if s.is_active else 'No',
             s.father_name, s.mother_name, s.guardian_phone, s.guardian_email,
             s.address,
@@ -475,6 +484,22 @@ def student_id_card(request, pk):
     return render(request, 'students/id_card.html', {'student': student})
 
 
+@login_required
+@role_required(*_STAFF)
+def continuation_agreement(request, pk):
+    """Printable continuation agreement for the upcoming academic year."""
+    from core.models import AcademicYear
+    student = get_object_or_404(
+        Student.objects.select_related('grade', 'section', 'academic_year', 'division'),
+        pk=pk,
+    )
+    next_year = AcademicYear.objects.exclude(pk=student.academic_year_id).order_by('-start_date').first()
+    return render(request, 'students/continuation_agreement.html', {
+        'student':    student,
+        'next_year':  next_year,
+    })
+
+
 # ────────────────────────── CSV IMPORT ──────────────────────────
 
 # Reverse maps: CSV display value → model code
@@ -583,21 +608,47 @@ def student_import(request):
                         errors.append(f"Row {i} ({full_name}): Academic Year '{year_name}' not found.")
                         continue
 
+                    # ── Religion / Study Mode / Fee Category mapping ───
+                    religion_raw = row.get('Religion', '').strip().lower()
+                    religion = ''
+                    if 'non' in religion_raw or 'غير' in religion_raw:
+                        religion = 'Non-Muslim'
+                    elif 'muslim' in religion_raw or 'مسلم' in religion_raw:
+                        religion = 'Muslim'
+
+                    study_mode = None
+                    sm_name = row.get('Study Mode', '').strip()
+                    if sm_name:
+                        from core.models import StudyMode
+                        study_mode = StudyMode.objects.filter(name__iexact=sm_name, is_active=True).first()
+
+                    fc_raw = row.get('Fee Category', '').strip().lower()
+                    fee_category = {
+                        'new': 'new', 'regular': 'regular',
+                        'transfer': 'transfer', 'other': 'other',
+                    }.get(fc_raw, 'regular')
+
                     # ── Build field dict ───────────────────────────────
                     fields = dict(
                         full_name       = full_name,
                         arabic_name     = row.get('Arabic Name', ''),
                         gender          = gender,
                         dob             = dob,
-                        nationality     = row.get('Nationality', 'Saudi'),
+                        nationality     = row.get('Nationality', 'Saudi Arabia'),
                         id_type         = id_type,
                         national_id     = row.get('National ID', ''),
+                        iqama_number    = row.get('Iqama Number', ''),
+                        passport_number = row.get('Passport Number', ''),
+                        religion        = religion,
+                        birth_place     = row.get('Birth Place', ''),
                         division        = division,
                         grade           = grade,
                         section         = section,
                         academic_year   = academic_year,
                         roll_number     = row.get('Roll No.', ''),
                         enrollment_type = enrollment_type,
+                        study_mode      = study_mode,
+                        fee_category    = fee_category,
                         admission_date  = admission_date,
                         is_active       = is_active,
                         father_name     = row.get('Father Name', ''),
@@ -651,20 +702,26 @@ def download_import_template(request):
     response['Content-Disposition'] = 'attachment; filename="students_import_template.csv"'
     response.write('﻿')   # BOM for Excel UTF-8 compatibility
     writer = csv.writer(response)
+    writer.writerow(STUDENT_CSV_COLUMNS)
+    # Example 1 — Saudi student (National ID)
     writer.writerow([
-        'Student ID', 'Full Name', 'Arabic Name', 'Gender', 'Date of Birth',
-        'Nationality', 'ID Type', 'National ID', 'Division', 'Grade', 'Section',
-        'Academic Year', 'Roll No.', 'Enrollment Type', 'Admission Date', 'Active',
-        'Father Name', 'Mother Name', 'Guardian Phone', 'Guardian Email',
-        'Address',
-    ])
-    # One example row so the user can see the expected format
-    writer.writerow([
-        '', 'Ahmed Mohammed Ali', 'أحمد محمد علي', 'Male / ذكر', '2015-09-01',
-        'Saudi Arabian', 'National ID / هوية وطنية', '1234567890', 'American', 'Grade 1', 'A',
-        '2025-26', '', 'New Student / طالب جديد', '2025-09-01', 'Yes',
+        '', 'Ahmed Mohammed Ali', 'أحمد محمد علي', 'Male', '2015-09-01',
+        'Saudi Arabia', 'National ID', '1234567890', '', '',
+        'Muslim', 'Riyadh',
+        'American', 'Grade 1', 'A', '2025-26', '01',
+        'New Student', 'Regular Mode', 'New', '2025-09-01', 'Yes',
         'Mohammed Ali', 'Fatima Ahmed', '+966501234567', 'parent@email.com',
         'Riyadh, Saudi Arabia',
+    ])
+    # Example 2 — Non-Saudi student (Iqama)
+    writer.writerow([
+        '', 'Yusuf Khan', 'يوسف خان', 'Male', '2014-05-20',
+        'Pakistan', 'Iqama', '', '2345678901', '',
+        'Muslim', 'Karachi',
+        'British', 'Grade 2', 'B', '2025-26', '05',
+        'Regular (Continuing)', 'Online Mode', 'Regular', '2024-09-01', 'Yes',
+        'Imran Khan', 'Aisha Khan', '+966502345678', 'khan@email.com',
+        'Jeddah, Saudi Arabia',
     ])
     return response
 

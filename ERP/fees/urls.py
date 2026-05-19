@@ -26,7 +26,9 @@ urlpatterns = [
     path('structures/<int:pk>/items/',    views.fee_structure_items_json, name='fee_structure_items'),
 
     # Bulk assign
-    path('assign/',                       views.bulk_assign_fees,      name='bulk_assign'),
+    path('assign/',                                  views.bulk_assign_fees,    name='bulk_assign'),
+    # Single-student assign
+    path('assign/student/<int:student_pk>/',         views.assign_student_fee,  name='assign_student_fee'),
 
     # Student fee edit
     path('student-fee/<int:pk>/edit/',    views.student_fee_edit,      name='student_fee_edit'),

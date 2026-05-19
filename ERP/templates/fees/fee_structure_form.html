@@ -462,6 +462,7 @@
             <div class="relative">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
                 <input type="text" inputmode="decimal" id="global-entrance" placeholder="0.00"
+                       value="{{ post_data.global_entrance|default:'' }}"
                        class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none">
             </div>
         </div>
@@ -472,6 +473,7 @@
             <div class="relative">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
                 <input type="text" inputmode="decimal" id="global-registration" placeholder="0.00"
+                       value="{{ post_data.global_registration|default:'' }}"
                        class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none">
             </div>
         </div>
@@ -482,6 +484,7 @@
             <div class="relative">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium pointer-events-none">SAR</span>
                 <input type="text" inputmode="decimal" id="global-downpayment" placeholder="0.00"
+                       value="{{ post_data.global_downpayment|default:'' }}"
                        class="border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm w-full focus:ring-2 focus:ring-amber-400/50 focus:outline-none">
             </div>
         </div>

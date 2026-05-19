@@ -57,13 +57,15 @@ def _build_row(structure, fee_types_map):
     entrance      = items_by_cat.get(_CAT_ENTRANCE,     Decimal('0.00'))
     registration  = items_by_cat.get(_CAT_REGISTRATION, Decimal('0.00'))
     reservation   = items_by_cat.get(_CAT_RESERVATION,  Decimal('0.00'))
-    gross_tuition = items_by_cat.get(_CAT_TUITION,      Decimal('0.00'))
+    net_tuition   = items_by_cat.get(_CAT_TUITION,      Decimal('0.00'))
+    # 'Gross Tuition' is stored as a separate item ONLY when a group discount
+    # was applied (so we can show Gross / Discount / Net distinctly).
+    gross_tuition = items_by_name.get('Gross Tuition', net_tuition)
+    group_disc_amt = gross_tuition - net_tuition if gross_tuition > net_tuition else Decimal('0.00')
 
     first_inst  = items_by_name.get('1st Installment', Decimal('0.00'))
     second_inst = items_by_name.get('2nd Installment', Decimal('0.00'))
     third_inst  = items_by_name.get('3rd Installment', Decimal('0.00'))
-
-    net_tuition = gross_tuition
 
     # Fallback: if installments were never saved, calculate 2 equal splits from remaining
     if first_inst == Decimal('0.00') and net_tuition > Decimal('0.00'):
@@ -85,7 +87,7 @@ def _build_row(structure, fee_types_map):
         'entrance_exam':  entrance,
         'registration':   registration,
         'gross_tuition':  gross_tuition,
-        'group_disc_amt': Decimal('0.00'),
+        'group_disc_amt': group_disc_amt,
         'tuition_net':    net_tuition,
         'reservation':    reservation,
         'first_inst':     first_inst,
@@ -93,15 +95,16 @@ def _build_row(structure, fee_types_map):
         'third_inst':     third_inst,
         'saudi_net':      net_tuition,
         # Non-Saudi amounts (with VAT applied to every column)
-        'n_entrance_exam': _vat(entrance),
-        'n_registration':  _vat(registration),
-        'n_gross_tuition': _vat(gross_tuition),
-        'n_tuition_net':   _vat(net_tuition),
-        'n_reservation':   _vat(reservation),
-        'n_first_inst':    _vat(first_inst),
-        'n_second_inst':   _vat(second_inst),
-        'n_third_inst':    _vat(third_inst),
-        'non_saudi_net':   non_saudi_net,
+        'n_entrance_exam':  _vat(entrance),
+        'n_registration':   _vat(registration),
+        'n_gross_tuition':  _vat(gross_tuition),
+        'n_group_disc_amt': _vat(group_disc_amt) if group_disc_amt > 0 else Decimal('0.00'),
+        'n_tuition_net':    _vat(net_tuition),
+        'n_reservation':    _vat(reservation),
+        'n_first_inst':     _vat(first_inst),
+        'n_second_inst':    _vat(second_inst),
+        'n_third_inst':     _vat(third_inst),
+        'non_saudi_net':    non_saudi_net,
     }
 
 
@@ -185,6 +188,17 @@ def fee_structure_export_group_pdf(request):
         structure_name = structure_name.rsplit(' — ', 1)[0]
     study_mode_label = str(first_structure.study_mode) if first_structure and first_structure.study_mode else '—'
 
+    # Group-discount summary (use first row that has a discount as representative)
+    group_disc_flag = 'NO'
+    group_disc_pct  = '—'
+    for r in rows:
+        gross = r.get('gross_tuition', Decimal('0'))
+        disc  = r.get('group_disc_amt', Decimal('0'))
+        if gross > 0 and disc > 0:
+            group_disc_flag = 'YES'
+            group_disc_pct  = (disc / gross * 100).quantize(Decimal('0.01'))
+            break
+
     context = {
         'division':         division,
         'year':             year_label,
@@ -194,8 +208,8 @@ def fee_structure_export_group_pdf(request):
         'description':      description,
         'vat_pct':          Decimal('15.00'),
         'max_num_payments': num_payments,
-        'group_discount':   'NO',
-        'group_disc_pct':   '—',
+        'group_discount':   group_disc_flag,
+        'group_disc_pct':   group_disc_pct,
         'includes_books':   'NO',
         'divide_reservation': 'NO',
         'entrance_exam':    first_row.get('entrance_exam',  Decimal('0.00')),

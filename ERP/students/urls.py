@@ -31,6 +31,8 @@ urlpatterns = [
 
     # Regular Student — ID Card
     path('regular/<int:pk>/id-card/',       views.student_id_card,        name='id_card'),
+    # Continuation Agreement (PDF-style printable)
+    path('regular/<int:pk>/continuation-agreement/', views.continuation_agreement, name='continuation_agreement'),
 
     # External Candidates
     path('external/',                        views.external_list,          name='external_list'),

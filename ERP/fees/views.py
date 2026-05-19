@@ -385,9 +385,13 @@ def fee_structure_form(request, pk=None):
         form = FeeStructureForm(request.POST or None, instance=instance)
         if request.method == 'POST' and form.is_valid():
             form.save()
+            removed = updated = created = 0
             for ft in all_fee_types:
-                raw = request.POST.get(f'amount_{ft.pk}', '').strip()
+                field_name = f'amount_{ft.pk}'
+                raw = request.POST.get(field_name, '').strip()
+
                 if raw:
+                    # Field present with a value → upsert
                     try:
                         amt = Decimal(raw)
                     except Exception:
@@ -395,17 +399,31 @@ def fee_structure_form(request, pk=None):
                     if amt and amt > 0:
                         if ft.pk in existing_items:
                             item = existing_items[ft.pk]
-                            item.amount = amt
-                            item.save()
+                            if item.amount != amt:
+                                item.amount = amt
+                                item.save()
+                                updated += 1
                         else:
                             FeeStructureItem.objects.create(structure=instance, fee_type=ft, amount=amt)
+                            created += 1
                     else:
-                        if ft.pk in existing_items:
+                        # Field present but value is 0/blank → user wants it removed.
+                        # Only remove if no StudentFee references it (avoid ProtectedError).
+                        if ft.pk in existing_items and not existing_items[ft.pk].student_fees.exists():
                             existing_items[ft.pk].delete()
-                else:
-                    if ft.pk in existing_items:
-                        existing_items[ft.pk].delete()
-            messages.success(request, "Fee structure saved.")
+                            removed += 1
+                # else: field NOT in POST (disabled input or unchecked optional).
+                # Do NOT touch the existing item — preserves data when checkboxes are
+                # toggled or when JS disables the input. To remove an item, the user
+                # must explicitly clear its amount field.
+
+            msg_parts = []
+            if created: msg_parts.append(f'{created} item(s) added')
+            if updated: msg_parts.append(f'{updated} item(s) updated')
+            if removed: msg_parts.append(f'{removed} item(s) removed')
+            messages.success(request,
+                "Fee structure saved." + (" " + ", ".join(msg_parts) + "." if msg_parts else "")
+            )
             return redirect('fees:fee_structure_list')
 
         fee_types_with_amounts = [
@@ -498,7 +516,10 @@ def fee_structure_form(request, pk=None):
                         registration = _d(request.POST.get(f'registration_{grade.pk}', '0'))
                         gross        = _d(gross_raw)
                         per_grade_raw = request.POST.get(f'group_discount_{grade.pk}', '').strip()
-                        discount_pct  = _d(per_grade_raw) if per_grade_raw else global_discount
+                        # Only let per-grade override global when it's a positive,
+                        # explicitly-different value. "0" / blank / matches-global → use global.
+                        per_grade_pct = _d(per_grade_raw) if per_grade_raw else Decimal('0')
+                        discount_pct  = per_grade_pct if per_grade_pct > 0 else global_discount
                         net_tuition   = (gross * (1 - discount_pct / 100)).quantize(Decimal('0.01'))
                         down          = _d(request.POST.get(f'down_payment_{grade.pk}', '0'))
                         bundle_name   = f'{structure_name_base} — {grade.name}'
@@ -540,6 +561,19 @@ def fee_structure_form(request, pk=None):
                             structure=structure, fee_type=ft_tuition,
                             defaults={'amount': net_tuition},
                         )
+                        # When a group discount is applied, also store the original
+                        # gross so the PDF/reports can show Gross / Discount / Net.
+                        if discount_pct > 0 and gross > net_tuition:
+                            ft_gross = _get_fee_type(FeeType.OTHER, 'Gross Tuition')
+                            FeeStructureItem.objects.update_or_create(
+                                structure=structure, fee_type=ft_gross,
+                                defaults={'amount': gross},
+                            )
+                        else:
+                            # No discount → clean up any stale 'Gross Tuition' record
+                            ft_gross = FeeType.objects.filter(category=FeeType.OTHER, name='Gross Tuition').first()
+                            if ft_gross:
+                                FeeStructureItem.objects.filter(structure=structure, fee_type=ft_gross).delete()
                         if down > 0:
                             ft_res = _get_fee_type(FeeType.RESERVATION, 'Reservation / Down Payment')
                             FeeStructureItem.objects.update_or_create(
@@ -616,13 +650,30 @@ def fee_structure_form(request, pk=None):
         if bundle_qs:
             is_bundle_edit = True
             first = bundle_qs[0]
+            base_name = (first.name.rsplit(' — ', 1)[0] if ' — ' in (first.name or '') else (first.name or ''))
+
+            # ── Derive Structure Code from name / division / year ───────
+            div_prefix    = (first.grade.division.name[:2].upper() if first.grade and first.grade.division else 'XX')
+            stype_code    = {'regular':'REG','new':'NEW','transfer':'TRA','other':'OTH'}.get((first.structure_type or 'regular'), 'GEN')
+            year_short    = ''.join(c for c in (first.academic_year.name if first.academic_year else '') if c.isdigit())[-4:] or ''
+            derived_code  = f'{div_prefix}-{stype_code}-{year_short}'
+
+            # ── Derive Due Date: use the academic year's end_date if set ─
+            derived_due = ''
+            if first.academic_year and getattr(first.academic_year, 'end_date', None):
+                derived_due = first.academic_year.end_date.isoformat()
+
             # Bundle-level prefill values for top of form
             prefill_post_data = {
-                'academic_year':     str(first.academic_year_id) if first.academic_year_id else '',
-                'division':          str(first.grade.division_id) if first.grade and first.grade.division_id else edit_div_id,
-                'structure_type':    first.structure_type or edit_stype,
-                'study_mode':        str(first.study_mode_id) if first.study_mode_id else '',
-                'structure_name':    (first.name.rsplit(' — ', 1)[0] if ' — ' in (first.name or '') else (first.name or '')),
+                'academic_year':          str(first.academic_year_id) if first.academic_year_id else '',
+                'division':               str(first.grade.division_id) if first.grade and first.grade.division_id else edit_div_id,
+                'structure_type':         first.structure_type or edit_stype,
+                'study_mode':             str(first.study_mode_id) if first.study_mode_id else '',
+                'structure_name':         base_name,
+                'structure_code':         derived_code,
+                'due_date':               derived_due,
+                'global_group_discount':  '0',
+                'description':            '',
             }
 
             # Derive installments_count from items
@@ -635,6 +686,41 @@ def fee_structure_form(request, pk=None):
             # +1 because UI installments_count includes the down-payment row
             if max_inst > 0:
                 prefill_post_data['installments_count'] = str(max_inst + 1)
+
+            # ── Derive Group Discount % from explicit Gross vs Net ──────
+            for s in bundle_qs:
+                gross = net = Decimal('0')
+                for it in s.items.all():
+                    if it.fee_type.name == 'Gross Tuition':         gross = it.amount
+                    if it.fee_type.category == FeeType.TUITION:     net   = it.amount
+                if gross > 0 and net > 0 and net < gross:
+                    pct = ((gross - net) / gross * 100).quantize(Decimal('0.01'))
+                    prefill_post_data['global_group_discount'] = str(pct)
+                    break
+
+            # ── Quick-fill common fees: detect if all grades share the same
+            #    Entrance / Registration / Down values — if so, prefill them.
+            entrances     = set()
+            registrations = set()
+            downs         = set()
+            for s in bundle_qs:
+                e = r = d = Decimal('0')
+                for it in s.items.all():
+                    if it.fee_type.category == FeeType.ENTRANCE_EXAM: e = it.amount
+                    if it.fee_type.category == FeeType.REGISTRATION: r = it.amount
+                    if it.fee_type.category == FeeType.RESERVATION:  d = it.amount
+                entrances.add(str(e))
+                registrations.add(str(r))
+                downs.add(str(d))
+            if len(entrances) == 1:
+                val = entrances.pop()
+                prefill_post_data['global_entrance'] = '' if val == '0' else val
+            if len(registrations) == 1:
+                val = registrations.pop()
+                prefill_post_data['global_registration'] = '' if val == '0' else val
+            if len(downs) == 1:
+                val = downs.pop()
+                prefill_post_data['global_downpayment'] = '' if val == '0' else val
 
             # Per-grade prefill
             for s in bundle_qs:
@@ -657,10 +743,15 @@ def fee_structure_form(request, pk=None):
                             return v
                     return Decimal('0')
 
+                # Prefer the explicit 'Gross Tuition' item (set when a group
+                # discount was saved); fall back to the TUITION item amount.
+                gross_val = items_by_name.get('Gross Tuition') or _get(
+                    FeeType.TUITION, 'Tuition Fee', 'Tuition'
+                )
                 bundle_data[str(s.grade_id)] = {
                     'entrance':     str(_get(FeeType.ENTRANCE_EXAM, 'Entrance Exam Fee', 'Entrance Exam')),
                     'registration': str(_get(FeeType.REGISTRATION,  'Registration Fee', 'Registration')),
-                    'gross':        str(_get(FeeType.TUITION,       'Tuition Fee', 'Tuition')),
+                    'gross':        str(gross_val),
                     'down':         str(_get(FeeType.RESERVATION,   'Reservation / Down Payment', 'Down Payment')),
                 }
 
@@ -776,6 +867,81 @@ def fee_structure_items_json(request, pk):
 
 @login_required
 @role_required(*_ACCOUNTANT)
+def assign_student_fee(request, student_pk):
+    """Assign one or more fee-structure items to a single student."""
+    student = get_object_or_404(
+        Student.objects.select_related('grade__division', 'section'), pk=student_pk
+    )
+
+    # Eligible fee structures = same grade as the student.
+    eligible_structures = (
+        FeeStructure.objects.filter(grade=student.grade)
+        .select_related('academic_year', 'grade', 'study_mode')
+        .prefetch_related('items__fee_type')
+        .order_by('-academic_year__start_date', 'structure_type')
+    )
+
+    if request.method == 'POST':
+        structure_id = request.POST.get('structure_id')
+        item_ids     = request.POST.getlist('item_ids')
+        due_date_raw = request.POST.get('due_date')
+        discount_pct = Decimal(request.POST.get('discount_pct', '0') or '0')
+
+        if not structure_id or not item_ids:
+            messages.error(request, 'Please choose a fee structure and at least one fee item.')
+            return redirect('fees:assign_student_fee', student_pk=student.pk)
+
+        try:
+            from datetime import date as _date
+            due_date = _date.fromisoformat(due_date_raw) if due_date_raw else _date.today()
+        except ValueError:
+            due_date = _date.today()
+
+        structure = get_object_or_404(FeeStructure, pk=structure_id, grade=student.grade)
+        # 'Gross Tuition' is for PDF display only — never assign it to a student.
+        items = list(
+            structure.items.filter(pk__in=item_ids)
+            .exclude(fee_type__name='Gross Tuition')
+            .select_related('fee_type')
+        )
+
+        created = skipped = 0
+        with transaction.atomic():
+            for item in items:
+                discount_amt = (item.amount * discount_pct / 100).quantize(Decimal('0.01'))
+                obj, was_created = StudentFee.objects.get_or_create(
+                    student=student,
+                    fee_structure=item,
+                    defaults={
+                        'amount':        item.amount,
+                        'discount':      discount_amt,
+                        'discount_note': f'{discount_pct}% discount' if discount_pct > 0 else '',
+                        'due_date':      due_date,
+                        'assigned_by':   request.user,
+                    },
+                )
+                if was_created:
+                    obj.save()  # triggers net_amount + VAT calc
+                    created += 1
+                else:
+                    skipped += 1
+
+        if created:
+            messages.success(request,
+                f'Assigned {created} fee item(s) to {student.full_name}.' +
+                (f' Skipped {skipped} already-assigned item(s).' if skipped else ''))
+        else:
+            messages.warning(request, 'All selected fee items were already assigned to this student.')
+        return redirect('students:detail', pk=student.pk)
+
+    return render(request, 'fees/assign_student_fee.html', {
+        'student':              student,
+        'eligible_structures':  eligible_structures,
+    })
+
+
+@login_required
+@role_required(*_ACCOUNTANT)
 def bulk_assign_fees(request):
     deassign_structure_id = request.POST.get('deassign_structure_id', '').strip() if request.method == 'POST' else ''
     if request.method == 'POST' and deassign_structure_id:
@@ -808,7 +974,11 @@ def bulk_assign_fees(request):
         discount_pct = form.cleaned_data['discount_pct']   # Decimal 0-100
         due_date     = form.cleaned_data['due_date']
 
-        items = list(structure.items.select_related('fee_type').all())
+        # 'Gross Tuition' is stored for PDF rendering only — never billable.
+        items = list(
+            structure.items.select_related('fee_type')
+            .exclude(fee_type__name='Gross Tuition')
+        )
         if not items:
             messages.warning(request, 'This fee structure has no fee-type items yet.')
             return redirect('fees:fee_structure_list')

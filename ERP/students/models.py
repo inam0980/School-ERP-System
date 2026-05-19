@@ -182,8 +182,17 @@ class Student(models.Model):
         if not self.student_id:
             year = self.academic_year.name.replace('-', '')[:4]
             div  = self.division.name[:2].upper()
-            uid  = str(uuid.uuid4().int)[:5]
-            self.student_id = f"AKS-{year}-{div}-{uid}"
+            # Retry until the generated id is unique (5-digit slice from UUID
+            # can collide on bulk imports — keep trying with fresh UUIDs).
+            for _ in range(20):
+                uid = str(uuid.uuid4().int)[:6]
+                candidate = f"AKS-{year}-{div}-{uid}"
+                if not Student.objects.filter(student_id=candidate).exists():
+                    self.student_id = candidate
+                    break
+            else:
+                # Extremely unlikely fall-through — use the full UUID hex
+                self.student_id = f"AKS-{year}-{div}-{uuid.uuid4().hex[:10]}"
         super().save(*args, **kwargs)
 
     @property
