@@ -33,6 +33,8 @@ urlpatterns = [
     path('regular/<int:pk>/id-card/',       views.student_id_card,        name='id_card'),
     # Continuation Agreement (PDF-style printable)
     path('regular/<int:pk>/continuation-agreement/', views.continuation_agreement, name='continuation_agreement'),
+    # Enrollment Contract (full admission contract — bilingual)
+    path('regular/<int:pk>/enrollment-contract/',    views.enrollment_contract,    name='enrollment_contract'),
 
     # External Candidates
     path('external/',                        views.external_list,          name='external_list'),

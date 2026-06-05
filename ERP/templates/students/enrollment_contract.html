@@ -1,0 +1,445 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <title>Enrollment Contract — {{ student.full_name }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            color: #111; background: #e5e7eb;
+            font-size: 10.5pt; line-height: 1.5;
+        }
+        .page {
+            width: 210mm; min-height: 297mm; background: #fff;
+            margin: 12mm auto; padding: 14mm 16mm;
+            box-shadow: 0 4px 20px rgba(0,0,0,.1); position: relative;
+        }
+        /* ── Top banner ─── */
+        .banner {
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 12px;
+        }
+        .banner .logo  img { width: 80px; height: 80px; object-fit: contain; }
+        .banner .center { flex: 1; text-align: center; padding: 0 10px; }
+        .banner .center .en { font-size: 12pt; font-weight: bold; }
+        .banner .center .ar { font-size: 11pt; font-weight: bold; font-family: Arial, sans-serif; }
+        .banner .right img { height: 70px; object-fit: contain; }
+
+        h1.section-title {
+            text-align: center; font-size: 14pt; font-weight: bold;
+            border: 1.5px solid #111; padding: 6px; margin: 10px 0;
+        }
+        h2.sub-head { font-weight: bold; color: #1e3a5f; margin: 12px 0 6px; font-size: 11pt; }
+
+        /* ── Two-column form table (label + filled value) ── */
+        table.info {
+            width: 100%; border-collapse: collapse; margin-bottom: 6px;
+        }
+        table.info td {
+            border: 1px solid #444; padding: 5px 8px; font-size: 10pt;
+            vertical-align: middle;
+        }
+        table.info td.label {
+            background: #f3f4f6; font-weight: bold; width: 30%;
+            text-align: right; direction: rtl;
+        }
+        table.info td.label .en { display: block; font-size: 8.5pt; color: #555; direction: ltr; text-align: left; font-weight: normal; }
+        table.info td.value { font-weight: 600; min-height: 22px; }
+
+        /* When manual mode is on, show empty underline boxes instead of student data */
+        body.manual-mode td.value { color: transparent !important; }
+        body.manual-mode td.value::before {
+            content: ""; display: block;
+            border-bottom: 0px solid #111;
+            min-height: 18px;
+        }
+
+        /* When Arabic is selected */
+        body.ar-mode .en-only { display: none !important; }
+        body.en-mode .ar-only { display: none !important; }
+
+        /* Terms list */
+        ul.terms { margin: 6px 0 6px 22px; }
+        ul.terms li { margin: 3px 0; font-size: 10pt; line-height: 1.4; }
+
+        /* Fee table */
+        table.fees {
+            width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 9.5pt;
+        }
+        table.fees th, table.fees td {
+            border: 1px solid #444; padding: 5px 6px; text-align: center;
+        }
+        table.fees th { background: #1e3a5f; color: #fff; font-size: 9pt; }
+        table.fees tr:nth-child(even) td { background: #f8fafc; }
+
+        .bank-box {
+            border: 1.5px solid #111; padding: 8px 12px; margin: 10px 0;
+            background: #f9fafb;
+        }
+        .bank-box .row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10pt; }
+
+        .signature-area {
+            display: flex; justify-content: space-between; margin-top: 30px;
+            font-size: 10.5pt;
+        }
+        .signature-area .field {
+            border-bottom: 1px solid #111; width: 200px; padding: 0 4px;
+            display: inline-block; font-weight: bold;
+        }
+
+        .toolbar {
+            max-width: 210mm; margin: 12mm auto 0;
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+        }
+        .btn {
+            padding: 8px 16px; font-size: 13px; font-weight: 600;
+            border-radius: 6px; cursor: pointer; border: none;
+            text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn-primary { background: #1e3a5f; color: #fff; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .toggle-group {
+            background: #fff; border: 1px solid #cbd5e1; border-radius: 8px;
+            padding: 4px; display: inline-flex;
+        }
+        .toggle-group button {
+            background: transparent; border: none; padding: 6px 12px; font-size: 12px;
+            font-weight: 600; color: #475569; cursor: pointer; border-radius: 6px;
+        }
+        .toggle-group button.active { background: #1e3a5f; color: #fff; }
+
+        /* Print */
+        @media print {
+            @page { size: 8.27in 11.69in; margin: 10mm; }
+            body { background: #fff; }
+            .page { box-shadow: none; margin: 0; padding: 0; width: auto; min-height: 0; page-break-after: always; }
+            .page:last-of-type { page-break-after: auto !important; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="en-mode auto-mode">
+
+<div class="toolbar no-print">
+    <button onclick="window.print()" class="btn btn-primary">🖨️ Print</button>
+    <a href="{% url 'students:detail' student.pk %}" class="btn btn-secondary">← Back</a>
+
+    <span style="margin-left:auto; font-size:12px; color:#64748b;">Language:</span>
+    <div class="toggle-group" id="langToggle">
+        <button data-lang="en" class="active">English</button>
+        <button data-lang="ar">العربية</button>
+    </div>
+
+    <span style="font-size:12px; color:#64748b;">Fill:</span>
+    <div class="toggle-group" id="fillToggle">
+        <button data-mode="auto" class="active">Auto (from profile)</button>
+        <button data-mode="manual">Blank (fill by hand)</button>
+    </div>
+</div>
+
+<!-- ══════════════════════ PAGE 1 ══════════════════════ -->
+<div class="page">
+    <div class="banner">
+        <div class="logo"><img src="{% static 'images/logo.png' %}" alt=""></div>
+        <div class="center">
+            <div class="en">LES ÉCOLES INTERNATIONALES AL-KAWTHAR</div>
+            <div class="ar">مدارس الكوثر العالمية</div>
+            <div class="en">AL-KAWTHAR INTERNATIONAL SCHOOLS</div>
+        </div>
+        <div class="right">
+            <img src="{% static 'images/boards/ministry_of_education.png' %}" alt="MoE">
+        </div>
+    </div>
+
+    <h1 class="section-title">
+        <span class="ar-only">عقد التحاق (طالب/ة)</span>
+        <span class="en-only">Student Enrollment Contract</span>
+    </h1>
+
+    <h2 class="sub-head">
+        <span class="ar-only">البيانات الشخصية (الطالب/ة)</span>
+        <span class="en-only">Personal Information (Student)</span>
+    </h2>
+
+    <table class="info">
+        <tr><td class="label">الاسم الأول <span class="en">First Name</span></td>
+            <td class="value">{{ student.full_name|cut:" "|truncatewords:1|default:student.full_name }}</td></tr>
+        <tr><td class="label">اسم الأب <span class="en">Father's Name</span></td>
+            <td class="value">{{ student.father_name }}</td></tr>
+        <tr><td class="label">اسم العائلة <span class="en">Family Name</span></td>
+            <td class="value">{{ student.full_name }}</td></tr>
+        <tr><td class="label">رقم السجل المدني <span class="en">Civil Registration / ID Number</span></td>
+            <td class="value">{{ student.national_id|default:student.iqama_number|default:student.passport_number }}</td></tr>
+        <tr><td class="label">الجنس <span class="en">Gender</span></td>
+            <td class="value">{{ student.get_gender_display|default:student.gender }}</td></tr>
+        <tr><td class="label">الديانة <span class="en">Religion</span></td>
+            <td class="value">{{ student.get_religion_display|default:student.religion }}</td></tr>
+        <tr><td class="label">تاريخ الميلاد <span class="en">Date of Birth</span></td>
+            <td class="value">{{ student.dob|date:"d M Y" }}</td></tr>
+        <tr><td class="label">الجنسية <span class="en">Nationality</span></td>
+            <td class="value">{{ student.nationality }}</td></tr>
+        <tr><td class="label">بلد الميلاد <span class="en">Birth Country / Place</span></td>
+            <td class="value">{{ student.birth_place }}</td></tr>
+        <tr><td class="label">المرحلة الدراسية / العام الدراسي <span class="en">Grade / Academic Year</span></td>
+            <td class="value">{{ student.grade.name }} — {{ student.academic_year }}</td></tr>
+    </table>
+
+    <h2 class="sub-head">
+        <span class="ar-only">البيانات الشخصية (ولي الأمر)</span>
+        <span class="en-only">Personal Information (Guardian)</span>
+    </h2>
+    <table class="info">
+        <tr><td class="label">الاسم الرباعي <span class="en">Guardian Full Name</span></td>
+            <td class="value">{{ student.father_name }}</td></tr>
+        <tr><td class="label">رقم السجل المدني <span class="en">Civil Reg / ID</span></td>
+            <td class="value">{{ student.father_national_id }}</td></tr>
+        <tr><td class="label">صلة القرابة <span class="en">Relationship</span></td>
+            <td class="value">Father / الأب</td></tr>
+        <tr><td class="label">الوظيفة / مكان العمل <span class="en">Occupation / Workplace</span></td>
+            <td class="value">{{ student.father_occupation }}{% if student.father_employer %} — {{ student.father_employer }}{% endif %}</td></tr>
+    </table>
+
+    <h2 class="sub-head">
+        <span class="ar-only">بيانات التواصل</span>
+        <span class="en-only">Contact Information</span>
+    </h2>
+    <table class="info">
+        <tr><td class="label">العنوان <span class="en">Address</span></td>
+            <td class="value">{{ student.address }}</td></tr>
+        <tr><td class="label">هاتف المنزل <span class="en">Home Phone</span></td>
+            <td class="value">{{ student.father_home_phone|default:student.guardian_phone }}</td></tr>
+        <tr><td class="label">هاتف العمل <span class="en">Work Phone</span></td>
+            <td class="value">{{ student.father_business_phone }}</td></tr>
+        <tr><td class="label">جوال الأب <span class="en">Father Mobile</span></td>
+            <td class="value">{{ student.father_mobile }}</td></tr>
+        <tr><td class="label">جوال الأم <span class="en">Mother Mobile</span></td>
+            <td class="value">{{ student.mother_mobile }}</td></tr>
+        <tr><td class="label">البريد الإلكتروني <span class="en">Email</span></td>
+            <td class="value">{{ student.father_email|default:student.guardian_email }}</td></tr>
+    </table>
+</div>
+
+<!-- ══════════════════════ PAGE 2 — POLICIES ══════════════════════ -->
+<div class="page">
+    <div class="banner">
+        <div class="logo"><img src="{% static 'images/logo.png' %}" alt=""></div>
+        <div class="center">
+            <div class="en">AL-KAWTHAR INTERNATIONAL SCHOOLS</div>
+            <div class="ar">مدارس الكوثر العالمية</div>
+        </div>
+        <div class="right"><img src="{% static 'images/boards/ministry_of_education.png' %}" alt=""></div>
+    </div>
+
+    <table class="info">
+        <tr>
+            <td class="label">مدارس الكوثر العالمية <span class="en">First Party (Al-Kawthar Int. Schools)</span></td>
+            <td class="value">Ms. Abeer Ibrahim Al-Sunaidi</td>
+        </tr>
+        <tr>
+            <td class="label">السيد / ولي الأمر <span class="en">Second Party (Guardian)</span></td>
+            <td class="value">{{ student.father_name }}</td>
+        </tr>
+        <tr>
+            <td class="label">هوية رقم <span class="en">ID Number</span></td>
+            <td class="value">{{ student.father_national_id }}</td>
+        </tr>
+    </table>
+
+    <h2 class="sub-head ar-only">نظام وسياسات مدارس الكوثر العالمية</h2>
+    <h2 class="sub-head en-only">School System & Policies</h2>
+
+    <div class="ar-only" style="direction:rtl; text-align:right; line-height:1.8;">
+        <p><b>أولاً:</b> المدرسة نائبة على الطالب/ة خلال تواجده بالمدرسة، وتعتبر إجراءاتها التعليمية والتربوية نحوه صالحة.</p>
+        <p><b>ثانياً:</b> أُلزم ابني/ابنتي بما يلي:</p>
+        <ul class="terms">
+            <li>احترام أساتذته وزملائه الطلاب وعدم الإساءة إليهم بالقول أو العمل.</li>
+            <li>حضور ومغادرة المدرسة في المواعيد التي تحددها إدارة المدرسة.</li>
+            <li>عدم مغادرة المدرسة أثناء الدوام إلا بعد الاستئذان بخطاب رسمي أو عن طريق الاتصال هاتفياً.</li>
+            <li>ارتداء الزي الرسمي يومياً.</li>
+            <li>أداء الواجبات اليومية والأسبوعية بانتظام.</li>
+            <li>عدم إطالة الشعر والأظافر والمحافظة على النظافة العامة.</li>
+            <li>عدم العبث بممتلكات المدرسة والمحافظة عليها.</li>
+            <li>المشاركة في الأنشطة التي تنفذها المدرسة إن أمكن.</li>
+        </ul>
+        <p><b>ثالثاً:</b> أن ألتزم بالآتي:</p>
+        <ul class="terms">
+            <li>دفع الرسوم الدراسية المقررة سنوياً.</li>
+            <li>إشعار المدرسة عن أسباب غياب الطالب.</li>
+            <li>إشعار المدرسة عند تغيير محل العمل أو السكن أو الهاتف.</li>
+            <li>إشعار المدرسة عند تجديد الإقامة وموافاتنا بصورة منها (لغير السعوديين).</li>
+            <li>متابعة الطالب المستمرة ومراجعة المدرسة عند الاستدعاء.</li>
+            <li>حضور مجالس الآباء المدرسية وعدم مراجعة أي مدرس بشأن الطالب — تكون المراجعة أولاً مع إدارة المدرسة.</li>
+            <li>إصلاح أو دفع قيمة ما يتلفه الطالب من أثاث وأجهزة ومعدات.</li>
+        </ul>
+        <p><b>رابعاً:</b> من حق المدرسة استدعائي عن طريق المراسلة إذا تكررت مع ابني مخالفات مثل: التقصير الدراسي، مخالفة اللوائح، أو إساءة السلوك داخل أو خارج الفصل.</p>
+    </div>
+
+    <div class="en-only">
+        <p><b>First:</b> The school acts <i>in loco parentis</i> for the student during school hours; its educational and disciplinary actions are deemed valid.</p>
+        <p><b>Second:</b> I commit my son/daughter to the following:</p>
+        <ul class="terms">
+            <li>Respect teachers and fellow students; no verbal or physical abuse.</li>
+            <li>Arrive and leave at the times set by the school administration.</li>
+            <li>No leaving the school during the day without written or telephone permission.</li>
+            <li>Wear the official uniform daily.</li>
+            <li>Complete daily and weekly homework regularly.</li>
+            <li>Maintain personal hygiene (hair, nails, cleanliness).</li>
+            <li>Do not damage school property; preserve it.</li>
+            <li>Participate in school activities where possible.</li>
+        </ul>
+        <p><b>Third:</b> I, as guardian, commit to:</p>
+        <ul class="terms">
+            <li>Pay the annual tuition fees on time.</li>
+            <li>Notify the school of the reason for any absence.</li>
+            <li>Notify the school of any change of address, workplace, or phone.</li>
+            <li>Notify the school upon renewal of Iqama (non-Saudis) and provide a copy.</li>
+            <li>Follow up with the student and attend the school when summoned.</li>
+            <li>Attend parent councils; raise any teacher matter first with school administration.</li>
+            <li>Pay for or repair any damage caused by the student to school property.</li>
+        </ul>
+        <p><b>Fourth:</b> The school may summon me by official correspondence if violations recur (academic underperformance, breach of regulations, misbehaviour inside or outside class).</p>
+    </div>
+</div>
+
+<!-- ══════════════════════ PAGE 3 — FEES ══════════════════════ -->
+<div class="page">
+    <div class="banner">
+        <div class="logo"><img src="{% static 'images/logo.png' %}" alt=""></div>
+        <div class="center">
+            <div class="en">AL-KAWTHAR INTERNATIONAL SCHOOLS</div>
+            <div class="ar">مدارس الكوثر العالمية</div>
+        </div>
+        <div class="right"><img src="{% static 'images/boards/ministry_of_education.png' %}" alt=""></div>
+    </div>
+
+    <h2 class="sub-head ar-only">السياسة المالية ونظام سداد أقساط الرسوم الدراسية</h2>
+    <h2 class="sub-head en-only">Financial Policy & Tuition Payment Schedule</h2>
+
+    <table class="fees">
+        <thead>
+            <tr>
+                <th>العام الدراسي / Grade Level</th>
+                <th>الفصل الأول<br>Semester 1 (SAR)</th>
+                <th>الفصل الثاني<br>Semester 2 (SAR)</th>
+                <th>مجموع الرسوم سنوياً<br>Annual Total (SAR)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="3"><b>الدفعة الأولى تخصم من الأقساط الدراسية / Down Payment (deducted)</b></td><td><b>3,000</b></td></tr>
+            <tr><td>رسوم حضانة / Nursery</td><td>13,000</td><td>13,000</td><td>26,000</td></tr>
+            <tr><td>رسوم روضة أول / KG1</td><td>13,000</td><td>13,000</td><td>26,000</td></tr>
+            <tr><td>رسوم روضة ثاني / KG2</td><td>13,500</td><td>13,500</td><td>27,000</td></tr>
+            <tr><td>رسوم تمهيدي / Preparatory</td><td>14,000</td><td>14,000</td><td>28,000</td></tr>
+            <tr style="background:#fef3c7;"><td colspan="4"><b>الابتدائية / Elementary</b></td></tr>
+            <tr><td>الابتدائي 1-3 / Grades 1-3</td><td>16,500</td><td>16,500</td><td>33,000</td></tr>
+            <tr><td>الابتدائي 4-6 / Grades 4-6</td><td>17,000</td><td>17,000</td><td>34,000</td></tr>
+            <tr style="background:#fef3c7;"><td colspan="4"><b>المتوسط والثانوي / Middle &amp; High School</b></td></tr>
+            <tr><td>المتوسط 1-2 / Middle 1-2</td><td>18,000</td><td>18,000</td><td>36,000</td></tr>
+            <tr><td>المتوسط 3 / Middle 3</td><td>18,500</td><td>18,500</td><td>37,000</td></tr>
+            <tr><td>الثانوي 1 / Grade 10</td><td>20,000</td><td>20,000</td><td>40,000</td></tr>
+            <tr><td>الثانوي 2-3 / Grades 11-12</td><td>22,500</td><td>22,500</td><td>45,000</td></tr>
+        </tbody>
+    </table>
+
+    <p style="font-size:10pt; color:#c00;"><b>ملاحظة:</b> يجب إضافة ضريبة القيمة المضافة 15% لغير السعوديين. اختبار دخول المدرسة 500 ريال غير مستردة.</p>
+    <p style="font-size:10pt; color:#c00;"><b>Note:</b> 15% VAT must be added for non-Saudi students. Entrance exam fee: SAR 500 (non-refundable).</p>
+
+    <h2 class="sub-head">خصم الإخوة والأخوات / Sibling Discount</h2>
+    <ul class="terms">
+        <li>5% discount for the 2nd sibling / <span class="ar-only">5% خصم للأخ الثاني</span></li>
+        <li>7% discount for the 3rd sibling / <span class="ar-only">7% خصم للأخ الثالث</span></li>
+    </ul>
+
+    <ul class="terms">
+        <li><b>Sem 1 payment</b> due before September 1. / <b>دفعة الفصل الأول</b> قبل الأول من سبتمبر.</li>
+        <li><b>Sem 2 payment</b> due before December 1. / <b>دفعة الفصل الثاني</b> قبل الأول من ديسمبر.</li>
+        <li>Seat reservation: SAR 3,000 by April 1 to reserve next year's seat (non-refundable, deducted from tuition).</li>
+        <li>All tuition fees are non-refundable and non-transferable if the student withdraws.</li>
+    </ul>
+</div>
+
+<!-- ══════════════════════ PAGE 4 — BANK + DECLARATION ══════════════════════ -->
+<div class="page">
+    <div class="banner">
+        <div class="logo"><img src="{% static 'images/logo.png' %}" alt=""></div>
+        <div class="center">
+            <div class="en">AL-KAWTHAR INTERNATIONAL SCHOOLS</div>
+            <div class="ar">مدارس الكوثر العالمية</div>
+        </div>
+        <div class="right"><img src="{% static 'images/boards/ministry_of_education.png' %}" alt=""></div>
+    </div>
+
+    <h2 class="sub-head">طرق السداد للأقساط المدرسية / Payment Methods</h2>
+    <p>بطاقات الائتمان داخل المبنى الدراسي، حوالة بنكية (تسلم إدارة المدرسة بإيصال التحويل).</p>
+    <p>Credit cards (in school office), Bank transfer (submit receipt to school administration).</p>
+
+    <h2 class="sub-head">حساب المدرسة / School Bank Account (SNB)</h2>
+    <div class="bank-box">
+        <div class="row"><b>Account Name / اسم المدرسة:</b><span>مدارس الكوثر العالمية — Al-Kawthar International Schools</span></div>
+        <div class="row"><b>IBAN:</b><span>SA93-1000-0075-4000-0346-4603</span></div>
+        <div class="row"><b>Account Number / رقم الحساب:</b><span>75400003464603</span></div>
+    </div>
+
+    <h1 class="section-title">
+        <span class="ar-only">إقرار مالي</span>
+        <span class="en-only">Financial Declaration</span>
+    </h1>
+
+    <table class="info">
+        <tr><td class="label">أقر أنا / I, the undersigned <span class="en">Full name</span></td>
+            <td class="value">{{ student.father_name }}</td></tr>
+        <tr><td class="label">العنوان <span class="en">Address</span></td>
+            <td class="value">{{ student.address }}</td></tr>
+        <tr><td class="label">الجنسية <span class="en">Nationality</span></td>
+            <td class="value">{{ student.father_nationality|default:student.nationality }}</td></tr>
+        <tr><td class="label">رقم الهوية <span class="en">ID Number</span></td>
+            <td class="value">{{ student.father_national_id }}</td></tr>
+    </table>
+
+    <div class="ar-only" style="direction:rtl; text-align:right; margin-top:10px;">
+        <p>بأنني أتعهد بالالتزام بسداد الأقساط في الموعد المحدد حسب النظام المتفق عليه بهذا العقد. وفي حالة عدم الالتزام يحق لإدارة المدارس الرجوع عليّ قضائياً ومطالبتي بالمبالغ المستحقة مع تحمّلي أتعاب المحاماة كاملة.</p>
+        <p>ويجدد هذا العقد تلقائياً ما لم يصل إدارة المدارس مني طلب رسمي بنقل الطالب/ة إلى مدرسة أخرى مرفق بخطاب القبول. وهذا إقرار مني بذلك.</p>
+    </div>
+    <div class="en-only" style="margin-top:10px;">
+        <p>I hereby commit to pay the tuition fees on the agreed dates per this contract. If I default, the school administration may take legal action to recover the outstanding amounts and all legal fees.</p>
+        <p>This contract auto-renews unless I submit an official transfer request together with a new-school acceptance letter. I acknowledge that fees may vary year to year. This is my acknowledgement.</p>
+    </div>
+
+    <div class="signature-area">
+        <div>الاسم / Name: <span class="field">{{ student.father_name }}</span></div>
+        <div>التاريخ / Date: <span class="field">&nbsp;</span></div>
+        <div>التوقيع / Signature: <span class="field">&nbsp;</span></div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const langButtons = document.querySelectorAll('#langToggle button');
+    const fillButtons = document.querySelectorAll('#fillToggle button');
+    const body = document.body;
+
+    function setActive(group, btn) {
+        group.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+    function setLang(lang) {
+        body.classList.toggle('ar-mode', lang === 'ar');
+        body.classList.toggle('en-mode', lang === 'en');
+        document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
+    }
+    function setFill(mode) {
+        body.classList.toggle('manual-mode', mode === 'manual');
+        body.classList.toggle('auto-mode', mode === 'auto');
+    }
+    langButtons.forEach(b => b.addEventListener('click', () => {
+        setActive(langButtons, b); setLang(b.dataset.lang);
+    }));
+    fillButtons.forEach(b => b.addEventListener('click', () => {
+        setActive(fillButtons, b); setFill(b.dataset.mode);
+    }));
+})();
+</script>
+</body>
+</html>

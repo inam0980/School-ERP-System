@@ -486,6 +486,19 @@ def student_id_card(request, pk):
 
 @login_required
 @role_required(*_STAFF)
+def enrollment_contract(request, pk):
+    """Printable Student Enrollment Contract (Arabic/English, auto-fill toggle)."""
+    student = get_object_or_404(
+        Student.objects.select_related('grade', 'section', 'academic_year', 'division'),
+        pk=pk,
+    )
+    return render(request, 'students/enrollment_contract.html', {
+        'student': student,
+    })
+
+
+@login_required
+@role_required(*_STAFF)
 def continuation_agreement(request, pk):
     """Printable continuation agreement for the upcoming academic year."""
     from core.models import AcademicYear
