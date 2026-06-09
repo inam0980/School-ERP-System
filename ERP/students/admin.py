@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Student, StudentDocument, Sibling, AuthorizedPickup
+from .models import Student, StudentDocument, Sibling, AuthorizedPickup, PromotionHistory
 
 
 class DocumentInline(admin.TabularInline):
@@ -69,3 +69,17 @@ class SiblingAdmin(admin.ModelAdmin):
 class AuthorizedPickupAdmin(admin.ModelAdmin):
     list_display  = ('student', 'full_name', 'relation', 'phone')
     search_fields = ('student__full_name', 'student__student_id', 'full_name', 'phone')
+
+
+@admin.register(PromotionHistory)
+class PromotionHistoryAdmin(admin.ModelAdmin):
+    list_display = (
+        'student', 'action',
+        'from_academic_year', 'from_grade', 'from_section',
+        'to_academic_year', 'to_grade', 'to_section',
+        'promoted_by', 'promoted_at',
+    )
+    list_filter   = ('action', 'to_academic_year', 'from_academic_year', 'to_division')
+    search_fields = ('student__full_name', 'student__student_id')
+    readonly_fields = ('promoted_at',)
+    autocomplete_fields = ('student',)

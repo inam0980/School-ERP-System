@@ -290,3 +290,52 @@ class AuthorizedPickup(models.Model):
 
     def __str__(self):
         return f"{self.student} — {self.full_name} ({self.relation})"
+
+
+class PromotionHistory(models.Model):
+    """Audit log for every promotion / retention / transfer-out action.
+
+    Each row is a snapshot of where the student was and where they ended up
+    after an admin action at end-of-year promotion time.
+    """
+    PROMOTE      = 'PROMOTE'
+    RETAIN       = 'RETAIN'
+    TRANSFER_OUT = 'TRANSFER_OUT'
+    ACTION_CHOICES = [
+        (PROMOTE,      'Promoted / ترقية'),
+        (RETAIN,       'Retained / إعادة'),
+        (TRANSFER_OUT, 'Transferred Out / منقول خارجاً'),
+    ]
+
+    student            = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='promotion_history')
+    action             = models.CharField(max_length=15, choices=ACTION_CHOICES, default=PROMOTE)
+
+    # Snapshot: where the student was
+    from_academic_year = models.ForeignKey('core.AcademicYear', on_delete=models.PROTECT, related_name='promotion_from_year')
+    from_division      = models.ForeignKey('core.Division',     on_delete=models.PROTECT, related_name='promotion_from_division')
+    from_grade         = models.ForeignKey('core.Grade',        on_delete=models.PROTECT, related_name='promotion_from_grade')
+    from_section       = models.ForeignKey('core.Section',      on_delete=models.PROTECT, related_name='promotion_from_section')
+
+    # Snapshot: where the student ended up (null for transfer_out)
+    to_academic_year   = models.ForeignKey('core.AcademicYear', on_delete=models.PROTECT, null=True, blank=True, related_name='promotion_to_year')
+    to_division        = models.ForeignKey('core.Division',     on_delete=models.PROTECT, null=True, blank=True, related_name='promotion_to_division')
+    to_grade           = models.ForeignKey('core.Grade',        on_delete=models.PROTECT, null=True, blank=True, related_name='promotion_to_grade')
+    to_section         = models.ForeignKey('core.Section',      on_delete=models.PROTECT, null=True, blank=True, related_name='promotion_to_section')
+
+    notes              = models.CharField(max_length=300, blank=True)
+    promoted_by        = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='promotions_done'
+    )
+    promoted_at        = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-promoted_at']
+        verbose_name = 'Promotion History / سجل الترقية'
+        indexes = [
+            models.Index(fields=['student', '-promoted_at'], name='promo_student_idx'),
+            models.Index(fields=['to_academic_year'], name='promo_to_year_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.student} — {self.get_action_display()} ({self.promoted_at:%Y-%m-%d})"

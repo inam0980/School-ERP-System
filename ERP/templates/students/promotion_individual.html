@@ -1,0 +1,192 @@
+{% extends 'base.html' %}
+{% block title %}Promote {{ student.full_name }} — Al-Kawthar{% endblock %}
+{% block page_title %}Promote Student / ترقية طالب{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6 pb-12">
+
+    <!-- Current state card -->
+    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <p class="text-xs text-slate-500 uppercase tracking-wider">Current Enrollment</p>
+        <h2 class="text-xl font-bold text-primary mt-1">{{ student.full_name }}</h2>
+        <p class="text-xs text-slate-500">{{ student.student_id }}</p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-sm">
+            <div>
+                <p class="text-xs text-slate-400">Academic Year</p>
+                <p class="font-semibold">{{ student.academic_year.name }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-slate-400">Division</p>
+                <p class="font-semibold">{{ student.division.name }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-slate-400">Grade</p>
+                <p class="font-semibold">{{ student.grade.name }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-slate-400">Section</p>
+                <p class="font-semibold">{{ student.section.name }}</p>
+            </div>
+        </div>
+        {% if suggested_grade %}
+            <p class="text-xs text-emerald-600 mt-3">
+                Suggested next grade: <b>{{ suggested_grade.name }}</b> (in {{ suggested_grade.division.name }})
+            </p>
+        {% else %}
+            <p class="text-xs text-amber-600 mt-3">
+                This is the last grade in this division — promotion requires changing division.
+            </p>
+        {% endif %}
+    </div>
+
+    <!-- Form -->
+    <form method="post" class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+        {% csrf_token %}
+        <p class="text-xs text-slate-500 uppercase tracking-wider">Promotion Details</p>
+
+        {% if form.non_field_errors %}
+            <div class="bg-rose-50 border border-rose-200 text-rose-800 text-sm rounded p-3">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <div>
+            <label class="text-xs font-semibold text-slate-600">{{ form.action.label }}</label>
+            {{ form.action }}
+            {{ form.action.errors }}
+        </div>
+
+        <div id="target_fields" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+                <label class="text-xs font-semibold text-slate-600">{{ form.to_academic_year.label }}</label>
+                {{ form.to_academic_year }}
+                {{ form.to_academic_year.errors }}
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">{{ form.to_division.label }}</label>
+                {{ form.to_division }}
+                <p class="text-xs text-slate-400 mt-1">{{ form.to_division.help_text }}</p>
+                {{ form.to_division.errors }}
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">{{ form.to_grade.label }}</label>
+                {{ form.to_grade }}
+                {{ form.to_grade.errors }}
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">{{ form.to_section.label }}</label>
+                {{ form.to_section }}
+                {{ form.to_section.errors }}
+            </div>
+        </div>
+
+        <div>
+            <label class="text-xs font-semibold text-slate-600">{{ form.notes.label }}</label>
+            {{ form.notes }}
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+            <a href="{% url 'students:detail' student.pk %}"
+               class="text-sm text-slate-500 hover:text-slate-700">← Cancel</a>
+            <button type="submit"
+                    class="bg-primary text-white text-sm font-semibold px-6 py-2.5 rounded-lg
+                           hover:bg-primary/90 transition">
+                Save
+            </button>
+        </div>
+    </form>
+
+    <!-- History -->
+    {% if history %}
+    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <p class="text-xs text-slate-500 uppercase tracking-wider mb-3">Promotion History</p>
+        <table class="w-full text-sm">
+            <thead class="text-xs text-slate-500 uppercase">
+                <tr>
+                    <th class="text-left pb-2">When</th>
+                    <th class="text-left pb-2">Action</th>
+                    <th class="text-left pb-2">From</th>
+                    <th class="text-left pb-2">To</th>
+                    <th class="text-left pb-2">By</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for h in history %}
+                <tr>
+                    <td class="py-2 text-slate-600">{{ h.promoted_at|date:"d M Y" }}</td>
+                    <td class="py-2">{{ h.get_action_display }}</td>
+                    <td class="py-2 text-slate-600">{{ h.from_grade.name }} / {{ h.from_section.name }}</td>
+                    <td class="py-2 text-slate-600">
+                        {% if h.to_grade %}{{ h.to_grade.name }} / {{ h.to_section.name }}{% else %}—{% endif %}
+                    </td>
+                    <td class="py-2 text-slate-500">{{ h.promoted_by|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+(function () {
+    const grade_url   = "{% url 'students:ajax_grades_for_division' %}";
+    const section_url = "{% url 'students:ajax_sections_for_grade' %}";
+
+    const actionSel  = document.getElementById('id_action');
+    const targetWrap = document.getElementById('target_fields');
+    const divSel     = document.getElementById('id_to_division');
+    const grSel      = document.getElementById('id_to_grade');
+    const secSel     = document.getElementById('id_to_section');
+
+    function toggleTargets() {
+        if (actionSel.value === 'TRANSFER_OUT') {
+            targetWrap.style.display = 'none';
+        } else {
+            targetWrap.style.display = '';
+        }
+    }
+    actionSel.addEventListener('change', toggleTargets);
+    toggleTargets();
+
+    function fetchJson(url) { return fetch(url, {credentials: 'same-origin'}).then(r => r.json()); }
+    function fill(sel, items, placeholder, selectedId) {
+        const prev = selectedId || sel.value;
+        sel.innerHTML = '';
+        const opt = document.createElement('option');
+        opt.value = ''; opt.textContent = placeholder;
+        sel.appendChild(opt);
+        items.forEach(it => {
+            const o = document.createElement('option');
+            o.value = it.id; o.textContent = it.name;
+            if (String(it.id) === String(prev)) o.selected = true;
+            sel.appendChild(o);
+        });
+    }
+
+    divSel.addEventListener('change', function () {
+        fetchJson(grade_url + '?division=' + this.value).then(d => {
+            fill(grSel, d.grades, '— Select Grade —');
+            fill(secSel, [], '— Select Section —');
+        });
+    });
+    grSel.addEventListener('change', function () {
+        fetchJson(section_url + '?grade=' + this.value).then(d => {
+            fill(secSel, d.sections, '— Select Section —');
+        });
+    });
+
+    // Initial preload (so the pre-selected division → grade list loads correctly)
+    if (divSel.value) {
+        fetchJson(grade_url + '?division=' + divSel.value).then(d => {
+            fill(grSel, d.grades, '— Select Grade —', grSel.value);
+            if (grSel.value) {
+                fetchJson(section_url + '?grade=' + grSel.value).then(d2 => {
+                    fill(secSel, d2.sections, '— Select Section —', secSel.value);
+                });
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

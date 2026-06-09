@@ -9,10 +9,13 @@ from django.db.models import Q, Sum, Count
 from django.views.decorators.http import require_POST
 
 from accounts.decorators import role_required
-from .models import Student, StudentDocument, Sibling, AuthorizedPickup
-from .forms import StudentForm, DocumentUploadForm, StudentFilterForm, SiblingForm, AuthorizedPickupForm
+from .models import Student, StudentDocument, Sibling, AuthorizedPickup, PromotionHistory
+from .forms import (
+    StudentForm, DocumentUploadForm, StudentFilterForm, SiblingForm, AuthorizedPickupForm,
+    PromotionFilterForm, IndividualPromotionForm,
+)
 from fees.models import ExternalCandidate, ExternalCandidatePayment
-from core.models import Grade, Division, Board
+from core.models import Grade, Division, Board, AcademicYear, Section
 
 _ADMIN   = ('SUPER_ADMIN', 'ADMIN')
 _STAFF   = ('SUPER_ADMIN', 'ADMIN', 'TEACHER', 'ACCOUNTANT', 'STAFF')
@@ -904,4 +907,303 @@ def external_detail(request, pk):
         'payments':   payments,
         'total_paid': total_paid,
     })
+
+
+# ════════════════════════════════════════════════════════════════════════════
+#  PROMOTION  ─  end-of-year bulk + individual student promotion
+# ════════════════════════════════════════════════════════════════════════════
+
+from django.db import transaction
+
+
+def _next_grade(grade):
+    """Return the next Grade in the same Division, or None if `grade` is the last."""
+    if not grade:
+        return None
+    return (Grade.objects
+            .filter(division=grade.division, order__gt=grade.order)
+            .order_by('order')
+            .first())
+
+
+# ──────────────────────────── PROMOTION HUB ────────────────────────────
+
+@login_required
+@role_required(*_ADMIN)
+def promotion_hub(request):
+    """Landing page for the promotion workflow."""
+    current_year = AcademicYear.objects.filter(is_current=True).first()
+    last_promotion = PromotionHistory.objects.order_by('-promoted_at').first()
+    total_promotions = PromotionHistory.objects.count()
+    return render(request, 'students/promotion_hub.html', {
+        'current_year':     current_year,
+        'last_promotion':   last_promotion,
+        'total_promotions': total_promotions,
+    })
+
+
+# ──────────────────────────── BULK PROMOTION ────────────────────────────
+
+@login_required
+@role_required(*_ADMIN)
+def promotion_bulk(request):
+    """
+    Two-phase screen:
+      GET  with ?from_academic_year=&from_division=&from_grade=[&from_section=]
+           → list the matching active students with per-row override controls
+      POST → commit promotions in a single transaction
+    """
+    filter_form = PromotionFilterForm(request.GET or None)
+    students    = None
+    suggested_to_grade = None
+    target_year_default = None
+
+    if filter_form.is_valid():
+        from_year     = filter_form.cleaned_data['from_academic_year']
+        from_division = filter_form.cleaned_data['from_division']
+        from_grade    = filter_form.cleaned_data['from_grade']
+        from_section  = filter_form.cleaned_data.get('from_section')
+
+        students = (Student.objects
+                    .select_related('division', 'grade', 'section', 'academic_year')
+                    .filter(academic_year=from_year,
+                            division=from_division,
+                            grade=from_grade,
+                            is_active=True)
+                    .order_by('section__name', 'full_name'))
+        if from_section:
+            students = students.filter(section=from_section)
+
+        suggested_to_grade  = _next_grade(from_grade)
+        # default target year = first future year after `from_year`, else current
+        target_year_default = (AcademicYear.objects
+                               .filter(start_date__gt=from_year.start_date)
+                               .order_by('start_date').first()
+                               or AcademicYear.objects.filter(is_current=True).first())
+
+    if request.method == 'POST':
+        return _process_bulk_promotion(request)
+
+    return render(request, 'students/promotion_bulk.html', {
+        'filter_form':         filter_form,
+        'students':            students,
+        'suggested_to_grade':  suggested_to_grade,
+        'target_year_default': target_year_default,
+        'academic_years':      AcademicYear.objects.all().order_by('-start_date'),
+        'divisions':           Division.objects.filter(is_active=True),
+    })
+
+
+@require_POST
+def _process_bulk_promotion(request):
+    """Commit the bulk promotion form. Wrapped in a transaction so an error
+    rolls everything back — half-promoted cohorts would be a nightmare to clean up."""
+    student_ids = request.POST.getlist('student_ids')
+    if not student_ids:
+        messages.error(request, "No students were selected.")
+        return redirect(f"{reverse('students:promotion_bulk')}?{request.POST.urlencode()}")
+
+    default_to_year_id    = request.POST.get('default_to_academic_year') or None
+    default_to_division   = request.POST.get('default_to_division') or None
+    default_to_grade      = request.POST.get('default_to_grade') or None
+    notes_global          = (request.POST.get('notes') or '').strip()
+
+    promoted = retained = transferred = skipped = 0
+    errors = []
+
+    try:
+        with transaction.atomic():
+            for sid in student_ids:
+                action = request.POST.get(f'action_{sid}', 'PROMOTE')
+                student = Student.objects.select_related('academic_year', 'division', 'grade', 'section').filter(pk=sid).first()
+                if not student:
+                    skipped += 1
+                    continue
+
+                # Snapshot the "from" side
+                snap = dict(
+                    from_academic_year=student.academic_year,
+                    from_division=student.division,
+                    from_grade=student.grade,
+                    from_section=student.section,
+                )
+
+                if action == 'TRANSFER_OUT':
+                    student.is_active = False
+                    student.save(update_fields=['is_active', 'updated_at'])
+                    PromotionHistory.objects.create(
+                        student=student, action=PromotionHistory.TRANSFER_OUT,
+                        promoted_by=request.user, notes=notes_global,
+                        **snap,
+                    )
+                    transferred += 1
+                    continue
+
+                # PROMOTE or RETAIN — both need target year/div/grade/section
+                to_year_id     = request.POST.get(f'to_year_{sid}')     or default_to_year_id
+                to_division_id = request.POST.get(f'to_division_{sid}') or default_to_division
+                to_grade_id    = request.POST.get(f'to_grade_{sid}')    or default_to_grade
+                to_section_id  = request.POST.get(f'to_section_{sid}')
+
+                if not all([to_year_id, to_division_id, to_grade_id, to_section_id]):
+                    errors.append(f"{student.full_name}: missing target year/division/grade/section")
+                    continue
+
+                to_year     = AcademicYear.objects.get(pk=to_year_id)
+                to_division = Division.objects.get(pk=to_division_id)
+                to_grade    = Grade.objects.get(pk=to_grade_id)
+                to_section  = Section.objects.get(pk=to_section_id)
+
+                # Sanity: grade must belong to division, section to grade
+                if to_grade.division_id != to_division.pk:
+                    errors.append(f"{student.full_name}: grade '{to_grade}' does not belong to division '{to_division}'")
+                    continue
+                if to_section.grade_id != to_grade.pk:
+                    errors.append(f"{student.full_name}: section '{to_section}' does not belong to grade '{to_grade}'")
+                    continue
+
+                student.academic_year = to_year
+                student.division      = to_division
+                student.grade         = to_grade
+                student.section       = to_section
+                student.enrollment_type = Student.REGULAR
+                student.save(update_fields=['academic_year', 'division', 'grade', 'section',
+                                            'enrollment_type', 'updated_at'])
+
+                PromotionHistory.objects.create(
+                    student=student,
+                    action=(PromotionHistory.RETAIN if action == 'RETAIN' else PromotionHistory.PROMOTE),
+                    promoted_by=request.user,
+                    notes=notes_global,
+                    to_academic_year=to_year, to_division=to_division,
+                    to_grade=to_grade, to_section=to_section,
+                    **snap,
+                )
+                if action == 'RETAIN':
+                    retained += 1
+                else:
+                    promoted += 1
+
+            if errors:
+                # roll back the whole batch — caller must fix issues and retry
+                raise ValueError("validation_errors")
+
+    except ValueError:
+        for e in errors:
+            messages.error(request, e)
+        messages.error(request, "Nothing was saved — fix the issues above and try again.")
+        return redirect(f"{reverse('students:promotion_bulk')}?{request.GET.urlencode()}")
+
+    parts = []
+    if promoted:    parts.append(f"{promoted} promoted")
+    if retained:    parts.append(f"{retained} retained")
+    if transferred: parts.append(f"{transferred} transferred out")
+    if skipped:     parts.append(f"{skipped} skipped")
+    messages.success(request, "Promotion complete: " + (", ".join(parts) or "no changes."))
+    return redirect('students:promotion_hub')
+
+
+# ──────────────────────────── INDIVIDUAL PROMOTION ────────────────────────────
+
+@login_required
+@role_required(*_ADMIN)
+def promotion_individual(request, pk):
+    """Promote a single student. Linked from the student detail page."""
+    student = get_object_or_404(
+        Student.objects.select_related('academic_year', 'division', 'grade', 'section'),
+        pk=pk,
+    )
+    suggested_grade = _next_grade(student.grade)
+
+    if request.method == 'POST':
+        form = IndividualPromotionForm(request.POST)
+        if form.is_valid():
+            action = form.cleaned_data['action']
+            snap = dict(
+                from_academic_year=student.academic_year,
+                from_division=student.division,
+                from_grade=student.grade,
+                from_section=student.section,
+            )
+            if action == 'TRANSFER_OUT':
+                student.is_active = False
+                student.save(update_fields=['is_active', 'updated_at'])
+                PromotionHistory.objects.create(
+                    student=student, action=PromotionHistory.TRANSFER_OUT,
+                    promoted_by=request.user, notes=form.cleaned_data['notes'],
+                    **snap,
+                )
+                messages.success(request, f"{student.full_name} marked as transferred out.")
+                return redirect('students:detail', pk=student.pk)
+
+            to_year     = form.cleaned_data['to_academic_year']
+            to_division = form.cleaned_data['to_division']
+            to_grade    = form.cleaned_data['to_grade']
+            to_section  = form.cleaned_data['to_section']
+
+            if to_grade.division_id != to_division.pk:
+                form.add_error('to_grade', "Selected grade does not belong to the selected division.")
+            elif to_section.grade_id != to_grade.pk:
+                form.add_error('to_section', "Selected section does not belong to the selected grade.")
+            else:
+                with transaction.atomic():
+                    student.academic_year   = to_year
+                    student.division        = to_division
+                    student.grade           = to_grade
+                    student.section         = to_section
+                    student.enrollment_type = Student.REGULAR
+                    student.save(update_fields=['academic_year', 'division', 'grade',
+                                                'section', 'enrollment_type', 'updated_at'])
+                    PromotionHistory.objects.create(
+                        student=student,
+                        action=(PromotionHistory.RETAIN if action == 'RETAIN' else PromotionHistory.PROMOTE),
+                        promoted_by=request.user, notes=form.cleaned_data['notes'],
+                        to_academic_year=to_year, to_division=to_division,
+                        to_grade=to_grade, to_section=to_section,
+                        **snap,
+                    )
+                label = "retained" if action == 'RETAIN' else "promoted"
+                messages.success(request, f"{student.full_name} {label} successfully.")
+                return redirect('students:detail', pk=student.pk)
+    else:
+        # Pre-fill: next year + suggested next grade in same division
+        next_year = (AcademicYear.objects
+                     .filter(start_date__gt=student.academic_year.start_date)
+                     .order_by('start_date').first()
+                     or AcademicYear.objects.filter(is_current=True).first())
+        form = IndividualPromotionForm(initial={
+            'action': 'PROMOTE',
+            'to_academic_year': next_year,
+            'to_division': student.division,
+            'to_grade': suggested_grade,
+        })
+
+    return render(request, 'students/promotion_individual.html', {
+        'student':         student,
+        'form':            form,
+        'suggested_grade': suggested_grade,
+        'history':         student.promotion_history.select_related(
+                              'from_grade', 'from_section', 'to_grade', 'to_section'
+                          ).all()[:20],
+    })
+
+
+# ─────────── AJAX helpers used by the cascading selects ───────────
+
+@login_required
+@role_required(*_STAFF)
+def ajax_grades_for_division(request):
+    """GET /students/promotion/ajax/grades/?division=<id>  →  JSON list."""
+    division_id = request.GET.get('division')
+    grades = Grade.objects.filter(division_id=division_id).order_by('order', 'name') if division_id else Grade.objects.none()
+    return JsonResponse({'grades': [{'id': g.pk, 'name': g.name} for g in grades]})
+
+
+@login_required
+@role_required(*_STAFF)
+def ajax_sections_for_grade(request):
+    """GET /students/promotion/ajax/sections/?grade=<id>  →  JSON list."""
+    grade_id = request.GET.get('grade')
+    sections = Section.objects.filter(grade_id=grade_id).order_by('name') if grade_id else Section.objects.none()
+    return JsonResponse({'sections': [{'id': s.pk, 'name': s.name} for s in sections]})
 

@@ -286,3 +286,92 @@ class StudentFilterForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={'class': _INPUT}),
     )
+
+
+# ──────────────────────────── PROMOTION FORMS ────────────────────────────
+
+class PromotionFilterForm(forms.Form):
+    """Picks the *source* cohort (which academic year/division/grade/section to promote)."""
+    from_academic_year = forms.ModelChoiceField(
+        queryset=AcademicYear.objects.all().order_by('-start_date'),
+        required=True, empty_label=None,
+        widget=forms.Select(attrs={'class': _INPUT}),
+        label="From Academic Year / من السنة الدراسية",
+    )
+    from_division = forms.ModelChoiceField(
+        queryset=Division.objects.filter(is_active=True),
+        required=True, empty_label="— Select Division —",
+        widget=forms.Select(attrs={'class': _INPUT, 'id': 'id_from_division'}),
+        label="From Division / من القسم",
+    )
+    from_grade = forms.ModelChoiceField(
+        queryset=Grade.objects.all(),
+        required=True, empty_label="— Select Grade —",
+        widget=forms.Select(attrs={'class': _INPUT, 'id': 'id_from_grade'}),
+        label="From Grade / من الصف",
+    )
+    from_section = forms.ModelChoiceField(
+        queryset=Section.objects.all(),
+        required=False, empty_label="All sections in grade",
+        widget=forms.Select(attrs={'class': _INPUT, 'id': 'id_from_section'}),
+        label="From Section / من الفصل (optional)",
+    )
+
+
+class IndividualPromotionForm(forms.Form):
+    """Promote / retain / transfer-out a single student."""
+    ACTION_CHOICES = [
+        ('PROMOTE',      'Promote to next grade / الترقية للصف التالي'),
+        ('RETAIN',       'Retain in same grade (new year) / إعادة في نفس الصف'),
+        ('TRANSFER_OUT', 'Transfer Out / منقول خارج المدرسة'),
+    ]
+
+    action = forms.ChoiceField(
+        choices=ACTION_CHOICES, initial='PROMOTE',
+        widget=forms.Select(attrs={'class': _INPUT, 'id': 'id_action'}),
+        label="Action / الإجراء",
+    )
+    to_academic_year = forms.ModelChoiceField(
+        queryset=AcademicYear.objects.all().order_by('-start_date'),
+        required=False, empty_label="— Select Academic Year —",
+        widget=forms.Select(attrs={'class': _INPUT}),
+        label="To Academic Year / إلى السنة الدراسية",
+    )
+    to_division = forms.ModelChoiceField(
+        queryset=Division.objects.filter(is_active=True),
+        required=False, empty_label="— Select Division —",
+        widget=forms.Select(attrs={'class': _INPUT, 'id': 'id_to_division'}),
+        label="To Division / إلى القسم",
+        help_text="Change division here if the student is moving curricula.",
+    )
+    to_grade = forms.ModelChoiceField(
+        queryset=Grade.objects.all(),
+        required=False, empty_label="— Select Grade —",
+        widget=forms.Select(attrs={'class': _INPUT, 'id': 'id_to_grade'}),
+        label="To Grade / إلى الصف",
+    )
+    to_section = forms.ModelChoiceField(
+        queryset=Section.objects.all(),
+        required=False, empty_label="— Select Section —",
+        widget=forms.Select(attrs={'class': _INPUT, 'id': 'id_to_section'}),
+        label="To Section / إلى الفصل",
+    )
+    notes = forms.CharField(
+        required=False, max_length=300,
+        widget=forms.TextInput(attrs={'class': _INPUT,
+                                       'placeholder': 'Optional notes / ملاحظات اختيارية'}),
+        label="Notes / ملاحظات",
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        action = cleaned.get('action')
+        if action in ('PROMOTE', 'RETAIN'):
+            missing = [f for f in ('to_academic_year', 'to_division', 'to_grade', 'to_section')
+                       if not cleaned.get(f)]
+            if missing:
+                raise forms.ValidationError(
+                    "Target academic year, division, grade and section are all required for "
+                    "Promote / Retain."
+                )
+        return cleaned

@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+{% block title %}Bulk Promotion — Al-Kawthar{% endblock %}
+{% block page_title %}Bulk Promotion / ترقية جماعية{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6 pb-12">
+
+    <!-- Step 1 — pick source cohort -->
+    <form method="get" class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+        <p class="text-xs text-slate-500 uppercase tracking-wider mb-3">
+            Step 1 — Select source cohort
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+            <div>
+                <label class="text-xs font-semibold text-slate-600">From Academic Year</label>
+                {{ filter_form.from_academic_year }}
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">From Division</label>
+                {{ filter_form.from_division }}
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">From Grade</label>
+                {{ filter_form.from_grade }}
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">From Section (optional)</label>
+                {{ filter_form.from_section }}
+            </div>
+            <button type="submit"
+                    class="bg-primary text-white text-sm font-semibold px-4 py-2.5 rounded-lg
+                           hover:bg-primary/90 transition">
+                Load Students
+            </button>
+        </div>
+    </form>
+
+    {% if students is not None %}
+
+    {% if students %}
+    <!-- Step 2 — set targets + commit -->
+    <form method="post"
+          action="{% url 'students:promotion_bulk' %}?{{ request.GET.urlencode }}"
+          class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+        {% csrf_token %}
+
+        <p class="text-xs text-slate-500 uppercase tracking-wider">
+            Step 2 — Set defaults for the whole batch
+        </p>
+        <p class="text-xs text-slate-400 -mt-2">
+            These apply to every selected student. Override per-row below if needed.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+                <label class="text-xs font-semibold text-slate-600">To Academic Year</label>
+                <select name="default_to_academic_year" id="default_to_year"
+                        class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white">
+                    {% for y in academic_years %}
+                        <option value="{{ y.pk }}" {% if y == target_year_default %}selected{% endif %}>{{ y.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">To Division</label>
+                <select name="default_to_division" id="default_to_division"
+                        class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white">
+                    {% for d in divisions %}
+                        <option value="{{ d.pk }}"
+                          {% if suggested_to_grade and d.pk == suggested_to_grade.division_id %}selected{% endif %}>
+                            {{ d.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">To Grade</label>
+                <select name="default_to_grade" id="default_to_grade"
+                        class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white">
+                    {% if suggested_to_grade %}
+                        <option value="{{ suggested_to_grade.pk }}" selected>{{ suggested_to_grade.name }} (suggested)</option>
+                    {% else %}
+                        <option value="">— Select Grade —</option>
+                    {% endif %}
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600">Notes (optional)</label>
+                <input type="text" name="notes" maxlength="300"
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white"
+                       placeholder="e.g. End-of-year 2025-26 batch promotion">
+            </div>
+        </div>
+
+        <!-- Per-student rows -->
+        <div class="overflow-x-auto border border-slate-200 rounded-lg">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+                    <tr>
+                        <th class="px-3 py-2 text-left">
+                            <input type="checkbox" id="select_all" checked
+                                   class="w-4 h-4 rounded border-slate-300">
+                        </th>
+                        <th class="px-3 py-2 text-left">Student</th>
+                        <th class="px-3 py-2 text-left">Current Section</th>
+                        <th class="px-3 py-2 text-left">Action</th>
+                        <th class="px-3 py-2 text-left">Override Division</th>
+                        <th class="px-3 py-2 text-left">Override Grade</th>
+                        <th class="px-3 py-2 text-left">Section *</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for s in students %}
+                    <tr class="hover:bg-slate-50" data-row="{{ s.pk }}">
+                        <td class="px-3 py-2">
+                            <input type="checkbox" name="student_ids" value="{{ s.pk }}" checked
+                                   class="row-check w-4 h-4 rounded border-slate-300">
+                        </td>
+                        <td class="px-3 py-2">
+                            <p class="font-medium text-slate-800">{{ s.full_name }}</p>
+                            <p class="text-xs text-slate-500">{{ s.student_id }}</p>
+                        </td>
+                        <td class="px-3 py-2 text-slate-600">{{ s.section }}</td>
+                        <td class="px-3 py-2">
+                            <select name="action_{{ s.pk }}"
+                                    class="text-xs px-2 py-1.5 border border-slate-200 rounded bg-white">
+                                <option value="PROMOTE" selected>Promote</option>
+                                <option value="RETAIN">Retain</option>
+                                <option value="TRANSFER_OUT">Transfer Out</option>
+                            </select>
+                        </td>
+                        <td class="px-3 py-2">
+                            <select name="to_division_{{ s.pk }}"
+                                    class="row-division text-xs px-2 py-1.5 border border-slate-200 rounded bg-white">
+                                <option value="">(use default)</option>
+                                {% for d in divisions %}
+                                    <option value="{{ d.pk }}">{{ d.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td class="px-3 py-2">
+                            <select name="to_grade_{{ s.pk }}"
+                                    class="row-grade text-xs px-2 py-1.5 border border-slate-200 rounded bg-white">
+                                <option value="">(use default)</option>
+                            </select>
+                        </td>
+                        <td class="px-3 py-2">
+                            <select name="to_section_{{ s.pk }}" required
+                                    class="row-section text-xs px-2 py-1.5 border border-slate-200 rounded bg-white">
+                                <option value="">— pick section —</option>
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="text-xs text-slate-400">
+            * Section is required for each student — pick it from the dropdown (loads after you choose division / grade).
+        </p>
+
+        <div class="flex items-center justify-between pt-2">
+            <a href="{% url 'students:promotion_hub' %}"
+               class="text-sm text-slate-500 hover:text-slate-700">← Back</a>
+            <button type="submit"
+                    onclick="return confirm('Commit promotions for the selected students? This will update their records.');"
+                    class="bg-primary text-white text-sm font-semibold px-6 py-2.5 rounded-lg
+                           hover:bg-primary/90 transition">
+                Commit Promotions
+            </button>
+        </div>
+    </form>
+    {% else %}
+        <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-5 text-sm">
+            No active students found for that cohort.
+        </div>
+    {% endif %}
+    {% endif %}
+</div>
+
+{# ── cascading-dropdowns JS ───────────────────────────────────────────── #}
+<script>
+(function () {
+    const grade_url   = "{% url 'students:ajax_grades_for_division' %}";
+    const section_url = "{% url 'students:ajax_sections_for_grade' %}";
+
+    function fetchJson(url) { return fetch(url, {credentials: 'same-origin'}).then(r => r.json()); }
+
+    function populateSelect(sel, items, labelKey, placeholder) {
+        sel.innerHTML = '';
+        if (placeholder !== null) {
+            const opt = document.createElement('option');
+            opt.value = ''; opt.textContent = placeholder;
+            sel.appendChild(opt);
+        }
+        items.forEach(it => {
+            const opt = document.createElement('option');
+            opt.value = it.id; opt.textContent = it[labelKey];
+            sel.appendChild(opt);
+        });
+    }
+
+    // ── filter form (step 1) cascading ──
+    const fromDivision = document.getElementById('id_from_division');
+    const fromGrade    = document.getElementById('id_from_grade');
+    const fromSection  = document.getElementById('id_from_section');
+    if (fromDivision && fromGrade) {
+        fromDivision.addEventListener('change', function () {
+            fetchJson(grade_url + '?division=' + this.value).then(d => {
+                populateSelect(fromGrade, d.grades, 'name', '— Select Grade —');
+                if (fromSection) populateSelect(fromSection, [], 'name', 'All sections in grade');
+            });
+        });
+        if (fromGrade && fromSection) {
+            fromGrade.addEventListener('change', function () {
+                fetchJson(section_url + '?grade=' + this.value).then(d => {
+                    populateSelect(fromSection, d.sections, 'name', 'All sections in grade');
+                });
+            });
+        }
+    }
+
+    // ── defaults (step 2) cascading ──
+    const defDivision = document.getElementById('default_to_division');
+    const defGrade    = document.getElementById('default_to_grade');
+    if (defDivision && defGrade) {
+        defDivision.addEventListener('change', function () {
+            fetchJson(grade_url + '?division=' + this.value).then(d => {
+                populateSelect(defGrade, d.grades, 'name', '— Select Grade —');
+            });
+        });
+    }
+
+    // ── per-row cascading ──
+    document.querySelectorAll('tr[data-row]').forEach(row => {
+        const div = row.querySelector('.row-division');
+        const gr  = row.querySelector('.row-grade');
+        const sec = row.querySelector('.row-section');
+
+        div.addEventListener('change', function () {
+            if (!this.value) {
+                populateSelect(gr,  [], 'name', '(use default)');
+                populateSelect(sec, [], 'name', '— pick section —');
+                return;
+            }
+            fetchJson(grade_url + '?division=' + this.value).then(d => {
+                populateSelect(gr, d.grades, 'name', '— pick grade —');
+                populateSelect(sec, [], 'name', '— pick section —');
+            });
+        });
+        gr.addEventListener('change', function () {
+            if (!this.value) {
+                populateSelect(sec, [], 'name', '— pick section —');
+                return;
+            }
+            fetchJson(section_url + '?grade=' + this.value).then(d => {
+                populateSelect(sec, d.sections, 'name', '— pick section —');
+            });
+        });
+    });
+
+    // When defaults change → preload section dropdowns for rows still on "(use default)"
+    function preloadDefaultSections() {
+        if (!defGrade.value) return;
+        fetchJson(section_url + '?grade=' + defGrade.value).then(d => {
+            document.querySelectorAll('tr[data-row]').forEach(row => {
+                const div = row.querySelector('.row-division');
+                const sec = row.querySelector('.row-section');
+                if (!div.value && sec.options.length <= 1) {
+                    populateSelect(sec, d.sections, 'name', '— pick section —');
+                }
+            });
+        });
+    }
+    if (defGrade) {
+        defGrade.addEventListener('change', preloadDefaultSections);
+        preloadDefaultSections();
+    }
+
+    // select-all toggle
+    const all = document.getElementById('select_all');
+    if (all) all.addEventListener('change', function () {
+        document.querySelectorAll('.row-check').forEach(c => c.checked = this.checked);
+    });
+})();
+</script>
+{% endblock %}

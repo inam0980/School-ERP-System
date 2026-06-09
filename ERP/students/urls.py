@@ -36,6 +36,13 @@ urlpatterns = [
     # Enrollment Contract (full admission contract — bilingual)
     path('regular/<int:pk>/enrollment-contract/',    views.enrollment_contract,    name='enrollment_contract'),
 
+    # Promotion (end-of-year)
+    path('promotion/',                       views.promotion_hub,          name='promotion_hub'),
+    path('promotion/bulk/',                  views.promotion_bulk,         name='promotion_bulk'),
+    path('regular/<int:pk>/promote/',        views.promotion_individual,   name='promotion_individual'),
+    path('promotion/ajax/grades/',           views.ajax_grades_for_division, name='ajax_grades_for_division'),
+    path('promotion/ajax/sections/',         views.ajax_sections_for_grade,  name='ajax_sections_for_grade'),
+
     # External Candidates
     path('external/',                        views.external_list,          name='external_list'),
     path('external/add/',                    views.external_add,           name='external_add'),
