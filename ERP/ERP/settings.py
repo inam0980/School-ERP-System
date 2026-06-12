@@ -10,10 +10,30 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+# ── Minimal .env loader (no external dependency) ─────────────────────────────
+# Reads KEY=VALUE lines from a .env file (repo root or BASE_DIR) into the
+# environment, without overwriting variables already set by the OS/server.
+def _load_dotenv():
+    for candidate in (BASE_DIR.parent / '.env', BASE_DIR / '.env'):
+        if not candidate.exists():
+            continue
+        for line in candidate.read_text(encoding='utf-8').splitlines():
+            line = line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, _, value = line.partition('=')
+            key, value = key.strip(), value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+        break
+
+_load_dotenv()
 
 
 # Quick-start development settings - unsuitable for production
@@ -165,3 +185,18 @@ CACHES = {
 # OpenAI (optional) — set to enable GPT-4o-mini summaries in AI features
 OPENAI_API_KEY = ''
 
+
+# ── Email (fee reminders etc.) ────────────────────────────────────────────────
+# Set EMAIL_HOST (+ credentials) in .env to send real email; without it,
+# emails are printed to the console (dev mode).
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+if EMAIL_HOST:
+    EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_PORT          = int(os.environ.get('EMAIL_PORT', '587'))
+    EMAIL_HOST_USER     = os.environ.get('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+    EMAIL_USE_TLS       = os.environ.get('EMAIL_USE_TLS', '1') == '1'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL', 'Al-Kawthar International School <no-reply@alkawthar.edu.sa>')

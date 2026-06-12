@@ -264,6 +264,24 @@
             </div>
         </div>
 
+        <!-- ── SECTION 3d: Fees / Billing Contact (reminders) ───────── -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-3.5 bg-emerald-700 text-white flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                <span class="text-sm font-semibold">Fees Contact (for reminders) / جهة اتصال الرسوم</span>
+            </div>
+            <div class="px-6 py-5">
+                <p class="text-xs text-slate-500 mb-4">
+                    Fee reminders (WhatsApp &amp; email) is contact par jaayenge. Khaali chhoda to system
+                    khud father → mother → guardian me se pehla available use karega.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {% include 'students/_field.html' with field=form.fees_contact_phone %}
+                    {% include 'students/_field.html' with field=form.fees_contact_email %}
+                </div>
+            </div>
+        </div>
+
         <!-- ── SECTION 4: Address ───────────────────────────────── -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <div class="px-6 py-3.5 bg-amber-600 text-white flex items-center gap-2">

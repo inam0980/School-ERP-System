@@ -315,6 +315,18 @@
             </div>
         </div>
 
+        <!-- Fees Contact Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-5 py-3 bg-emerald-50 border-b border-emerald-100 text-sm font-semibold text-emerald-700">Fees Contact (reminders)</div>
+            <div class="px-5 py-4 space-y-3">
+                {% include 'students/_detail_row.html' with label="Phone (used)" value=student.reminder_phone %}
+                {% include 'students/_detail_row.html' with label="Email (used)" value=student.reminder_email %}
+                {% if not student.fees_contact_phone and not student.fees_contact_email %}
+                <p class="text-xs text-slate-400">Auto-picked from parent/guardian (no dedicated fees contact set).</p>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- General Contact Card -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <div class="px-5 py-3 bg-teal-50 border-b border-teal-100 text-sm font-semibold text-teal-700">Emergency / General Contact</div>

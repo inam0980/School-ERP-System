@@ -43,6 +43,10 @@ urlpatterns = [
     path('outstanding/',                  views.outstanding_report,    name='outstanding'),
     path('unpaid-tuition/',               views.unpaid_tuition_report, name='unpaid_tuition'),
     path('sales/',                        views.sales_report,          name='sales_report'),
+    path('daily-collection/',             views.daily_collection_report, name='daily_collection'),
+    path('payments/<int:pk>/void/',       views.void_payment,          name='void_payment'),
+    path('payments/<int:pk>/refund/',     views.refund_payment,        name='refund_payment'),
+    path('defaulters/send-reminders/',    views.send_fee_reminders,    name='send_reminders'),
     path('defaulters/',                   views.defaulters_list,       name='defaulters'),
     path('ledger/<int:student_pk>/',      views.student_ledger,        name='student_ledger'),
 

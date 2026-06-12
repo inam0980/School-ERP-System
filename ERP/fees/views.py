@@ -20,7 +20,7 @@ from students.models import Student
 from core.models import AcademicYear, Division, Grade, Section
 from .models import (
     FeeType, FeeStructure, FeeStructureItem,
-    StudentFee, Payment, TaxInvoice, Salary,
+    StudentFee, Payment, Refund, TaxInvoice, Salary,
     TuitionFeeConfig, TuitionInstallment,
     PaymentPlan, PaymentPlanInstallment,
     ExternalCandidate, ExternalCandidatePayment,
@@ -2007,7 +2007,8 @@ def unpaid_tuition_report(request):
             'student', 'student__grade', 'student__division',
             'fee_structure__fee_type',
         )
-        .annotate(paid=Sum('payments__paid_amount'))
+        .annotate(paid=Sum('payments__paid_amount',
+                           filter=Q(payments__is_voided=False)))
     )
     if year:
         fees = fees.filter(fee_structure__structure__academic_year=year)
@@ -2136,6 +2137,7 @@ def sales_report(request):
         .filter(
             payment_date__range=(date_from, date_to),
             student_fee__fee_structure__fee_type__category__in=cats,
+            is_voided=False,
         )
         .select_related(
             'student_fee__student', 'student_fee__student__grade',
@@ -2205,6 +2207,284 @@ def sales_report(request):
 
 
 # ════════════════════════════════════════════════════════════════
+#  DAILY COLLECTION / CASHIER CLOSING REPORT
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def daily_collection_report(request):
+    """
+    End-of-day cashier closing: every payment taken on a date, broken down
+    by payment method and by collector, plus refunds and voided payments.
+    """
+    try:
+        report_date = date.fromisoformat(request.GET.get('date', ''))
+    except ValueError:
+        report_date = timezone.localdate()
+
+    all_payments = list(
+        Payment.objects.filter(payment_date=report_date)
+        .select_related(
+            'student_fee__student', 'student_fee__student__grade',
+            'student_fee__fee_structure__fee_type', 'collected_by', 'voided_by',
+        )
+        .order_by('pk')
+    )
+    payments = [p for p in all_payments if not p.is_voided]
+    voided   = [p for p in all_payments if p.is_voided]
+
+    refunds = list(
+        Refund.objects.filter(refund_date=report_date)
+        .select_related('payment__student_fee__student', 'refunded_by')
+        .order_by('pk')
+    )
+
+    # Breakdown by payment method
+    method_labels = dict(Payment.PAYMENT_METHODS)
+    by_method = {}
+    for p in payments:
+        m = by_method.setdefault(p.payment_method, {
+            'label': method_labels.get(p.payment_method, p.payment_method),
+            'count': 0, 'total': Decimal('0'),
+        })
+        m['count'] += 1
+        m['total'] += p.paid_amount
+
+    # Breakdown by collector
+    by_collector = {}
+    for p in payments:
+        name = getattr(p.collected_by, 'username', None) or '—'
+        cgrp = by_collector.setdefault(name, {'count': 0, 'total': Decimal('0')})
+        cgrp['count'] += 1
+        cgrp['total'] += p.paid_amount
+
+    total_collected = sum((p.paid_amount for p in payments), Decimal('0'))
+    total_refunded  = sum((r.amount for r in refunds), Decimal('0'))
+    total_voided    = sum((p.paid_amount for p in voided), Decimal('0'))
+    net_collected   = total_collected - total_refunded
+
+    # CSV export
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = f'attachment; filename="daily_collection_{report_date}.csv"'
+        response.write('\ufeff')
+        writer = csv.writer(response)
+        writer.writerow(['Receipt', 'Student ID', 'Student', 'Fee', 'Method',
+                         'Amount', 'Collected By', 'Status'])
+        for p in all_payments:
+            stu = p.student_fee.student
+            writer.writerow([
+                p.receipt_number, stu.student_id, stu.full_name,
+                p.student_fee.fee_structure.fee_type.name,
+                p.get_payment_method_display(), p.paid_amount,
+                getattr(p.collected_by, 'username', ''),
+                'VOIDED' if p.is_voided else 'OK',
+            ])
+        for r in refunds:
+            stu = r.payment.student_fee.student
+            writer.writerow([
+                r.refund_number, stu.student_id, stu.full_name,
+                r.reason, r.get_method_display(), -r.amount,
+                getattr(r.refunded_by, 'username', ''), 'REFUND',
+            ])
+        return response
+
+    return render(request, 'fees/daily_collection.html', {
+        'report_date':      report_date,
+        'payments':         payments,
+        'voided':           voided,
+        'refunds':          refunds,
+        'by_method':        by_method.values(),
+        'by_collector':     sorted(by_collector.items()),
+        'total_collected':  total_collected,
+        'total_refunded':   total_refunded,
+        'total_voided':     total_voided,
+        'net_collected':    net_collected,
+        'today':            timezone.localdate().isoformat(),
+    })
+
+
+# ════════════════════════════════════════════════════════════════
+#  VOID & REFUND PAYMENTS
+# ════════════════════════════════════════════════════════════════
+
+def _redirect_back(request, fallback='fees:daily_collection'):
+    nxt = request.POST.get('next', '')
+    if nxt.startswith('/'):
+        return redirect(nxt)
+    return redirect(fallback)
+
+
+@login_required
+@role_required(*_ADMIN)
+@require_POST
+def void_payment(request, pk):
+    """Cancel a mistaken payment, keeping it on record for audit."""
+    payment = get_object_or_404(
+        Payment.objects.select_related('student_fee', 'installment'), pk=pk)
+
+    if payment.is_voided:
+        messages.warning(request, f"{payment.receipt_number} is already voided.")
+        return _redirect_back(request)
+    if payment.refunds.exists():
+        messages.error(request, f"{payment.receipt_number} has refunds — it cannot be voided.")
+        return _redirect_back(request)
+
+    reason = request.POST.get('reason', '').strip()
+    if not reason:
+        messages.error(request, "A reason is required to void a payment.")
+        return _redirect_back(request)
+
+    payment.is_voided   = True
+    payment.voided_at   = timezone.now()
+    payment.voided_by   = request.user
+    payment.void_reason = reason
+    payment.save(update_fields=['is_voided', 'voided_at', 'voided_by', 'void_reason'])
+
+    # Roll back installment allocation if any
+    if payment.installment_id:
+        inst = payment.installment
+        inst.paid_amount = max(Decimal('0.00'), inst.paid_amount - payment.paid_amount)
+        inst.save(update_fields=['paid_amount'])
+        inst.refresh_status()
+
+    payment.student_fee.refresh_status()
+    messages.success(
+        request,
+        f"Payment {payment.receipt_number} (SAR {payment.paid_amount:.2f}) voided."
+    )
+    return _redirect_back(request)
+
+
+@login_required
+@role_required(*_ADMIN)
+@require_POST
+def refund_payment(request, pk):
+    """Return money against a payment (e.g. security deposit refund)."""
+    payment = get_object_or_404(
+        Payment.objects.select_related('student_fee', 'installment'), pk=pk)
+
+    if payment.is_voided:
+        messages.error(request, "Cannot refund a voided payment.")
+        return _redirect_back(request)
+
+    reason = request.POST.get('reason', '').strip()
+    try:
+        amount = Decimal(request.POST.get('amount', '').strip())
+    except Exception:
+        amount = Decimal('0')
+
+    refundable = payment.refundable_amount
+    if not reason:
+        messages.error(request, "A reason is required for a refund.")
+        return _redirect_back(request)
+    if amount <= 0 or amount > refundable:
+        messages.error(
+            request,
+            f"Refund must be between 0.01 and SAR {refundable:.2f} "
+            f"(amount still refundable on {payment.receipt_number})."
+        )
+        return _redirect_back(request)
+
+    refund = Refund.objects.create(
+        payment=payment, amount=amount, reason=reason,
+        method=request.POST.get('method', Payment.BANK),
+        refunded_by=request.user,
+    )
+
+    if payment.installment_id:
+        inst = payment.installment
+        inst.paid_amount = max(Decimal('0.00'), inst.paid_amount - amount)
+        inst.save(update_fields=['paid_amount'])
+        inst.refresh_status()
+
+    payment.student_fee.refresh_status()
+    messages.success(
+        request,
+        f"Refund {refund.refund_number} of SAR {amount:.2f} recorded "
+        f"against {payment.receipt_number}."
+    )
+    return _redirect_back(request)
+
+
+# ════════════════════════════════════════════════════════════════
+#  FEE REMINDERS  (email defaulters' parents)
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+@require_POST
+def send_fee_reminders(request):
+    """
+    Email a fee reminder to every defaulter's parent (father → mother →
+    guardian email, first available). Uses the same filters as the
+    defaulters list (passed as hidden fields).
+    """
+    from django.core.mail import send_mail
+    from django.conf import settings as dj_settings
+
+    as_of_str  = request.POST.get('as_of_date', '')
+    grade_id   = request.POST.get('grade', '')
+    div_id     = request.POST.get('division', '')
+    try:
+        as_of = date.fromisoformat(as_of_str)
+    except ValueError:
+        as_of = timezone.localdate()
+
+    fees = StudentFee.objects.filter(due_date__lte=as_of).exclude(
+        status__in=['PAID', 'WAIVED'],
+    ).select_related('student', 'student__grade', 'fee_structure__fee_type')
+    if grade_id:
+        fees = fees.filter(student__grade_id=grade_id)
+    if div_id:
+        fees = fees.filter(student__division_id=div_id)
+
+    # Group balances per student
+    per_student = {}
+    for f in fees:
+        bal = f.balance
+        if bal <= 0:
+            continue
+        entry = per_student.setdefault(f.student, {'total': Decimal('0'), 'lines': []})
+        entry['total'] += bal
+        entry['lines'].append(f"  - {f.fee_structure.fee_type.name}: SAR {bal:.2f} (due {f.due_date:%d %b %Y})")
+
+    sent = skipped = failed = 0
+    for stu, info in per_student.items():
+        email = stu.reminder_email()
+        if not email:
+            skipped += 1
+            continue
+        body = (
+            f"Dear Parent,\n\n"
+            f"This is a kind reminder from Al-Kawthar International School.\n"
+            f"The following fees for {stu.full_name} ({stu.grade.name}) are outstanding:\n\n"
+            + "\n".join(info['lines']) +
+            f"\n\nTotal outstanding: SAR {info['total']:.2f}\n\n"
+            f"Kindly arrange payment at your earliest convenience.\n"
+            f"If you have already paid, please ignore this message.\n\n"
+            f"Accounts Department\nAl-Kawthar International School"
+        )
+        try:
+            send_mail(
+                subject=f"Fee Reminder — {stu.full_name} — SAR {info['total']:.2f} outstanding",
+                message=body,
+                from_email=dj_settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                fail_silently=False,
+            )
+            sent += 1
+        except Exception:
+            failed += 1
+
+    msg = f"Reminders: {sent} email(s) sent, {skipped} skipped (no parent email on file)."
+    if failed:
+        msg += f" {failed} failed — check EMAIL_HOST settings in the environment."
+    (messages.success if sent else messages.warning)(request, msg)
+    return redirect(f"/fees/defaulters/?as_of_date={as_of}&grade={grade_id}&division={div_id}")
+
+
+# ════════════════════════════════════════════════════════════════
 #  STUDENT LEDGER
 # ════════════════════════════════════════════════════════════════
 
@@ -2266,14 +2546,31 @@ def defaulters_list(request):
     if division_f:
         fees = fees.filter(student__division=division_f)
 
-    fees = fees.order_by('due_date', 'student__full_name')
+    fees_qs = fees.order_by('due_date', 'student__full_name')
+    total_overdue = fees_qs.aggregate(s=Sum('net_amount'))['s'] or 0
+    fees = list(fees_qs)
 
     # Mark overdue on the fly
     pks_to_mark = [f.pk for f in fees if f.status != 'OVERDUE']
     if pks_to_mark:
         StudentFee.objects.filter(pk__in=pks_to_mark).update(status='OVERDUE')
 
-    total_overdue = fees.aggregate(s=Sum('net_amount'))['s'] or 0
+    # WhatsApp click-to-chat link per row (fees contact → father → mother → guardian)
+    from urllib.parse import quote as _q
+    for f in fees:
+        raw = f.student.reminder_phone()
+        digits = ''.join(ch for ch in raw if ch.isdigit())
+        if digits.startswith('0'):
+            digits = '966' + digits.lstrip('0')
+        elif digits and not digits.startswith('966'):
+            digits = '966' + digits
+        f.wa_phone = digits
+        f.wa_text = _q(
+            f"Dear Parent, kind reminder from Al-Kawthar International School: "
+            f"{f.student.full_name} ({f.student.grade.name}) has an outstanding fee "
+            f"of SAR {f.balance:.2f} ({f.fee_structure.fee_type.name}, due {f.due_date:%d %b %Y}). "
+            f"Kindly arrange payment. Thank you."
+        )
 
     if request.GET.get('export') == 'csv':
         response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
@@ -2525,15 +2822,16 @@ def fees_dashboard(request):
     year   = AcademicYear.objects.filter(is_current=True).first()
 
     overdue_count  = StudentFee.objects.filter(status='OVERDUE').count()
-    paid_today     = Payment.objects.filter(payment_date=today).aggregate(
+    live_payments  = Payment.objects.filter(is_voided=False)
+    paid_today     = live_payments.filter(payment_date=today).aggregate(
         s=Sum('paid_amount'))['s'] or 0
-    paid_month     = Payment.objects.filter(
+    paid_month     = live_payments.filter(
         payment_date__year=today.year,
         payment_date__month=today.month,
     ).aggregate(s=Sum('paid_amount'))['s'] or 0
 
     total_assigned = StudentFee.objects.aggregate(s=Sum('net_amount'))['s'] or 0
-    total_collected = Payment.objects.aggregate(s=Sum('paid_amount'))['s'] or 0
+    total_collected = live_payments.aggregate(s=Sum('paid_amount'))['s'] or 0
 
     recent_payments = Payment.objects.select_related(
         'student_fee__student', 'student_fee__fee_structure__fee_type',
@@ -2557,6 +2855,7 @@ def fees_dashboard(request):
             ('Outstanding Report',    '/fees/outstanding/',         '📋', 'slate'),
             ('Unpaid Tuition Report', '/fees/unpaid-tuition/',      '💳', 'slate'),
             ('Sales Report',          '/fees/sales/',               '🛍️', 'slate'),
+            ('Daily Collection',      '/fees/daily-collection/',    '💰', 'slate'),
             ('Defaulters List',       '/fees/defaulters/',          '⚠️',  'red'),
             ('All Tax Invoices',      '/fees/invoices/',            '📄', 'slate'),
             ('Payroll',               '/fees/payroll/',             '💼', 'slate'),

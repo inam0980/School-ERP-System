@@ -132,6 +132,26 @@ class Student(models.Model):
     guardian_email  = models.EmailField(blank=True, verbose_name="Guardian Email / بريد ولي الأمر")
     guardian_phone2 = models.CharField(max_length=20, blank=True, verbose_name="Alt. Phone / هاتف بديل")
 
+    # ── Fees / billing contact (used for fee reminders: WhatsApp & email) ──
+    fees_contact_phone = models.CharField(
+        max_length=20, blank=True,
+        verbose_name="Fees Contact Phone / هاتف للرسوم",
+        help_text="Phone used for fee reminders (WhatsApp). Leave blank to use father → mother → guardian.")
+    fees_contact_email = models.EmailField(
+        blank=True,
+        verbose_name="Fees Contact Email / بريد للرسوم",
+        help_text="Email used for fee reminders. Leave blank to use father → mother → guardian.")
+
+    def reminder_phone(self):
+        """Phone for fee reminders: explicit fees contact, else father→mother→guardian."""
+        return (self.fees_contact_phone or self.father_mobile
+                or self.mother_mobile or self.guardian_phone or '').strip()
+
+    def reminder_email(self):
+        """Email for fee reminders: explicit fees contact, else father→mother→guardian."""
+        return (self.fees_contact_email or self.father_email
+                or self.mother_email or self.guardian_email or '').strip()
+
     # ── Address ───────────────────────────────────────────────────────
     address         = models.TextField(blank=True, verbose_name="Address / العنوان")
     arabic_address  = models.TextField(blank=True, verbose_name="العنوان (عربي)")

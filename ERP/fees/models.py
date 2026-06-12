@@ -226,7 +226,13 @@ class StudentFee(models.Model):
 
     @property
     def amount_paid(self):
-        return self.payments.aggregate(s=models.Sum('paid_amount'))['s'] or Decimal('0.00')
+        """Net collected: live payments minus refunds (voided payments excluded)."""
+        paid = self.payments.filter(is_voided=False).aggregate(
+            s=models.Sum('paid_amount'))['s'] or Decimal('0.00')
+        refunded = Refund.objects.filter(
+            payment__student_fee=self, payment__is_voided=False,
+        ).aggregate(s=models.Sum('amount'))['s'] or Decimal('0.00')
+        return paid - refunded
 
     @property
     def balance(self):
@@ -274,6 +280,12 @@ class Payment(models.Model):
         help_text='Set if this payment is allocated to a specific installment.'
     )
     paid_amount    = models.DecimalField(max_digits=10, decimal_places=2)
+    # ── Void (cancel a mistaken payment, keeping the audit trail) ──
+    is_voided      = models.BooleanField(default=False)
+    voided_at      = models.DateTimeField(null=True, blank=True)
+    voided_by      = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                       null=True, blank=True, related_name='payments_voided')
+    void_reason    = models.CharField(max_length=300, blank=True)
     payment_date   = models.DateField(default=timezone.localdate)
     payment_method = models.CharField(max_length=15, choices=PAYMENT_METHODS, default=CREDIT_CARD)
     receipt_number = models.CharField(max_length=30, unique=True,
@@ -301,6 +313,45 @@ class Payment(models.Model):
         super().save(*args, **kwargs)
         # Update parent StudentFee status after every payment
         self.student_fee.refresh_status()
+
+    @property
+    def refunded_amount(self):
+        return self.refunds.aggregate(s=models.Sum('amount'))['s'] or Decimal('0.00')
+
+    @property
+    def refundable_amount(self):
+        if self.is_voided:
+            return Decimal('0.00')
+        return self.paid_amount - self.refunded_amount
+
+
+# ════════════════════════════════════════════════════════════════
+#  REFUND  (money returned against a payment — e.g. security deposit)
+# ════════════════════════════════════════════════════════════════
+
+def _refund_number():
+    return "RFD-" + str(uuid.uuid4().int)[:8].upper()
+
+
+class Refund(models.Model):
+    payment       = models.ForeignKey(Payment, on_delete=models.PROTECT,
+                                      related_name='refunds')
+    refund_number = models.CharField(max_length=30, unique=True,
+                                     default=_refund_number, editable=False)
+    amount        = models.DecimalField(max_digits=10, decimal_places=2)
+    refund_date   = models.DateField(default=timezone.localdate)
+    method        = models.CharField(max_length=15, choices=Payment.PAYMENT_METHODS,
+                                     default=Payment.BANK)
+    reason        = models.CharField(max_length=300)
+    refunded_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                      null=True, blank=True, related_name='refunds_made')
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-refund_date', '-id']
+
+    def __str__(self):
+        return f"{self.refund_number} — SAR {self.amount} (against {self.payment.receipt_number})"
 
 
 # ════════════════════════════════════════════════════════════════

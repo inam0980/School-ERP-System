@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Daily Collection — Al-Kawthar{% endblock %}
+
+{% block content %}
+<style>
+  @media print {
+    .no-print, nav, aside, header { display: none !important; }
+    .print-area { box-shadow: none !important; }
+  }
+</style>
+
+<div class="flex items-center justify-between mb-6 no-print">
+    <div class="flex items-center gap-3">
+        <a href="{% url 'fees:dashboard' %}" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition" title="Back to Finance">
+            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-primary">💰 Daily Collection Report</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Cashier closing — {{ report_date|date:"l, d F Y" }}</p>
+        </div>
+    </div>
+    <div class="flex gap-2 items-end">
+        <form method="get" class="flex gap-2 items-end">
+            <div>
+                <label class="block text-xs font-medium text-slate-500 mb-1">Date</label>
+                <input type="date" name="date" value="{{ report_date|date:'Y-m-d' }}" max="{{ today }}"
+                       class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+            <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-light transition">Go</button>
+        </form>
+        <button onclick="window.print()" class="border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition font-medium">🖨 Print</button>
+        <a href="?date={{ report_date|date:'Y-m-d' }}&export=csv"
+           class="border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition font-medium">📥 CSV</a>
+    </div>
+</div>
+
+<!-- Summary cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 print-area">
+    <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Receipts</p>
+        <p class="text-xl font-bold text-slate-700">{{ payments|length }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Collected</p>
+        <p class="text-xl font-bold text-slate-700">SAR {{ total_collected|money }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <p class="text-xs text-red-400 uppercase tracking-wide mb-1">Refunded</p>
+        <p class="text-xl font-bold text-red-600">− SAR {{ total_refunded|money }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-green-200 px-5 py-4 bg-green-50/50">
+        <p class="text-xs text-green-600 uppercase tracking-wide mb-1">Net Cash-In (Closing)</p>
+        <p class="text-xl font-bold text-green-700">SAR {{ net_collected|money }}</p>
+    </div>
+</div>
+
+<div class="grid md:grid-cols-2 gap-4 mb-6 print-area">
+    <!-- By payment method -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-100"><h2 class="font-semibold text-slate-700">By Payment Method</h2></div>
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+                <tr><th class="px-4 py-2 text-left">Method</th><th class="px-4 py-2 text-center">Count</th><th class="px-4 py-2 text-right">Total (SAR)</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for m in by_method %}
+                <tr><td class="px-4 py-2.5">{{ m.label }}</td><td class="px-4 py-2.5 text-center">{{ m.count }}</td><td class="px-4 py-2.5 text-right font-semibold">{{ m.total|money }}</td></tr>
+                {% empty %}
+                <tr><td colspan="3" class="px-4 py-6 text-center text-slate-400 italic">No collections.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <!-- By collector -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-100"><h2 class="font-semibold text-slate-700">By Collector (Cashier)</h2></div>
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+                <tr><th class="px-4 py-2 text-left">User</th><th class="px-4 py-2 text-center">Receipts</th><th class="px-4 py-2 text-right">Total (SAR)</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for name, c in by_collector %}
+                <tr><td class="px-4 py-2.5 font-medium">{{ name }}</td><td class="px-4 py-2.5 text-center">{{ c.count }}</td><td class="px-4 py-2.5 text-right font-semibold">{{ c.total|money }}</td></tr>
+                {% empty %}
+                <tr><td colspan="3" class="px-4 py-6 text-center text-slate-400 italic">No collections.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Transactions -->
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto mb-6 print-area">
+    <div class="px-5 py-3 border-b border-slate-100"><h2 class="font-semibold text-slate-700">Payments ({{ payments|length }})</h2></div>
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wide">
+            <tr>
+                <th class="px-4 py-3 text-left">Receipt</th>
+                <th class="px-4 py-3 text-left">Student</th>
+                <th class="px-4 py-3 text-left">Fee</th>
+                <th class="px-4 py-3 text-left">Method</th>
+                <th class="px-4 py-3 text-right">Amount</th>
+                <th class="px-4 py-3 text-left">By</th>
+                <th class="px-4 py-3 text-center no-print">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for p in payments %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-2.5"><a href="{% url 'fees:receipt_print' p.pk %}" class="text-primary hover:underline font-mono text-xs">{{ p.receipt_number }}</a></td>
+                <td class="px-4 py-2.5">
+                    <span class="font-medium text-slate-700">{{ p.student_fee.student.full_name }}</span>
+                    <span class="text-xs text-slate-400 block">{{ p.student_fee.student.grade.name }}</span>
+                </td>
+                <td class="px-4 py-2.5">{{ p.student_fee.fee_structure.fee_type.name }}</td>
+                <td class="px-4 py-2.5 text-xs text-slate-500">{{ p.get_payment_method_display }}</td>
+                <td class="px-4 py-2.5 text-right font-semibold text-green-700">{{ p.paid_amount|money }}</td>
+                <td class="px-4 py-2.5 text-xs text-slate-500">{{ p.collected_by.username|default:"—" }}</td>
+                <td class="px-4 py-2.5 text-center no-print">
+                    {% if p.refunded_amount %}
+                    <span class="text-xs text-orange-600 font-semibold block mb-1">Refunded SAR {{ p.refunded_amount|money }}</span>
+                    {% endif %}
+                    <button onclick="voidPayment({{ p.pk }}, '{{ p.receipt_number }}')"
+                            class="text-xs text-red-600 hover:underline mr-2">Void</button>
+                    <button onclick="refundPayment({{ p.pk }}, '{{ p.receipt_number }}', '{{ p.refundable_amount }}')"
+                            class="text-xs text-orange-600 hover:underline">Refund</button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="px-4 py-8 text-center text-slate-400 italic">No payments on this date.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Refunds -->
+{% if refunds %}
+<div class="bg-white rounded-xl shadow-sm border border-orange-200 overflow-x-auto mb-6 print-area">
+    <div class="px-5 py-3 border-b border-orange-100 bg-orange-50/60"><h2 class="font-semibold text-orange-700">Refunds ({{ refunds|length }})</h2></div>
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+            <tr>
+                <th class="px-4 py-2 text-left">Refund No</th>
+                <th class="px-4 py-2 text-left">Against Receipt</th>
+                <th class="px-4 py-2 text-left">Student</th>
+                <th class="px-4 py-2 text-left">Reason</th>
+                <th class="px-4 py-2 text-right">Amount</th>
+                <th class="px-4 py-2 text-left">By</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for r in refunds %}
+            <tr>
+                <td class="px-4 py-2.5 font-mono text-xs">{{ r.refund_number }}</td>
+                <td class="px-4 py-2.5 font-mono text-xs">{{ r.payment.receipt_number }}</td>
+                <td class="px-4 py-2.5">{{ r.payment.student_fee.student.full_name }}</td>
+                <td class="px-4 py-2.5 text-xs text-slate-500">{{ r.reason }}</td>
+                <td class="px-4 py-2.5 text-right font-semibold text-orange-700">− {{ r.amount|money }}</td>
+                <td class="px-4 py-2.5 text-xs text-slate-500">{{ r.refunded_by.username|default:"—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Voided -->
+{% if voided %}
+<div class="bg-white rounded-xl shadow-sm border border-red-200 overflow-x-auto print-area">
+    <div class="px-5 py-3 border-b border-red-100 bg-red-50/60"><h2 class="font-semibold text-red-700">Voided Payments ({{ voided|length }}) — excluded from totals</h2></div>
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+            <tr>
+                <th class="px-4 py-2 text-left">Receipt</th>
+                <th class="px-4 py-2 text-left">Student</th>
+                <th class="px-4 py-2 text-right">Amount</th>
+                <th class="px-4 py-2 text-left">Voided By</th>
+                <th class="px-4 py-2 text-left">Reason</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for p in voided %}
+            <tr class="text-slate-400">
+                <td class="px-4 py-2.5 font-mono text-xs line-through">{{ p.receipt_number }}</td>
+                <td class="px-4 py-2.5">{{ p.student_fee.student.full_name }}</td>
+                <td class="px-4 py-2.5 text-right line-through">{{ p.paid_amount|money }}</td>
+                <td class="px-4 py-2.5 text-xs">{{ p.voided_by.username|default:"—" }} · {{ p.voided_at|date:"d M H:i" }}</td>
+                <td class="px-4 py-2.5 text-xs">{{ p.void_reason }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Hidden action form -->
+<form id="actionForm" method="post" class="hidden">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <input type="hidden" name="reason" id="actReason">
+    <input type="hidden" name="amount" id="actAmount">
+</form>
+
+<script>
+function voidPayment(pk, receipt) {
+    const reason = prompt(`VOID payment ${receipt}?\n\nThis cancels the payment (kept on record for audit).\nEnter the reason:`);
+    if (!reason || !reason.trim()) return;
+    const f = document.getElementById('actionForm');
+    document.getElementById('actReason').value = reason.trim();
+    f.action = `/fees/payments/${pk}/void/`;
+    f.submit();
+}
+function refundPayment(pk, receipt, refundable) {
+    const amount = prompt(`REFUND against ${receipt}\n\nRefundable: SAR ${refundable}\nEnter refund amount:`, refundable);
+    if (!amount) return;
+    const reason = prompt('Reason for refund (e.g. Security deposit return):');
+    if (!reason || !reason.trim()) return;
+    const f = document.getElementById('actionForm');
+    document.getElementById('actAmount').value = amount.trim();
+    document.getElementById('actReason').value = reason.trim();
+    f.action = `/fees/payments/${pk}/refund/`;
+    f.submit();
+}
+</script>
+{% endblock %}

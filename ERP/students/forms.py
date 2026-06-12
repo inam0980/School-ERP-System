@@ -100,6 +100,8 @@ class StudentForm(forms.ModelForm):
             'mother_home_address', 'mother_employed_at_school', 'mother_school_job',
             # Legacy contact
             'guardian_phone', 'guardian_phone2', 'guardian_email',
+            # Fees / billing contact (reminders)
+            'fees_contact_phone', 'fees_contact_email',
             # Address
             'address', 'arabic_address',
             # Status
