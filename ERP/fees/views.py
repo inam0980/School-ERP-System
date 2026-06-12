@@ -39,6 +39,59 @@ _ADMIN       = ('SUPER_ADMIN', 'ADMIN')
 _ACCOUNTANT  = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT')
 _STAFF_VIEW  = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'STAFF')
 
+# Legacy tuition payment fee-type names (pre-rename), in payment order.
+# Migration 0037 re-points existing data to the semester-based names below.
+LEGACY_INST_NAMES = ['1st Installment', '2nd Installment', '3rd Installment', '4th Installment']
+
+_ORDINALS = ['1st', '2nd', '3rd', '4th']
+
+
+def semester_payment_names(n):
+    """
+    Fee-type names for n tuition payments. The first ceil(n/2) payments fall
+    under Semester 1, the rest under Semester 2. When a semester holds more
+    than one payment, the installment number is embedded in the name, e.g.
+      2 → ['1st Semester', '2nd Semester']
+      3 → ['1st Semester - 1st Installment',
+           '1st Semester - 2nd Installment',
+           '2nd Semester']
+    """
+    cap = (n + 1) // 2
+    names = []
+    for i in range(n):
+        sem, k, size = ('1st', i, cap) if i < cap else ('2nd', i - cap, n - cap)
+        names.append(f'{sem} Semester' if size == 1
+                     else f'{sem} Semester - {_ORDINALS[k]} Installment')
+    return names
+
+
+def is_semester_fee_name(name):
+    """True if a fee-type name is a tuition semester payment (new or legacy)."""
+    return (name.startswith('1st Semester') or name.startswith('2nd Semester')
+            or name in LEGACY_INST_NAMES)
+
+
+def split_semester_fees(fees, name_of=lambda f: f.fee_structure.fee_type.name):
+    """
+    Split tuition payment fees into (sem1, sem2) lists. New-style names encode
+    their semester; legacy 'Nth Installment' names fall back to the half-half
+    rule (first ceil(N/2) → Semester 1). Non-tuition fees are ignored.
+    """
+    sem1, sem2, legacy = [], [], []
+    for f in fees:
+        n = name_of(f)
+        if n.startswith('1st Semester'):
+            sem1.append(f)
+        elif n.startswith('2nd Semester'):
+            sem2.append(f)
+        elif n in LEGACY_INST_NAMES:
+            legacy.append(f)
+    sem1.sort(key=name_of)
+    sem2.sort(key=name_of)
+    legacy.sort(key=lambda f: LEGACY_INST_NAMES.index(name_of(f)))
+    cap = (len(legacy) + 1) // 2
+    return sem1 + legacy[:cap], sem2 + legacy[cap:]
+
 
 def _grades_by_division():
     """Return list of (division, [grade, ...]) ordered for optgroup display."""
@@ -593,23 +646,28 @@ def fee_structure_form(request, pk=None):
                                 structure=structure, fee_type=ft_res,
                                 defaults={'amount': down},
                             )
-                        ft_i1 = _get_fee_type(FeeType.OTHER, '1st Installment')
-                        FeeStructureItem.objects.update_or_create(
-                            structure=structure, fee_type=ft_i1,
-                            defaults={'amount': inst1},
-                        )
-                        if inst2 > 0:
-                            ft_i2 = _get_fee_type(FeeType.OTHER, '2nd Installment')
+                        # Semester payments: first half → Semester 1 (with
+                        # installment no. when more than one), rest → Semester 2.
+                        payments  = [a for a in (inst1, inst2, inst3) if a > 0]
+                        pay_names = semester_payment_names(len(payments))
+                        for nm, amt in zip(pay_names, payments):
+                            ft = _get_fee_type(FeeType.OTHER, nm)
                             FeeStructureItem.objects.update_or_create(
-                                structure=structure, fee_type=ft_i2,
-                                defaults={'amount': inst2},
+                                structure=structure, fee_type=ft,
+                                defaults={'amount': amt},
                             )
-                        if inst3 > 0:
-                            ft_i3 = _get_fee_type(FeeType.OTHER, '3rd Installment')
-                            FeeStructureItem.objects.update_or_create(
-                                structure=structure, fee_type=ft_i3,
-                                defaults={'amount': inst3},
-                            )
+                        # Remove stale semester/installment items from a
+                        # previous save with a different payment count.
+                        stale = [
+                            it for it in structure.items.select_related('fee_type')
+                            if is_semester_fee_name(it.fee_type.name)
+                            and it.fee_type.name not in pay_names
+                        ]
+                        for it in stale:
+                            try:
+                                it.delete()
+                            except ProtectedError:
+                                pass   # already has student fees → keep it
                         created_count += 1
                     except Exception as exc:
                         messages.error(request, f'Error saving {grade.name}: {exc}')
@@ -692,10 +750,11 @@ def fee_structure_form(request, pk=None):
             # Derive installments_count from items
             max_inst = 0
             for s in bundle_qs:
-                for it in s.items.all():
-                    if it.fee_type.name == '1st Installment' and it.amount > 0: max_inst = max(max_inst, 1)
-                    if it.fee_type.name == '2nd Installment' and it.amount > 0: max_inst = max(max_inst, 2)
-                    if it.fee_type.name == '3rd Installment' and it.amount > 0: max_inst = max(max_inst, 3)
+                cnt = sum(
+                    1 for it in s.items.all()
+                    if it.amount > 0 and is_semester_fee_name(it.fee_type.name)
+                )
+                max_inst = max(max_inst, cnt)
             # +1 because UI installments_count includes the down-payment row
             if max_inst > 0:
                 prefill_post_data['installments_count'] = str(max_inst + 1)
@@ -1345,31 +1404,14 @@ def fee_collection(request):
             )
 
         # ── Group dues into Semester 1 / Semester 2 / Other ─────────
-        INST_NAMES = ['1st Installment', '2nd Installment', '3rd Installment', '4th Installment']
-        installments_in_dues = sorted(
-            [d for d in dues if d.fee_structure.fee_type.name in INST_NAMES],
-            key=lambda d: INST_NAMES.index(d.fee_structure.fee_type.name),
-        )
-        n_inst   = len(installments_in_dues)
-        sem1_cap = (n_inst + 1) // 2   # ceil(N/2) → first half goes to Sem 1
+        sem1_fees, sem2_fees = split_semester_fees(dues)
 
-        sem1_fees  = []
-        sem2_fees  = []
-        other_fees = []
-        inst_seen  = 0
-        for d in dues:
-            ft_name = d.fee_structure.fee_type.name
-            ft_cat  = d.fee_structure.fee_type.category
-            if ft_cat == 'RESERVATION':   # Reservation / Down Payment → Sem 1
-                sem1_fees.append(d)
-            elif ft_name in INST_NAMES:
-                if inst_seen < sem1_cap:
-                    sem1_fees.append(d)
-                else:
-                    sem2_fees.append(d)
-                inst_seen += 1
-            else:
-                other_fees.append(d)
+        reservations = [d for d in dues
+                        if d.fee_structure.fee_type.category == 'RESERVATION']
+        sem1_fees = reservations + sem1_fees   # Reservation / Down Payment → Sem 1
+
+        in_semesters = set(id(d) for d in sem1_fees + sem2_fees)
+        other_fees   = [d for d in dues if id(d) not in in_semesters]
 
         # Per-semester subtotals
         sem1_balance = sum((d.balance for d in sem1_fees), Decimal('0'))
@@ -1924,6 +1966,245 @@ def _export_outstanding_csv(qs):
 
 
 # ════════════════════════════════════════════════════════════════
+#  UNPAID TUITION REPORT  (one row per student: tuition / paid / unpaid)
+# ════════════════════════════════════════════════════════════════
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def unpaid_tuition_report(request):
+    """
+    Crystal-report style summary: one row per active student with their
+    total tuition (reservation + installments), paid amount and unpaid
+    balance, plus father/mother contact info.
+
+    Filters: school year, semester (1 / 2 / all), division, grade,
+    and an "unpaid only" toggle.
+    """
+    year_id     = request.GET.get('year', '')
+    semester    = request.GET.get('semester', '')        # '', '1', '2'
+    div_id      = request.GET.get('division', '')
+    grade_id    = request.GET.get('grade', '')
+    unpaid_only = request.GET.get('unpaid_only', '') == '1'
+
+    years = AcademicYear.objects.all()
+    year  = None
+    if year_id:
+        year = AcademicYear.objects.filter(pk=year_id).first()
+    if year is None:
+        year = AcademicYear.objects.filter(is_current=True).first()
+
+    fees = (
+        StudentFee.objects
+        .filter(
+            Q(fee_structure__fee_type__name__startswith='1st Semester') |
+            Q(fee_structure__fee_type__name__startswith='2nd Semester') |
+            Q(fee_structure__fee_type__name__in=LEGACY_INST_NAMES) |
+            Q(fee_structure__fee_type__category=FeeType.RESERVATION),
+            student__is_active=True,
+        )
+        .exclude(status=StudentFee.WAIVED)
+        .select_related(
+            'student', 'student__grade', 'student__division',
+            'fee_structure__fee_type',
+        )
+        .annotate(paid=Sum('payments__paid_amount'))
+    )
+    if year:
+        fees = fees.filter(fee_structure__structure__academic_year=year)
+    if div_id:
+        fees = fees.filter(student__division_id=div_id)
+    if grade_id:
+        fees = fees.filter(student__grade_id=grade_id)
+
+    # Group fees per student
+    by_student = {}
+    for f in fees:
+        by_student.setdefault(f.student, []).append(f)
+
+    rows = []
+    for stu, stu_fees in by_student.items():
+        # Same semester split as fee_collection: reservation → Sem 1,
+        # payments by name (legacy names: first ceil(N/2) → Sem 1).
+        sem1, sem2 = split_semester_fees(stu_fees)
+        sem1 = [f for f in stu_fees
+                if f.fee_structure.fee_type.category == FeeType.RESERVATION] + sem1
+
+        selected = sem1 if semester == '1' else sem2 if semester == '2' else stu_fees
+        if not selected:
+            continue
+
+        tuition = sum((f.net_amount for f in selected), Decimal('0'))
+        paid    = sum((f.paid or Decimal('0') for f in selected), Decimal('0'))
+        unpaid  = tuition - paid
+        if unpaid_only and unpaid <= 0:
+            continue
+
+        rows.append({
+            'student': stu,
+            'id_number': stu.national_id or stu.iqama_number or stu.passport_number or '',
+            'tuition': tuition,
+            'paid':    paid,
+            'unpaid':  unpaid,
+        })
+
+    rows.sort(key=lambda r: (
+        r['student'].division_id or 0,
+        getattr(r['student'].grade, 'order', 0) or 0,
+        r['student'].grade.name,
+        r['student'].full_name,
+    ))
+
+    total_tuition = sum((r['tuition'] for r in rows), Decimal('0'))
+    total_paid    = sum((r['paid']    for r in rows), Decimal('0'))
+    total_unpaid  = sum((r['unpaid']  for r in rows), Decimal('0'))
+
+    grade_obj = Grade.objects.filter(pk=grade_id).first() if grade_id else None
+    div_obj   = Division.objects.filter(pk=div_id).first() if div_id else None
+
+    # CSV export
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = 'attachment; filename="unpaid_tuition_report.csv"'
+        response.write('\ufeff')
+        writer = csv.writer(response)
+        writer.writerow(['#', 'ID/IQAMA', 'Student Name', 'Grade', 'Division', 'Semester',
+                         'Father Contact #', 'Father Email', 'Mother Contact #',
+                         'Tuition Amount', 'Paid Amount', 'Unpaid Amount'])
+        for i, r in enumerate(rows, 1):
+            stu = r['student']
+            writer.writerow([
+                i, r['id_number'], stu.full_name, stu.grade.name, stu.division.name,
+                semester or 'ALL',
+                stu.father_mobile, stu.father_email, stu.mother_mobile,
+                r['tuition'], r['paid'], r['unpaid'],
+            ])
+        return response
+
+    return render(request, 'fees/unpaid_tuition_report.html', {
+        'rows':           rows,
+        'years':          years,
+        'year':           year,
+        'semester':       semester,
+        'division':       div_obj,
+        'grade':          grade_obj,
+        'unpaid_only':    unpaid_only,
+        'all_divisions':  Division.objects.filter(is_active=True).order_by('name'),
+        'all_grades':     Grade.objects.select_related('division').order_by('division__name', 'order', 'name'),
+        'total_tuition':  total_tuition,
+        'total_paid':     total_paid,
+        'total_unpaid':   total_unpaid,
+        'now':            timezone.localtime(),
+    })
+
+
+# ════════════════════════════════════════════════════════════════
+#  SALES REPORT  (items sold to students: uniform, books, ID cards…)
+# ════════════════════════════════════════════════════════════════
+
+# Categories treated as "item sales" by default in the sales report.
+SALES_CATEGORIES = [FeeType.UNIFORM, FeeType.BOOKS, FeeType.ID_CARD]
+
+
+@login_required
+@role_required(*_ACCOUNTANT)
+def sales_report(request):
+    """
+    Sales of physical items charged through the normal fee pipeline
+    (ad-hoc charge → StudentFee → Payment). Shows per-item quantity sold
+    and amounts collected, plus the individual transactions.
+
+    Filters: date range (defaults to current month) and category
+    (defaults to Uniform + Books + ID Card).
+    """
+    today = timezone.localdate()
+
+    def _parse_date(key, default):
+        try:
+            return date.fromisoformat(request.GET.get(key, ''))
+        except ValueError:
+            return default
+
+    date_from = _parse_date('from', today.replace(day=1))
+    date_to   = _parse_date('to',   today)
+    category  = request.GET.get('cat', '')          # '' → default sales set
+
+    valid_cats = dict(FeeType.FEE_CATEGORIES)
+    cats = [category] if category in valid_cats else SALES_CATEGORIES
+
+    payments = list(
+        Payment.objects
+        .filter(
+            payment_date__range=(date_from, date_to),
+            student_fee__fee_structure__fee_type__category__in=cats,
+        )
+        .select_related(
+            'student_fee__student', 'student_fee__student__grade',
+            'student_fee__fee_structure__fee_type', 'collected_by',
+        )
+        .order_by('-payment_date', '-pk')
+    )
+
+    # Per-payment VAT split + per-item summary
+    summary = {}
+    total_paid = total_net = total_vat = Decimal('0')
+    for p in payments:
+        ft   = p.student_fee.fee_structure.fee_type
+        rate = ft.vat_rate_for(p.student_fee.student.is_saudi)
+        paid = p.paid_amount
+        net  = (paid / (1 + rate)).quantize(Decimal('0.01')) if rate else paid
+        vat  = paid - net
+        p.net_part, p.vat_part = net, vat
+
+        s = summary.setdefault(ft.pk, {
+            'name': ft.name,
+            'category': ft.get_category_display(),
+            'qty': 0, 'net': Decimal('0'), 'vat': Decimal('0'), 'paid': Decimal('0'),
+        })
+        s['qty']  += 1
+        s['net']  += net
+        s['vat']  += vat
+        s['paid'] += paid
+        total_paid += paid
+        total_net  += net
+        total_vat  += vat
+
+    summary_rows = sorted(summary.values(), key=lambda s: (-s['paid'], s['name']))
+
+    # CSV export (transaction detail)
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = 'attachment; filename="sales_report.csv"'
+        response.write('\ufeff')
+        writer = csv.writer(response)
+        writer.writerow(['Date', 'Receipt No', 'Student ID', 'Student', 'Grade',
+                         'Item', 'Category', 'Net', 'VAT', 'Paid', 'Method', 'Collected By'])
+        for p in payments:
+            stu = p.student_fee.student
+            writer.writerow([
+                p.payment_date, p.receipt_number, stu.student_id, stu.full_name,
+                stu.grade.name, p.student_fee.fee_structure.fee_type.name,
+                p.student_fee.fee_structure.fee_type.get_category_display(),
+                p.net_part, p.vat_part, p.paid_amount,
+                p.get_payment_method_display(),
+                getattr(p.collected_by, 'username', ''),
+            ])
+        return response
+
+    return render(request, 'fees/sales_report.html', {
+        'payments':      payments,
+        'summary_rows':  summary_rows,
+        'date_from':     date_from,
+        'date_to':       date_to,
+        'category':      category,
+        'categories':    FeeType.FEE_CATEGORIES,
+        'total_paid':    total_paid,
+        'total_net':     total_net,
+        'total_vat':     total_vat,
+        'total_qty':     len(payments),
+    })
+
+
+# ════════════════════════════════════════════════════════════════
 #  STUDENT LEDGER
 # ════════════════════════════════════════════════════════════════
 
@@ -2062,12 +2343,14 @@ def generate_invoice(request, student_pk):
         messages.warning(request, "No paid fees found for this student.")
         return redirect('fees:student_ledger', student_pk=student_pk)
 
-    # Invoice descriptions: show "Semester Fees" instead of "Installment"
+    # Invoice descriptions: show "Semester Fees" (old 'Installment' names kept
+    # for fees created before the rename)
     SEMESTER_LABELS = {
+        '1st Semester':    '1st Semester Fees',
+        '2nd Semester':    '2nd Semester Fees',
         '1st Installment': '1st Semester Fees',
         '2nd Installment': '2nd Semester Fees',
-        '3rd Installment': '3rd Semester Fees',
-        '4th Installment': '4th Semester Fees',
+        '3rd Installment': '2nd Semester Fees',   # legacy 3-payment plans: 3rd pay = Sem 2
     }
 
     subtotal   = Decimal('0')
@@ -2272,6 +2555,8 @@ def fees_dashboard(request):
             ('Fee Structures',        '/fees/structures/',          '🗂️',  'slate'),
             ('Bulk Assign Fees',      '/fees/assign/',              '📌', 'slate'),
             ('Outstanding Report',    '/fees/outstanding/',         '📋', 'slate'),
+            ('Unpaid Tuition Report', '/fees/unpaid-tuition/',      '💳', 'slate'),
+            ('Sales Report',          '/fees/sales/',               '🛍️', 'slate'),
             ('Defaulters List',       '/fees/defaulters/',          '⚠️',  'red'),
             ('All Tax Invoices',      '/fees/invoices/',            '📄', 'slate'),
             ('Payroll',               '/fees/payroll/',             '💼', 'slate'),
@@ -2455,10 +2740,10 @@ def tuition_config_export_csv(request):
         'Net Tuition – Saudi (SAR)',
         'VAT Rate (%)', 'VAT Amount – Non-Saudi (SAR)',
         'Final Tuition – Non-Saudi (SAR)',
-        'Reservation Installment (SAR)',
-        '1st Installment (SAR)',
-        '2nd Installment (SAR)',
-        '3rd Installment (SAR)',
+        'Reservation / Down Payment Schedule (SAR)',
+        '1st Payment (SAR)',
+        '2nd Payment (SAR)',
+        '3rd Payment (SAR)',
         'Notes',
     ])
     for cfg in qs:

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -224,10 +224,13 @@
         <th>Group<br>Discount</th>
         <th>Tuition Net<br>of Disc.</th>
         <th>Reservation /<br>Down Payment</th>
-        <th>1st<br>Installment</th>
-        <th>2nd<br>Installment</th>
         {% if max_num_payments >= 3 %}
-        <th>3rd<br>Installment</th>
+        <th>1st Semester<br>1st Installment</th>
+        <th>1st Semester<br>2nd Installment</th>
+        <th>2nd<br>Semester</th>
+        {% else %}
+        <th>1st<br>Semester</th>
+        <th>2nd<br>Semester</th>
         {% endif %}
         <th>Net Tuition</th>
       </tr>
@@ -265,10 +268,13 @@
         <th>Group<br>Discount</th>
         <th>Tuition Net<br>of Disc.</th>
         <th>Reservation /<br>Down Payment</th>
-        <th>1st<br>Installment</th>
-        <th>2nd<br>Installment</th>
         {% if max_num_payments >= 3 %}
-        <th>3rd<br>Installment</th>
+        <th>1st Semester<br>1st Installment</th>
+        <th>1st Semester<br>2nd Installment</th>
+        <th>2nd<br>Semester</th>
+        {% else %}
+        <th>1st<br>Semester</th>
+        <th>2nd<br>Semester</th>
         {% endif %}
         <th>Net Tuition</th>
       </tr>

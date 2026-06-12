@@ -274,7 +274,7 @@
   <table>
     <thead>
       <tr>
-        <th>Installment</th>
+        <th>Payment</th>
         <th class="right">Amount (SAR)</th>
         <th>Due Date</th>
         <th>Notes</th>
@@ -283,7 +283,7 @@
     <tbody>
       {% for inst in installments %}
       <tr {% if inst.installment_type == 'RESERVATION' %}class="amber-row"{% endif %}>
-        <td>{{ inst.get_installment_type_display }}</td>
+        <td>{{ inst.semester_label }}</td>
         <td class="right"><strong>{{ inst.amount|money }}</strong></td>
         <td>{{ inst.due_date|default:"—" }}</td>
         <td>{{ inst.notes|default:"" }}</td>

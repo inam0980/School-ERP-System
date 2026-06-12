@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unpaid Tuition Report — Al-Kawthar</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; font-size: 10pt; background: #f1f5f9; }
+  .page {
+    width: 11.69in; min-height: 8.27in;     /* A4 landscape */
+    margin: 10mm auto; padding: 10mm 12mm;
+    background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+
+  /* ── Report header ─────────────────────────────────── */
+  .rpt-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; margin-bottom: 10px;
+  }
+  .rpt-header img { width: 70px; height: 70px; object-fit: contain; }
+  .rpt-title { text-align: center; flex: 1; padding: 0 14px; }
+  .rpt-title .school { font-size: 13pt; font-weight: 800; letter-spacing: .02em; }
+  .rpt-title .report { font-size: 15pt; font-weight: 700; color: #334155; margin-top: 2px; letter-spacing: .06em; }
+  .rpt-title .sub    { font-size: 9.5pt; color: #475569; margin-top: 2px; letter-spacing: .04em; }
+  .rpt-meta { text-align: right; font-size: 8.5pt; color: #334155; border: 1px solid #cbd5e1; padding: 5px 10px; min-width: 130px; }
+
+  /* ── Filter summary box ────────────────────────────── */
+  .filter-box { border: 1px solid #94a3b8; display: inline-block; margin-bottom: 12px; font-size: 8.5pt; }
+  .filter-box table { border-collapse: collapse; }
+  .filter-box td { border: 1px solid #cbd5e1; padding: 3px 10px; }
+  .filter-box td.lbl { background: #f1f5f9; font-weight: 700; text-align: right; color: #334155; text-transform: uppercase; }
+
+  /* ── Data table ────────────────────────────────────── */
+  table.data { width: 100%; border-collapse: collapse; }
+  table.data th {
+    background: #fdf6dd;                       /* cream header like the sample */
+    border: 1px solid #94a3b8;
+    font-size: 7.8pt; font-weight: 700; color: #1e293b;
+    padding: 5px 4px; text-align: center; text-transform: uppercase;
+  }
+  table.data td {
+    border: 1px solid #cbd5e1; padding: 4px 5px; font-size: 8.5pt;
+  }
+  table.data td.num   { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data td.ctr   { text-align: center; }
+  table.data td.name  { direction: rtl; text-align: right; font-weight: 600; }
+  table.data tr:nth-child(even) td { background: #f8fafc; }
+  table.data td.unpaid-pos { color: #b91c1c; font-weight: 700; }
+  table.data tr.totals td {
+    background: #fdf6dd; font-weight: 800; border-top: 2px solid #94a3b8; font-size: 9pt;
+  }
+
+  .empty { padding: 30px; text-align: center; color: #94a3b8; font-style: italic; }
+
+  /* ── On-screen filter bar (hidden in print) ────────── */
+  .toolbar {
+    width: 11.69in; margin: 10mm auto 0;
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+  }
+  .toolbar label { display: block; font-size: 8pt; font-weight: 600; color: #64748b; margin-bottom: 3px; text-transform: uppercase; }
+  .toolbar select { border: 1px solid #cbd5e1; border-radius: 6px; padding: 5px 8px; font-size: 9.5pt; min-width: 130px; }
+  .toolbar .chk { display: flex; align-items: center; gap: 6px; font-size: 9.5pt; padding-bottom: 6px; }
+  .btn {
+    display: inline-block; border-radius: 7px; padding: 7px 16px; font-size: 9.5pt; font-weight: 600;
+    cursor: pointer; text-decoration: none; border: 1px solid transparent;
+  }
+  .btn-primary { background: #1e3a5f; color: #fff; }
+  .btn-line    { background: #fff; color: #334155; border-color: #cbd5e1; }
+
+  @media print {
+    @page { size: 11.69in 8.27in; margin: 7mm; }   /* A4 landscape */
+    html, body { background: #fff; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .page { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+    .no-print { display: none !important; }
+    table.data thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Filter toolbar (screen only) ─────────────────────── -->
+<form method="get" class="toolbar no-print">
+  <div>
+    <label>School Year</label>
+    <select name="year">
+      {% for y in years %}
+      <option value="{{ y.pk }}" {% if year and y.pk == year.pk %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label>Semester</label>
+    <select name="semester">
+      <option value="">All</option>
+      <option value="1" {% if semester == '1' %}selected{% endif %}>Semester 1</option>
+      <option value="2" {% if semester == '2' %}selected{% endif %}>Semester 2</option>
+    </select>
+  </div>
+  <div>
+    <label>Division</label>
+    <select name="division">
+      <option value="">All Divisions</option>
+      {% for d in all_divisions %}
+      <option value="{{ d.pk }}" {% if division and d.pk == division.pk %}selected{% endif %}>{{ d }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label>Grade</label>
+    <select name="grade">
+      <option value="">All Grades</option>
+      {% for g in all_grades %}
+      <option value="{{ g.pk }}" {% if grade and g.pk == grade.pk %}selected{% endif %}>{{ g.division }} — {{ g }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="chk">
+    <input type="checkbox" name="unpaid_only" value="1" id="unpaidOnly" {% if unpaid_only %}checked{% endif %}>
+    <label for="unpaidOnly" style="margin:0; text-transform:none; font-size:9.5pt;">Unpaid only</label>
+  </div>
+  <button type="submit" class="btn btn-primary">Apply</button>
+  <button type="button" class="btn btn-line" onclick="window.print()">🖨 Print</button>
+  <a href="?{{ request.GET.urlencode }}{% if request.GET %}&{% endif %}export=csv" class="btn btn-line">📥 CSV</a>
+  <a href="{% url 'fees:dashboard' %}" class="btn btn-line">← Back</a>
+</form>
+
+<div class="page">
+
+  <!-- ── Header ─────────────────────────────────────────── -->
+  <div class="rpt-header">
+    <img src="{% static 'images/logo.png' %}" alt="Logo">
+    <div class="rpt-title">
+      <div class="school">AL KAWTHAR INTERNATIONAL SCHOOL</div>
+      <div class="report">UNPAID TUITION REPORT</div>
+      <div class="sub">ACTIVE STUDENTS (PAID/UNPAID)</div>
+    </div>
+    <div class="rpt-meta">
+      {{ now|date:"d-M-y h:i A" }}
+    </div>
+  </div>
+
+  <!-- ── Filter summary ─────────────────────────────────── -->
+  <div class="filter-box">
+    <table>
+      <tr><td class="lbl">School Year</td><td>{{ year|default:"ALL" }}</td></tr>
+      <tr><td class="lbl">Semester</td><td>{% if semester %}{{ semester }}{% else %}ALL{% endif %}</td></tr>
+      <tr><td class="lbl">Grade</td><td>{{ grade|default:"ALL" }}</td></tr>
+      <tr><td class="lbl">Division</td><td>{{ division|default:"ALL" }}</td></tr>
+    </table>
+  </div>
+
+  <!-- ── Data table ─────────────────────────────────────── -->
+  {% if rows %}
+  <table class="data">
+    <thead>
+      <tr>
+        <th style="width:28px">#</th>
+        <th style="width:90px">ID/IQAMA</th>
+        <th>Student Name</th>
+        <th style="width:80px">Grade</th>
+        <th style="width:80px">Division</th>
+        <th style="width:62px">Semester</th>
+        <th style="width:88px">Father<br>Contact #</th>
+        <th>Father<br>Email</th>
+        <th style="width:88px">Mother<br>Contact #</th>
+        <th style="width:80px">Tuition<br>Amount</th>
+        <th style="width:80px">Paid<br>Amount</th>
+        <th style="width:80px">Unpaid<br>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="ctr">{{ forloop.counter }}</td>
+        <td class="ctr">{{ r.id_number }}</td>
+        <td class="name">{{ r.student.arabic_name|default:r.student.full_name }}</td>
+        <td class="ctr">{{ r.student.grade.name|upper }}</td>
+        <td class="ctr">{{ r.student.division.name|upper }}</td>
+        <td class="ctr">{% if semester %}{{ semester }}{% else %}ALL{% endif %}</td>
+        <td class="ctr">{{ r.student.father_mobile }}</td>
+        <td style="font-size:7.8pt">{{ r.student.father_email|upper }}</td>
+        <td class="ctr">{{ r.student.mother_mobile }}</td>
+        <td class="num">{{ r.tuition|money }}</td>
+        <td class="num">{{ r.paid|money }}</td>
+        <td class="num {% if r.unpaid > 0 %}unpaid-pos{% endif %}">{{ r.unpaid|money }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="totals">
+        <td colspan="9" style="text-align:right">TOTAL — {{ rows|length }} STUDENT{{ rows|length|pluralize:"S" }}</td>
+        <td class="num">{{ total_tuition|money }}</td>
+        <td class="num">{{ total_paid|money }}</td>
+        <td class="num">{{ total_unpaid|money }}</td>
+      </tr>
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No tuition records found for the selected filters.</div>
+  {% endif %}
+
+</div>
+</body>
+</html>

@@ -427,8 +427,8 @@ class TuitionFeeConfig(models.Model):
     PAYMENTS_2 = 2
     PAYMENTS_3 = 3
     NUM_PAYMENTS_CHOICES = [
-        (PAYMENTS_2, '2 Installments'),
-        (PAYMENTS_3, '3 Installments'),
+        (PAYMENTS_2, '2 Payments (1 per semester)'),
+        (PAYMENTS_3, '3 Payments (2 in Semester 1, 1 in Semester 2)'),
     ]
 
     academic_year          = models.ForeignKey(
@@ -655,9 +655,9 @@ class TuitionInstallment(models.Model):
 
     INSTALLMENT_TYPES = [
         (RESERVATION, 'Reservation / Down Payment'),
-        (FIRST,       '1st Installment'),
-        (SECOND,      '2nd Installment'),
-        (THIRD,       '3rd Installment'),
+        (FIRST,       '1st Payment'),
+        (SECOND,      '2nd Payment'),
+        (THIRD,       '3rd Payment'),
     ]
 
     # For deterministic ordering without DB-level sort
@@ -676,8 +676,24 @@ class TuitionInstallment(models.Model):
         verbose_name = 'Tuition Installment'
         verbose_name_plural = 'Tuition Installments'
 
+    @property
+    def semester_label(self):
+        """
+        Display label resolving the payment to its semester. 2-payment
+        configs: 1st/2nd Payment = Semester 1/2. 3-payment configs: the
+        first two payments fall under Semester 1, the third is Semester 2.
+        """
+        if self.installment_type == self.RESERVATION:
+            return 'Reservation / Down Payment'
+        three = getattr(self.config, 'num_payments', 2) >= 3
+        return {
+            self.FIRST:  '1st Semester - 1st Installment' if three else '1st Semester',
+            self.SECOND: '1st Semester - 2nd Installment' if three else '2nd Semester',
+            self.THIRD:  '2nd Semester',
+        }.get(self.installment_type, self.get_installment_type_display())
+
     def __str__(self):
-        return (f"{self.config} — {self.get_installment_type_display()} "
+        return (f"{self.config} — {self.semester_label} "
                 f"— SAR {self.amount:,.2f}")
 
 

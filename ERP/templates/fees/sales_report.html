@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Sales Report — Al-Kawthar{% endblock %}
+
+{% block content %}
+<style>
+  @media print {
+    .no-print, nav, aside, header { display: none !important; }
+    .print-area { box-shadow: none !important; border: none !important; }
+  }
+</style>
+
+<div class="flex items-center justify-between mb-6 no-print">
+    <div class="flex items-center gap-3">
+        <a href="{% url 'fees:dashboard' %}" class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 transition" title="Back to Finance">
+            <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-primary">🛍️ Sales Report</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Items sold to students — uniform, books, ID cards &amp; more</p>
+        </div>
+    </div>
+    <div class="flex gap-2">
+        <button onclick="window.print()"
+                class="inline-flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition font-medium">
+            🖨 Print
+        </button>
+        <a href="?{{ request.GET.urlencode }}{% if request.GET %}&{% endif %}export=csv"
+           class="inline-flex items-center gap-2 border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm hover:bg-slate-50 transition font-medium">
+            📥 Export CSV
+        </a>
+    </div>
+</div>
+
+<!-- Filters -->
+<form method="get" class="bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3 mb-4 no-print">
+    <div class="flex flex-wrap gap-3 items-end">
+        <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">From</label>
+            <input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}"
+                   class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">To</label>
+            <input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}"
+                   class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Category</label>
+            <select name="cat" class="border border-slate-300 rounded-lg px-3 py-2 text-sm min-w-[220px]">
+                <option value="">Sales Items (Uniform + Books + ID Card)</option>
+                {% for code, label in categories %}
+                <option value="{{ code }}" {% if category == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit"
+                class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-light transition">
+            Apply
+        </button>
+        <a href="{% url 'fees:sales_report' %}"
+           class="border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition">
+            Reset
+        </a>
+    </div>
+</form>
+
+<!-- Summary cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 print-area">
+    <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Items Sold</p>
+        <p class="text-xl font-bold text-slate-700">{{ total_qty }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">Net Sales (ex-VAT)</p>
+        <p class="text-xl font-bold text-slate-700">SAR {{ total_net|money }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-slate-200 px-5 py-4">
+        <p class="text-xs text-slate-500 uppercase tracking-wide mb-1">VAT Collected</p>
+        <p class="text-xl font-bold text-orange-600">SAR {{ total_vat|money }}</p>
+    </div>
+    <div class="bg-white rounded-xl border border-green-200 px-5 py-4 bg-green-50/50">
+        <p class="text-xs text-green-600 uppercase tracking-wide mb-1">Total Collected</p>
+        <p class="text-xl font-bold text-green-700">SAR {{ total_paid|money }}</p>
+    </div>
+</div>
+
+<!-- Per-item summary -->
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto mb-6 print-area">
+    <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+        <h2 class="font-semibold text-slate-700">Sales by Item</h2>
+        <span class="text-xs text-slate-400">{{ date_from|date:"d M Y" }} — {{ date_to|date:"d M Y" }}</span>
+    </div>
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wide">
+            <tr>
+                <th class="px-4 py-3 text-left">Item</th>
+                <th class="px-4 py-3 text-left">Category</th>
+                <th class="px-4 py-3 text-center">Qty Sold</th>
+                <th class="px-4 py-3 text-right">Net (ex-VAT)</th>
+                <th class="px-4 py-3 text-right">VAT</th>
+                <th class="px-4 py-3 text-right">Total Collected</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for s in summary_rows %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-2.5 font-semibold text-slate-700">{{ s.name }}</td>
+                <td class="px-4 py-2.5 text-slate-500 text-xs">{{ s.category }}</td>
+                <td class="px-4 py-2.5 text-center font-semibold">{{ s.qty }}</td>
+                <td class="px-4 py-2.5 text-right">{{ s.net|money }}</td>
+                <td class="px-4 py-2.5 text-right text-orange-600">{{ s.vat|money }}</td>
+                <td class="px-4 py-2.5 text-right font-bold text-green-700">{{ s.paid|money }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="px-4 py-8 text-center text-slate-400 italic">No sales in this period.</td></tr>
+            {% endfor %}
+        </tbody>
+        {% if summary_rows %}
+        <tfoot class="bg-slate-50 border-t-2 border-slate-200 font-bold">
+            <tr>
+                <td class="px-4 py-3" colspan="2">TOTAL</td>
+                <td class="px-4 py-3 text-center">{{ total_qty }}</td>
+                <td class="px-4 py-3 text-right">{{ total_net|money }}</td>
+                <td class="px-4 py-3 text-right text-orange-600">{{ total_vat|money }}</td>
+                <td class="px-4 py-3 text-right text-green-700">SAR {{ total_paid|money }}</td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</div>
+
+<!-- Transactions -->
+<div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto print-area">
+    <div class="px-5 py-3 border-b border-slate-100">
+        <h2 class="font-semibold text-slate-700">Transactions ({{ payments|length }})</h2>
+    </div>
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wide">
+            <tr>
+                <th class="px-4 py-3 text-left">Date</th>
+                <th class="px-4 py-3 text-left">Receipt</th>
+                <th class="px-4 py-3 text-left">Student</th>
+                <th class="px-4 py-3 text-left">Item</th>
+                <th class="px-4 py-3 text-right">Paid (SAR)</th>
+                <th class="px-4 py-3 text-left">Method</th>
+                <th class="px-4 py-3 text-left">By</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+            {% for p in payments %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-2.5 text-slate-600">{{ p.payment_date|date:"d M Y" }}</td>
+                <td class="px-4 py-2.5">
+                    <a href="{% url 'fees:receipt_print' p.pk %}" class="text-primary hover:underline font-mono text-xs">
+                        {{ p.receipt_number }}
+                    </a>
+                </td>
+                <td class="px-4 py-2.5">
+                    <span class="font-medium text-slate-700">{{ p.student_fee.student.full_name }}</span>
+                    <span class="text-xs text-slate-400 block">{{ p.student_fee.student.grade.name }}</span>
+                </td>
+                <td class="px-4 py-2.5 font-medium">{{ p.student_fee.fee_structure.fee_type.name }}</td>
+                <td class="px-4 py-2.5 text-right font-semibold text-green-700">{{ p.paid_amount|money }}</td>
+                <td class="px-4 py-2.5 text-slate-500 text-xs">{{ p.get_payment_method_display }}</td>
+                <td class="px-4 py-2.5 text-slate-500 text-xs">{{ p.collected_by.username|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="px-4 py-8 text-center text-slate-400 italic">No transactions found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

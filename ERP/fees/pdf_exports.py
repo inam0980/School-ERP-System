@@ -46,7 +46,8 @@ def _logo_base64():
 def _build_row(structure, fee_types_map):
     """
     Build a dict with computed amounts for each PDF column from a FeeStructure.
-    Installments are stored as OTHER-category fee types named '1st/2nd/3rd Installment'.
+    Semester payments are stored as OTHER-category fee types named
+    '1st/2nd/3rd Semester' (named '1st/2nd/3rd Installment' before the rename).
     """
     items_by_cat  = {}
     items_by_name = {}
@@ -63,9 +64,21 @@ def _build_row(structure, fee_types_map):
     gross_tuition = items_by_name.get('Gross Tuition', net_tuition)
     group_disc_amt = gross_tuition - net_tuition if gross_tuition > net_tuition else Decimal('0.00')
 
-    first_inst  = items_by_name.get('1st Installment', Decimal('0.00'))
-    second_inst = items_by_name.get('2nd Installment', Decimal('0.00'))
-    third_inst  = items_by_name.get('3rd Installment', Decimal('0.00'))
+    # Payment columns by position. New names: 2-payment plans use
+    # '1st Semester' / '2nd Semester'; 3-payment plans use
+    # '1st Semester - 1st/2nd Installment' + '2nd Semester'.
+    zero     = Decimal('0.00')
+    sem1_2nd = items_by_name.get('1st Semester - 2nd Installment')
+    sem2     = items_by_name.get('2nd Semester')
+    first_inst = (items_by_name.get('1st Semester')
+                  or items_by_name.get('1st Semester - 1st Installment')
+                  or items_by_name.get('1st Installment', zero))
+    if sem1_2nd is not None:                      # 3-payment plan
+        second_inst = sem1_2nd
+        third_inst  = sem2 if sem2 is not None else items_by_name.get('3rd Installment', zero)
+    else:
+        second_inst = sem2 if sem2 is not None else items_by_name.get('2nd Installment', zero)
+        third_inst  = items_by_name.get('3rd Installment', zero)
 
     # Fallback: if installments were never saved, calculate 2 equal splits from remaining
     if first_inst == Decimal('0.00') and net_tuition > Decimal('0.00'):

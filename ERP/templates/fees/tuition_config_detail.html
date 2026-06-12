@@ -273,7 +273,7 @@
     <table class="min-w-full text-sm">
       <thead class="bg-slate-50">
         <tr>
-          <th class="px-5 py-3 text-left font-semibold text-slate-600">Installment</th>
+          <th class="px-5 py-3 text-left font-semibold text-slate-600">Payment</th>
           <th class="px-5 py-3 text-right font-semibold text-slate-600">Amount (SAR)</th>
           <th class="px-5 py-3 text-right font-semibold text-slate-600">Non-Saudi Total</th>
           <th class="px-5 py-3 text-left font-semibold text-slate-600">Due Date</th>
@@ -285,9 +285,9 @@
         <tr class="{% if inst.installment_type == 'RESERVATION' %}bg-amber-50{% endif %}">
           <td class="px-5 py-3 font-medium text-slate-700">
             {% if inst.installment_type == 'RESERVATION' %}
-            <span class="text-amber-700">⬇ {{ inst.get_installment_type_display }}</span>
+            <span class="text-amber-700">⬇ {{ inst.semester_label }}</span>
             {% else %}
-            {{ inst.get_installment_type_display }}
+            {{ inst.semester_label }}
             {% endif %}
           </td>
           <td class="px-5 py-3 text-right font-mono font-semibold text-slate-800">
@@ -311,7 +311,7 @@
         {% endfor %}
         <!-- Totals row -->
         <tr class="bg-slate-100 font-bold">
-          <td class="px-5 py-3 text-slate-700">TOTAL INSTALLMENTS</td>
+          <td class="px-5 py-3 text-slate-700">TOTAL PAYMENTS</td>
           <td class="px-5 py-3 text-right font-mono text-slate-800">
             {{ config.installments_total|money }}
           </td>
@@ -330,8 +330,8 @@
           <td class="px-5 py-3 text-xs
             {% if validation_errors %}text-red-600{% else %}text-green-600{% endif %}"
             colspan="3">
-            {% if not validation_errors %}✓ Installments match Net Tuition{% else %}
-            ⚠ Mismatch — check installments{% endif %}
+            {% if not validation_errors %}✓ Payments match Net Tuition{% else %}
+            ⚠ Mismatch — check payments{% endif %}
           </td>
         </tr>
       </tbody>
