@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "runCount": 1,
+  "totalTokensSaved": 473094,
+  "lastBuildSavings": 473094,
+  "lastBuildAt": "2026-11-17T01:32:25.847Z",
+  "notifiedMilestones": [
+    50000,
+    100000,
+    200000,
+    400000
+  ],
+  "newMilestones": [
+    50000,
+    100000,
+    200000,
+    400000
+  ],
+  "notice": "TokenCap has saved 473,094 context tokens across 1 builds.",
+  "baselineDefinition": "Eligible redacted text source files before ranking, selection, or compression.",
+  "tokenizerProfile": "tokencap-estimate-v1",
+  "runs": [
+    {
+      "generatedAt": "2026-11-17T01:32:25.847Z",
+      "profile": "balanced",
+      "baselineTokens": 520549,
+      "snapshotTokens": 47455,
+      "savedTokens": 473094,
+      "tokenizerProfile": "tokencap-estimate-v1",
+      "baselineDefinition": "Eligible redacted text source files before ranking, selection, or compression."
+    }
+  ]
+}
