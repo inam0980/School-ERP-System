@@ -6,17 +6,12 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from students.models import Student
-from .factories import (
+from tests.factories import (
     UserFactory, StudentFactory,
     DivisionFactory, GradeFactory, SectionFactory, AcademicYearFactory,
 )
 
 pytestmark = pytest.mark.django_db
-
-
-@pytest.fixture
-def admin(db):
-    return UserFactory(role=CustomUser.ADMIN)
 
 
 @pytest.fixture

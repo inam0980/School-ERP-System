@@ -1,0 +1,21 @@
+[run]
+source = .
+branch = True
+omit =
+    */migrations/*
+    tests/*
+    */tests.py
+    manage.py
+    serve.py
+    ERP/asgi.py
+    ERP/wsgi.py
+    ERP/settings*.py
+    */management/commands/seed_*.py
+
+[report]
+show_missing = False
+skip_covered = False
+precision = 1
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:

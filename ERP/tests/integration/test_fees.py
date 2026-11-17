@@ -9,7 +9,7 @@ from django.urls import reverse
 
 from accounts.models import CustomUser
 from fees.models import StudentFee, Payment
-from .factories import (
+from tests.factories import (
     UserFactory, AccountantFactory,
     StudentFeeFactory, PaymentFactory, StudentFactory,
     FeeStructureFactory, FeeTypeFactory,
@@ -19,23 +19,13 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def accountant(db):
-    return AccountantFactory()
-
-
-@pytest.fixture
-def admin(db):
-    return UserFactory(role=CustomUser.ADMIN)
-
-
-@pytest.fixture
 def student_fee(db):
     return StudentFeeFactory(
         amount=Decimal('10000.00'),
         discount=Decimal('0.00'),
         net_amount=Decimal('10000.00'),
         status=StudentFee.UNPAID,
-        due_date=datetime.date(2025, 10, 1),   # future — not overdue
+        due_date=datetime.date.today() + datetime.timedelta(days=30),  # future — not overdue
     )
 
 

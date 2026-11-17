@@ -5,7 +5,7 @@ import pytest
 from django.urls import reverse
 
 from accounts.models import CustomUser
-from .factories import UserFactory, TeacherFactory, AccountantFactory
+from tests.factories import UserFactory, TeacherFactory, AccountantFactory
 
 
 pytestmark = pytest.mark.django_db

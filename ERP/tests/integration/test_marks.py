@@ -8,23 +8,13 @@ from django.utils import timezone
 
 from accounts.models import CustomUser
 from academics.models import Mark
-from .factories import (
+from tests.factories import (
     UserFactory, TeacherFactory,
     ExamFactory, MarkFactory, StudentFactory,
     SectionFactory,
 )
 
 pytestmark = pytest.mark.django_db
-
-
-@pytest.fixture
-def admin(db):
-    return UserFactory(role=CustomUser.ADMIN)
-
-
-@pytest.fixture
-def teacher(db):
-    return TeacherFactory()
 
 
 @pytest.fixture
