@@ -2438,12 +2438,11 @@ def refund_payment(request, pk):
 @require_POST
 def send_fee_reminders(request):
     """
-    Email a fee reminder to every defaulter's parent (father → mother →
-    guardian email, first available). Uses the same filters as the
-    defaulters list (passed as hidden fields).
+    Email a fee reminder to every defaulter's parent (fees contact → father →
+    mother → guardian). Same filters as the defaulters list. Families reminded
+    within FEE_REMINDER_COOLDOWN_DAYS are skipped (see fees/reminders.py).
     """
-    from django.core.mail import send_mail
-    from django.conf import settings as dj_settings
+    from .reminders import send_reminders
 
     as_of_str  = request.POST.get('as_of_date', '')
     grade_id   = request.POST.get('grade', '')
@@ -2453,56 +2452,8 @@ def send_fee_reminders(request):
     except ValueError:
         as_of = timezone.localdate()
 
-    fees = StudentFee.objects.filter(due_date__lte=as_of).exclude(
-        status__in=['PAID', 'WAIVED'],
-    ).select_related('student', 'student__grade', 'fee_structure__fee_type')
-    if grade_id:
-        fees = fees.filter(student__grade_id=grade_id)
-    if div_id:
-        fees = fees.filter(student__division_id=div_id)
-
-    # Group balances per student
-    per_student = {}
-    for f in fees:
-        bal = f.balance
-        if bal <= 0:
-            continue
-        entry = per_student.setdefault(f.student, {'total': Decimal('0'), 'lines': []})
-        entry['total'] += bal
-        entry['lines'].append(f"  - {f.fee_structure.fee_type.name}: SAR {bal:.2f} (due {f.due_date:%d %b %Y})")
-
-    sent = skipped = failed = 0
-    for stu, info in per_student.items():
-        email = stu.reminder_email()
-        if not email:
-            skipped += 1
-            continue
-        body = (
-            f"Dear Parent,\n\n"
-            f"This is a kind reminder from Al-Kawthar International School.\n"
-            f"The following fees for {stu.full_name} ({stu.grade.name}) are outstanding:\n\n"
-            + "\n".join(info['lines']) +
-            f"\n\nTotal outstanding: SAR {info['total']:.2f}\n\n"
-            f"Kindly arrange payment at your earliest convenience.\n"
-            f"If you have already paid, please ignore this message.\n\n"
-            f"Accounts Department\nAl-Kawthar International School"
-        )
-        try:
-            send_mail(
-                subject=f"Fee Reminder — {stu.full_name} — SAR {info['total']:.2f} outstanding",
-                message=body,
-                from_email=dj_settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                fail_silently=False,
-            )
-            sent += 1
-        except Exception:
-            failed += 1
-
-    msg = f"Reminders: {sent} email(s) sent, {skipped} skipped (no parent email on file)."
-    if failed:
-        msg += f" {failed} failed — check EMAIL_HOST settings in the environment."
-    (messages.success if sent else messages.warning)(request, msg)
+    r = send_reminders(as_of=as_of, grade_id=grade_id or None, division_id=div_id or None, user=request.user)
+    (messages.success if r['sent'] else messages.warning)(request, "Reminders: " + r['message'])
     return redirect(f"/fees/defaulters/?as_of_date={as_of}&grade={grade_id}&division={div_id}")
 
 

@@ -871,3 +871,24 @@ class ExternalCandidatePayment(models.Model):
         self.vat_amount = (self.amount * self.vat_rate / 100).quantize(Decimal('0.01'))
         self.total = self.amount + self.vat_amount
         super().save(*args, **kwargs)
+
+
+# ════════════════════════════════════════════════════════════════
+#  FEE REMINDER LOG  (anti-spam: one reminder per family per cooldown)
+# ════════════════════════════════════════════════════════════════
+
+class FeeReminderLog(models.Model):
+    """One row per reminder email actually sent (failed sends are not logged, so they retry)."""
+    student   = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='fee_reminders')
+    sent_at   = models.DateTimeField(default=timezone.now, db_index=True)
+    email     = models.EmailField()
+    total     = models.DecimalField(max_digits=10, decimal_places=2)
+    automatic = models.BooleanField(default=False, help_text='Sent by the nightly job, not a person')
+    sent_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                  null=True, blank=True, related_name='fee_reminders_sent')
+
+    class Meta:
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f"{self.student} — {self.email} — SAR {self.total} ({self.sent_at:%Y-%m-%d})"
