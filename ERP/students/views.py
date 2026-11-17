@@ -241,12 +241,17 @@ def student_add(request):
             messages.warning(request, "This candidate is already approved and enrolled.")
             return redirect('students:detail', pk=candidate.enrolled_student.pk)
 
+        # Put the candidate's ID in the right field: an Iqama in "National ID" fails
+        # validation (must start with 1) and, if forced, bills an expat as Saudi.
+        id_number = (candidate.id_number or '').strip()
+        is_iqama = (candidate.is_saudi is False or
+                    (candidate.is_saudi is None and id_number.startswith('2')))
         initial = {
             'full_name': candidate.full_name,
             'arabic_name': candidate.arabic_name,
             'guardian_phone': candidate.phone,
             'nationality': candidate.nationality,
-            'national_id': candidate.id_number,
+            ('iqama_number' if is_iqama else 'national_id'): id_number,
             'grade': candidate.grade_applying,
             'enrollment_type': Student.NEW,
         }

@@ -555,3 +555,40 @@ class TestBug26MoneyFormsNeverCrashOrDelete:
             'fee_description[]': ['Entrance exam'], 'amount[]': ['500'], 'vat_rate[]': ['15']})
         p = ExternalCandidatePayment.objects.get()
         assert (p.amount, p.vat_amount, p.total) == (D('500'), D('75.00'), D('575.00'))
+
+
+# ── BUG-27  Enrolling an admitted candidate pre-filled their ID into "National ID"
+#            even for an Iqama holder, so the form rejected it ("must start with 1").
+
+class TestBug27EnrolCandidatePrefillsCorrectIdField:
+    def _initial(self, client, cand):
+        form = client.get(reverse('students:add'), {'candidate_id': cand.pk}).context['form']
+        return form.initial
+
+    def test_non_saudi_candidate_goes_to_iqama(self, login, admin, school):
+        cand = f.ExternalCandidateFactory(is_saudi=False, id_number='2123456789', grade_applying=school.grade)
+        init = self._initial(login(admin), cand)
+        assert init.get('iqama_number') == '2123456789' and not init.get('national_id')
+
+    def test_saudi_candidate_goes_to_national_id(self, login, admin, school):
+        cand = f.ExternalCandidateFactory(is_saudi=True, id_number='1123456789')
+        init = self._initial(login(admin), cand)
+        assert init.get('national_id') == '1123456789' and not init.get('iqama_number')
+
+    def test_unknown_citizenship_uses_id_prefix(self, login, admin, school):
+        cand = f.ExternalCandidateFactory(is_saudi=None, id_number='2999999999')
+        assert self._initial(login(admin), cand).get('iqama_number') == '2999999999'
+
+    def test_enrolling_marks_candidate_approved_and_links_student(self, login, admin, school):
+        from fees.models import ExternalCandidate
+        cand = f.ExternalCandidateFactory(is_saudi=False, id_number='2123456789', full_name='New Joiner')
+        login(admin).post(f"{reverse('students:add')}?candidate_id={cand.pk}", {
+            'full_name': 'New Joiner', 'arabic_name': 'طالب', 'dob': '2015-01-01', 'gender': 'M',
+            'nationality': 'India', 'iqama_number': '2123456789',
+            'division': school.division.pk, 'grade': school.grade.pk, 'section': school.section.pk,
+            'academic_year': school.year.pk, 'admission_date': '2025-09-01', 'enrollment_type': 'NEW',
+            'study_mode': school.study_mode.pk, 'fee_category': 'new', 'is_active': 'on'})
+        cand.refresh_from_db()
+        assert cand.status == ExternalCandidate.STATUS_APPROVED
+        assert cand.enrolled_student.full_name == 'New Joiner'
+        assert cand.enrolled_student.is_saudi is False
