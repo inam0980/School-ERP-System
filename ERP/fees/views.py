@@ -3511,13 +3511,15 @@ def tax_credit_note(request):
             desc = desc.strip()
             if not desc:
                 continue
-            try:
-                gross = Decimal(gross_amounts[i].strip() or '0')
-                disc  = Decimal(discounts[i].strip() or '0') if i < len(discounts) else Decimal('0')
-                rate  = Decimal(vat_rates[i].strip() or '0') / 100 if i < len(vat_rates) else Decimal('0')
-            except Exception:
-                errors.append(f"Row {i+1}: invalid number entered.")
+            def _cell(values):
+                return (values[i] if i < len(values) else '').strip() or '0'
+            gross    = _parse_decimal(_cell(gross_amounts), minimum=0)
+            disc     = _parse_decimal(_cell(discounts), minimum=0)      # a negative discount would inflate the credit
+            rate_pct = _parse_decimal(_cell(vat_rates), 0, 100)
+            if gross is None or disc is None or rate_pct is None:
+                errors.append(f"Row {i+1}: enter valid amounts (≥ 0) and a VAT rate between 0 and 100 %.")
                 continue
+            rate = rate_pct / 100
             base = gross - disc
             if base < Decimal('0'):
                 errors.append(f"Row {i+1}: discount exceeds gross amount.")
@@ -3536,6 +3538,9 @@ def tax_credit_note(request):
                 'total':          float(base + tax),
                 'is_credit':      True,
             })
+
+        if not reason:
+            errors.append("A reason is required for a credit note (ZATCA).")
 
         if errors:
             for e in errors:
@@ -3611,8 +3616,10 @@ def invoice_credit_note(request):
 
     original_pk = request.GET.get('invoice_id') or request.POST.get('original_invoice_id')
     if original_pk and student:
+        # Only a real issued tax invoice can be credited — never another credit note.
         original = get_object_or_404(
             TaxInvoice, pk=original_pk, student=student,
+            invoice_type=TaxInvoice.INVOICE_TYPE_STANDARD, status=TaxInvoice.ISSUED,
         )
 
     if request.method == 'POST' and student and original:
@@ -3631,15 +3638,14 @@ def invoice_credit_note(request):
             desc = desc.strip()
             if not desc:
                 continue
-            try:
-                net  = Decimal(net_amounts[i].strip() or '0')
-                rate = Decimal(vat_rates[i].strip() or '0') / 100 if i < len(vat_rates) else Decimal('0')
-            except Exception:
-                errors.append(f"Row {i+1}: invalid number.")
+            raw_net  = (net_amounts[i] if i < len(net_amounts) else '').strip() or '0'
+            raw_rate = (vat_rates[i] if i < len(vat_rates) else '').strip() or '0'
+            net      = _parse_decimal(raw_net, minimum=0)
+            rate_pct = _parse_decimal(raw_rate, 0, 100)
+            if net is None or rate_pct is None:
+                errors.append(f"Row {i+1}: enter a valid amount (≥ 0) and VAT rate (0–100 %).")
                 continue
-            if net < Decimal('0'):
-                errors.append(f"Row {i+1}: amount must be ≥ 0.")
-                continue
+            rate = rate_pct / 100
             tax = (net * rate).quantize(Decimal('0.01'))
             subtotal  += net
             tax_total += tax
@@ -3654,6 +3660,24 @@ def invoice_credit_note(request):
                 'total':          float(net + tax),
                 'is_credit':      True,
             })
+
+        if not reason:
+            errors.append("A reason is required for a credit note (ZATCA).")
+
+        # A credit note may never credit more than the invoice it refers to —
+        # counting every credit note already issued against it.
+        prior = TaxInvoice.objects.filter(
+            original_invoice=original, invoice_type=TaxInvoice.INVOICE_TYPE_CREDIT_NOTE,
+        ).aggregate(net=Sum('subtotal'), tax=Sum('tax_amount'))
+        prior_net, prior_tax = prior['net'] or Decimal('0'), prior['tax'] or Decimal('0')
+        if line_items and prior_net + subtotal > original.subtotal:
+            errors.append(
+                f"Credit exceeds the invoice: SAR {original.subtotal:,.2f} invoiced, "
+                f"SAR {prior_net:,.2f} already credited — at most SAR {original.subtotal - prior_net:,.2f} remains.")
+        if line_items and prior_tax + tax_total > original.tax_amount:
+            errors.append(
+                f"VAT credited exceeds VAT charged: SAR {original.tax_amount:,.2f} charged, "
+                f"SAR {prior_tax:,.2f} already credited.")
 
         if errors:
             for e in errors:

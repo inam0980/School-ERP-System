@@ -387,3 +387,99 @@ class TestBug19And20MoneyInputValidation:
         self._adhoc(login(accountant), school, amount='200', pct='10')
         sf = StudentFee.objects.get(student=school.student)
         assert (sf.amount, sf.discount, sf.net_amount) == (D('200'), D('20.00'), D('180.00'))
+
+
+# ── BUG-25  Credit notes against an invoice: no cap (could credit more than the
+#            invoice, repeatedly), could target another credit note, no reason
+#            required (ZATCA requires one), and NaN/Infinity crashed the view.
+
+class TestBug25InvoiceCreditNote:
+    @pytest.fixture
+    def invoice(self, school):
+        from fees.models import TaxInvoice
+        return TaxInvoice.objects.create(
+            student=school.expat, subtotal=D('1000'), tax_amount=D('150'), total=D('1150'),
+            status=TaxInvoice.ISSUED, invoice_type=TaxInvoice.INVOICE_TYPE_STANDARD)
+
+    def _credit(self, client, invoice, net='100', rate='15', reason='Fee refunded'):
+        return client.post(reverse('fees:invoice_credit_note'), {
+            'student_id': invoice.student_id, 'original_invoice_id': invoice.pk,
+            'item_description[]': ['Tuition credit'], 'item_net[]': [net], 'item_vat_rate[]': [rate],
+            'credit_note_reason': reason})
+
+    def _notes(self, invoice):
+        from fees.models import TaxInvoice
+        return TaxInvoice.objects.filter(original_invoice=invoice, invoice_type=TaxInvoice.INVOICE_TYPE_CREDIT_NOTE)
+
+    def test_partial_credit_note(self, login, accountant, invoice):
+        resp = self._credit(login(accountant), invoice, net='200')
+        cn = self._notes(invoice).get()
+        assert resp.status_code == 302
+        assert (cn.subtotal, cn.tax_amount, cn.total) == (D('200'), D('30.00'), D('230.00'))
+
+    def test_full_credit_allowed(self, login, accountant, invoice):
+        self._credit(login(accountant), invoice, net='1000')
+        assert self._notes(invoice).count() == 1
+
+    def test_cannot_credit_more_than_invoice(self, login, accountant, invoice):
+        self._credit(login(accountant), invoice, net='1000.01')
+        assert not self._notes(invoice).exists()
+
+    def test_cumulative_credits_capped(self, login, accountant, invoice):
+        client = login(accountant)
+        self._credit(client, invoice, net='700')
+        self._credit(client, invoice, net='400')          # 700 + 400 > 1000
+        assert self._notes(invoice).count() == 1
+
+    def test_vat_credited_cannot_exceed_vat_charged(self, login, accountant, invoice):
+        self._credit(login(accountant), invoice, net='500', rate='100')   # 500 VAT > 150 charged
+        assert not self._notes(invoice).exists()
+
+    def test_cannot_credit_a_credit_note(self, login, accountant, invoice):
+        client = login(accountant)
+        self._credit(client, invoice, net='100')
+        cn = self._notes(invoice).get()
+        resp = self._credit(client, cn, net='10')
+        assert resp.status_code == 404
+        assert not self._notes(cn).exists()
+
+    def test_reason_required(self, login, accountant, invoice):
+        self._credit(login(accountant), invoice, reason='  ')
+        assert not self._notes(invoice).exists()
+
+    @pytest.mark.parametrize("net, rate", [('NaN', '15'), ('Infinity', '15'), ('100', 'NaN'), ('100', 'Infinity')])
+    def test_bad_numbers_do_not_crash(self, login, accountant, invoice, net, rate):
+        resp = self._credit(login(accountant), invoice, net=net, rate=rate)
+        assert resp.status_code == 200
+        assert not self._notes(invoice).exists()
+
+
+class TestBug25StandaloneCreditNote:
+    """tax_credit_note (no original invoice): same parsing / reason defects."""
+    def _credit(self, client, student, gross='100', disc='0', rate='15', reason='Overcharge corrected'):
+        return client.post(reverse('fees:tax_credit_note'), {
+            'student_id': student.pk, 'item_description[]': ['Credit'], 'item_gross[]': [gross],
+            'item_discount[]': [disc], 'item_vat_rate[]': [rate], 'credit_note_reason': reason})
+
+    def _count(self):
+        from fees.models import TaxInvoice
+        return TaxInvoice.objects.filter(invoice_type=TaxInvoice.INVOICE_TYPE_CREDIT_NOTE).count()
+
+    def test_happy_path(self, login, accountant, school):
+        from fees.models import TaxInvoice
+        assert self._credit(login(accountant), school.expat, gross='200', disc='50').status_code == 302
+        cn = TaxInvoice.objects.get()
+        assert (cn.subtotal, cn.tax_amount) == (D('150'), D('22.50'))
+
+    @pytest.mark.parametrize("gross, disc, rate", [
+        ('NaN', '0', '15'), ('Infinity', '0', '15'), ('100', 'NaN', '15'), ('100', '0', 'Infinity'),
+        ('100', '-50', '15'),          # negative discount inflated the credit
+        ('-100', '0', '15'), ('100', '0', '150'),
+    ])
+    def test_bad_numbers_rejected_without_crash(self, login, accountant, school, gross, disc, rate):
+        resp = self._credit(login(accountant), school.expat, gross=gross, disc=disc, rate=rate)
+        assert resp.status_code == 200 and self._count() == 0
+
+    def test_reason_required(self, login, accountant, school):
+        self._credit(login(accountant), school.expat, reason='')
+        assert self._count() == 0
