@@ -48,3 +48,31 @@ Ye saari files DEPLOY\ folder me hain. Server par chalane ka order:
  nginx\ , systemd\ , setup_server.sh  -> ye LINUX ke liye hain,
  Windows deploy me IN-KI ZAROORAT NAHI. Ignore kar do.
 ============================================================
+
+
+============================================================
+ NIGHTLY AUTOMATION  (backup + fee status + alerts + report)
+============================================================
+ Ek baar:  deploy\install_daily_jobs.bat  -> right-click -> Run as administrator
+ Har raat 2:00 AM ye chalega (sab kuch isi server par, koi data bahar nahi jaata):
+   1. Database + uploaded files ka BACKUP  (verify hota hai, last 30 rakhta hai)
+   2. Due date nikal gayi fees ko OVERDUE mark karna
+   3. Staff Iqama (90 din) / MOE license (60 din) expiry check
+   4. Admins (Super Admin / Admin with email) ko daily report email
+ Log:  ERP\logs\daily_jobs.log
+
+ BACKUP KAHAN JAYE (.env me likho, DOOSRI disk best hai):
+   ERP_BACKUP_DIR=D:\ERP_Backups
+   ERP_BACKUP_KEEP=30
+ Abhi turant backup:   venv\Scripts\python ERP\manage.py backup_db
+
+ RESTORE (galti / crash ke baad):
+   1. Service band karo:   nssm\nssm.exe stop AlKawtharERP
+   2. venv\Scripts\python ERP\manage.py restore_db ERP\backups\erp-YYYYMMDD-HHMMSS.sqlite3 --yes
+      (purana database apne aap db.before-restore-....sqlite3 me save hota hai)
+   3. Service chalu karo:  nssm\nssm.exe start AlKawtharERP
+
+ PARENT FEE REMINDERS: "Send reminders" button ek family ko 7 din me
+ sirf ek baar email karta hai (double-click se spam nahi). Har hafte
+ automatic reminders chahiye to .env me:  ERP_AUTO_FEE_REMINDERS=true
+ (default OFF)

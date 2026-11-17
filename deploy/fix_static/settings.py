@@ -260,3 +260,15 @@ LOGGING = {
     },
     'root': {'handlers': ['console', 'file'], 'level': 'WARNING'},
 }
+
+
+# ── Automation (core/automation.py, run nightly by `manage.py run_daily_jobs`) ──
+# Backups: put ERP_BACKUP_DIR on ANOTHER disk / synced folder in .env if possible.
+BACKUP_DIR  = Path(os.environ.get('ERP_BACKUP_DIR') or (BASE_DIR / 'backups'))
+BACKUP_KEEP = int(os.environ.get('ERP_BACKUP_KEEP', '30'))
+# Daily admin email: defaults to all active Super Admins / Admins with an email.
+DIGEST_RECIPIENTS = [e.strip() for e in os.environ.get('ERP_DIGEST_RECIPIENTS', '').split(',') if e.strip()]
+# A family is never sent fee reminders more often than this (manual or automatic).
+FEE_REMINDER_COOLDOWN_DAYS = int(os.environ.get('ERP_FEE_REMINDER_COOLDOWN_DAYS', '7'))
+# Automatic weekly parent reminders — OFF unless the school switches it on.
+AUTO_FEE_REMINDERS = _env_bool('ERP_AUTO_FEE_REMINDERS', default=False)
