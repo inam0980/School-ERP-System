@@ -2648,8 +2648,10 @@ def invoice_list(request):
 @require_POST          # creates a ZATCA invoice — never on a GET
 def generate_invoice(request, student_pk):
     """
-    Generate a ZATCA-compliant simplified tax invoice for a student
-    covering all PAID fees in the current academic year (not yet invoiced).
+    Generate a ZATCA simplified tax invoice for a student's PAID fees that are
+    not on an invoice yet. Each fee is invoiced exactly once (ZATCA: one tax
+    invoice per supply); if nothing new is paid, the latest invoice is opened
+    (it then prints as a copy).
     """
     student = get_object_or_404(Student, pk=student_pk)
 
@@ -2673,10 +2675,40 @@ def generate_invoice(request, student_pk):
         '3rd Installment': '2nd Semester Fees',   # legacy 3-payment plans: 3rd pay = Sem 2
     }
 
+    # ── Which paid fees are already on a standard tax invoice? ───────────
+    # New invoices record each line's student_fee_id. Older invoices don't, so
+    # their lines are matched by what was printed: (description, gross, discount).
+    prior_invoices = TaxInvoice.objects.filter(
+        student=student, invoice_type=TaxInvoice.INVOICE_TYPE_STANDARD, status=TaxInvoice.ISSUED,
+    ).order_by('-date', '-pk')
+    invoiced_ids, legacy_lines = set(), []
+    for inv in prior_invoices:
+        for li in inv.line_items_json or []:
+            if li.get('student_fee_id'):
+                invoiced_ids.add(li['student_fee_id'])
+            else:
+                legacy_lines.append((li.get('description'), li.get('gross_amount'), li.get('discount')))
+
+    def _already_invoiced(fee):
+        if fee.pk in invoiced_ids:
+            return True
+        name = fee.fee_structure.fee_type.name
+        key = (SEMESTER_LABELS.get(name, name), float(fee.amount), float(fee.discount))
+        if key in legacy_lines:
+            legacy_lines.remove(key)          # one legacy line covers one fee
+            return True
+        return False
+
+    to_invoice = [fee for fee in paid_fees if not _already_invoiced(fee)]
+    if not to_invoice:
+        latest = prior_invoices.first()
+        messages.info(request, "All paid fees are already invoiced — opening the existing invoice.")
+        return redirect('fees:invoice_print', pk=latest.pk)
+
     subtotal   = Decimal('0')
     tax_total  = Decimal('0')
     line_items = []
-    for f in paid_fees:
+    for f in to_invoice:
         base = f.amount - f.discount
         if base < 0:
             base = Decimal('0')
@@ -2686,6 +2718,7 @@ def generate_invoice(request, student_pk):
         tax_total += tax
         ft_name = f.fee_structure.fee_type.name
         line_items.append({
+            'student_fee_id': f.pk,
             'description':    SEMESTER_LABELS.get(ft_name, ft_name),
             'qty':            1,
             'gross_amount':   float(f.amount),
@@ -2696,8 +2729,6 @@ def generate_invoice(request, student_pk):
             'total':          float(base + tax),
         })
 
-    has_prior = TaxInvoice.objects.filter(student=student).exists()
-
     invoice = TaxInvoice.objects.create(
         student    = student,
         subtotal   = subtotal,
@@ -2706,7 +2737,6 @@ def generate_invoice(request, student_pk):
         status     = TaxInvoice.ISSUED,
         created_by = request.user,
         line_items_json = line_items,
-        first_printed_at = timezone.now() if has_prior else None,
     )
     messages.success(request, f"Invoice {invoice.invoice_number} generated.")
     return redirect('fees:invoice_print', pk=invoice.pk)

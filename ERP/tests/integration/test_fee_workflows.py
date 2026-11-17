@@ -214,19 +214,50 @@ class TestGenerateInvoice:
         login(accountant).post(reverse('fees:generate_invoice', args=[school.student.pk]))
         assert TaxInvoice.objects.get().tax_amount == D('0')
 
-    def test_CURRENT_BEHAVIOUR_regenerating_reinvoices_same_fees(self, login, accountant, school, fee):
-        """
-        Pins current behaviour (pending a business decision): every call invoices
-        ALL paid fees again; only `first_printed_at` marks later ones as copies.
-        """
+    # ── Decided 2026-11-17 (ZATCA): each paid fee is invoiced exactly once ──
+
+    def _gen(self, client, student):
+        return client.post(reverse('fees:generate_invoice', args=[student.pk]))
+
+    def test_second_click_does_not_reinvoice_and_opens_existing(self, login, accountant, school, fee):
         f.PaymentFactory(student_fee=fee, paid_amount=D('1000'))
         client = login(accountant)
-        client.post(reverse('fees:generate_invoice', args=[school.student.pk]))
-        client.post(reverse('fees:generate_invoice', args=[school.student.pk]))
-        first, second = TaxInvoice.objects.order_by('pk')
-        assert first.total == second.total == D('1000')
-        assert first.first_printed_at is None and second.first_printed_at is not None
+        self._gen(client, school.student)
+        resp = self._gen(client, school.student)
+        inv = TaxInvoice.objects.get()
+        assert resp['Location'] == reverse('fees:invoice_print', args=[inv.pk])
+        assert inv.first_printed_at is None            # the original is not pre-marked as a copy
 
+    def test_new_invoice_contains_only_newly_paid_fees(self, login, accountant, school, fee):
+        f.PaymentFactory(student_fee=fee, paid_amount=D('1000'))
+        client = login(accountant)
+        self._gen(client, school.student)
+        bus = f.StudentFeeFactory(student=school.student, amount=D('300'),
+                                  fee_structure=f.FeeStructureItemFactory(fee_type=f.FeeTypeFactory(name='Bus')))
+        f.PaymentFactory(student_fee=bus, paid_amount=D('300'))
+        self._gen(client, school.student)
+        first, second = TaxInvoice.objects.order_by('pk')
+        assert [li['student_fee_id'] for li in first.line_items_json] == [fee.pk]
+        assert [li['student_fee_id'] for li in second.line_items_json] == [bus.pk]
+        assert second.total == D('300')
+
+    def test_fees_on_legacy_invoices_are_not_reinvoiced(self, login, accountant, school, fee):
+        """Invoices made before this fix have no student_fee_id — match them by line content."""
+        f.PaymentFactory(student_fee=fee, paid_amount=D('1000'))
+        TaxInvoice.objects.create(
+            student=school.student, subtotal=D('1000'), total=D('1000'), status=TaxInvoice.ISSUED,
+            line_items_json=[{'description': 'Books', 'qty': 1, 'gross_amount': 1000.0, 'discount': 0.0,
+                              'net_before_vat': 1000.0, 'vat_rate': 0, 'vat': 0.0, 'total': 1000.0}])
+        self._gen(login(accountant), school.student)
+        assert TaxInvoice.objects.count() == 1
+
+    def test_credit_notes_are_not_counted_as_invoices(self, login, accountant, school, fee):
+        f.PaymentFactory(student_fee=fee, paid_amount=D('1000'))
+        TaxInvoice.objects.create(
+            student=school.student, status=TaxInvoice.ISSUED, invoice_type=TaxInvoice.INVOICE_TYPE_CREDIT_NOTE,
+            line_items_json=[{'description': 'Books', 'gross_amount': 1000.0, 'discount': 0.0, 'student_fee_id': fee.pk}])
+        self._gen(login(accountant), school.student)
+        assert TaxInvoice.objects.filter(invoice_type=TaxInvoice.INVOICE_TYPE_STANDARD).count() == 1
 
 # ── Payroll & bank verification ──────────────────────────────────────────────
 
