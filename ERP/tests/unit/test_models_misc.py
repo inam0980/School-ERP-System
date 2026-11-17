@@ -205,3 +205,15 @@ class TestStaffModels:
     def test_staff_profile_full_name_proxies_user(self):
         p = f.StaffProfileFactory(user__full_name='Sara Ali')
         assert p.full_name == 'Sara Ali'
+
+
+class TestUserDisplayNames:
+    """BUG-17: templates/invoices call get_full_name(), which CustomUser lacked."""
+    def test_get_full_name_returns_full_name(self):
+        assert CustomUser(username='u', full_name='Fatima Al-Harbi').get_full_name() == 'Fatima Al-Harbi'
+
+    def test_falls_back_to_username_when_name_blank(self):
+        assert CustomUser(username='fh01', full_name='').get_full_name() == 'fh01'
+
+    def test_short_name_is_first_word(self):
+        assert CustomUser(username='u', full_name='Fatima Al-Harbi').get_short_name() == 'Fatima'

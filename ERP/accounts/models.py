@@ -71,6 +71,13 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return f"{self.full_name} ({self.get_role_display()})"
 
+    # Django's standard display-name API — used by templates, invoices and the admin.
+    def get_full_name(self):
+        return (self.full_name or '').strip() or self.username
+
+    def get_short_name(self):
+        return self.get_full_name().split()[0]
+
     @property
     def is_super_admin(self):
         return self.role == self.SUPER_ADMIN

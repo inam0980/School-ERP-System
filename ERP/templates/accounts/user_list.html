@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block title %}User Accounts{% endblock %}
+{% block page_title %}User Accounts{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <h2 class="font-semibold text-slate-800">User Accounts</h2>
+            <p class="text-xs text-slate-400 mt-0.5">{{ users|length }} account(s) · who can log in to the ERP</p>
+        </div>
+        <a href="{% url 'accounts:user_add' %}"
+           class="px-4 py-2 bg-[#1e3a5f] text-white text-sm font-medium rounded-lg hover:bg-[#2a5298] transition flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add User
+        </a>
+    </div>
+
+    <form method="GET" class="px-6 py-3 border-b border-slate-100 flex flex-wrap gap-2 items-center">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search name, username or email…"
+               class="flex-1 min-w-[200px] px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/30">
+        <select name="role" class="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
+            <option value="">All roles</option>
+            {% for value, label in roles %}
+            <option value="{{ value }}" {% if value == role %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button class="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition">Filter</button>
+        {% if q or role %}<a href="{% url 'accounts:user_list' %}" class="text-sm text-slate-500 hover:underline">Clear</a>{% endif %}
+    </form>
+
+    {% if users %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                <tr>
+                    <th class="px-6 py-3 text-left">Name</th>
+                    <th class="px-6 py-3 text-left">Username</th>
+                    <th class="px-6 py-3 text-left">Role</th>
+                    <th class="px-6 py-3 text-left">Status</th>
+                    <th class="px-6 py-3 text-left">Last login</th>
+                    <th class="px-6 py-3 text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+                {% for u in users %}
+                <tr class="hover:bg-slate-50 transition {% if not u.is_active %}opacity-60{% endif %}">
+                    <td class="px-6 py-3.5">
+                        <p class="font-medium text-slate-800">{{ u.full_name }}{% if u.pk == user.pk %} <span class="text-xs text-slate-400">(you)</span>{% endif %}</p>
+                        <p class="text-xs text-slate-400">{{ u.email }}</p>
+                    </td>
+                    <td class="px-6 py-3.5 text-slate-600 font-mono text-xs">{{ u.username }}</td>
+                    <td class="px-6 py-3.5">
+                        <span class="text-xs font-bold px-2 py-0.5 rounded-full
+                            {% if u.role == 'SUPER_ADMIN' %}bg-red-100 text-red-700
+                            {% elif u.role == 'ADMIN' %}bg-amber-100 text-amber-700
+                            {% elif u.role == 'TEACHER' %}bg-blue-100 text-blue-700
+                            {% elif u.role == 'ACCOUNTANT' %}bg-emerald-100 text-emerald-700
+                            {% elif u.role == 'PARENT' %}bg-teal-100 text-teal-700
+                            {% else %}bg-slate-100 text-slate-600{% endif %}">{{ u.get_role_display }}</span>
+                    </td>
+                    <td class="px-6 py-3.5">
+                        {% if u.is_active %}
+                        <span class="px-2.5 py-0.5 bg-green-50 text-green-700 text-xs font-semibold rounded-full border border-green-100">Active</span>
+                        {% else %}
+                        <span class="px-2.5 py-0.5 bg-slate-50 text-slate-500 text-xs rounded-full border border-slate-100">Deactivated</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-3.5 text-xs text-slate-500">{{ u.last_login|date:"d M Y, H:i"|default:"Never" }}</td>
+                    <td class="px-6 py-3.5 text-right">
+                        {% if u.role != 'SUPER_ADMIN' or user.role == 'SUPER_ADMIN' %}
+                        <div class="flex items-center justify-end gap-2">
+                            <a href="{% url 'accounts:user_edit' u.pk %}"
+                               class="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition">Edit</a>
+                            <a href="{% url 'accounts:user_reset_password' u.pk %}"
+                               class="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition">Reset password</a>
+                            {% if u.pk != user.pk %}
+                            <form method="POST" action="{% url 'accounts:user_toggle_active' u.pk %}" class="inline"
+                                  onsubmit="return confirm('{% if u.is_active %}Deactivate {{ u.full_name|escapejs }}? They will not be able to log in.{% else %}Reactivate {{ u.full_name|escapejs }}?{% endif %}')">
+                                {% csrf_token %}
+                                {% if u.is_active %}
+                                <button class="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition">Deactivate</button>
+                                {% else %}
+                                <button class="px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition">Reactivate</button>
+                                {% endif %}
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="px-6 py-14 text-center text-slate-400 text-sm">No accounts match your filter.</div>
+    {% endif %}
+</div>
+{% endblock %}

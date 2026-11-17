@@ -86,6 +86,7 @@ def world(db, school):
     w.assignment = f.TeacherAssignmentFactory(subject=w.subject, section=w.section, academic_year=w.year)
     w.vacation = f.VacationRequestFactory()
     w.moe = f.MOEApprovalFactory()
+    w.other_user = f.TeacherFactory()
     return w
 
 
@@ -139,6 +140,9 @@ ROUTE_OBJECTS = {
     'staff:moe_edit': 'moe', 'staff:moe_delete': 'moe',
 
     'ai:performance_summary': 'student',
+
+    'accounts:user_edit': 'other_user', 'accounts:user_reset_password': 'other_user',
+    'accounts:user_toggle_active': 'other_user',
 }
 
 
@@ -199,6 +203,8 @@ def test_no_route_crashes_and_get_never_deletes(client, world, role):
 # Adding a route here is a security decision: write the reason next to it.
 PUBLIC_TO_LOGGED_IN = {
     'core:dashboard', 'accounts:profile', 'accounts:login',
+    # Every user must be able to change their own password.
+    'accounts:password_change',
     # Dropdown reference data (names of grades/sections/subjects) — no PII.
     'core:api_grades', 'core:api_sections', 'core:api_study_modes',
     'academics:api_subjects', 'academics:api_exams',

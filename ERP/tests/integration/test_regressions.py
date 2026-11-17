@@ -235,3 +235,31 @@ class TestBug15GenerateInvoiceRequiresPost:
         html = resp.content.decode()
         url = reverse('fees:generate_invoice', args=[school.student.pk])
         assert f'action="{url}"' in html and 'method="post"' in html.lower()
+
+
+# ── BUG-16  Open redirect after login: /accounts/login/?next=https://evil.example.com
+
+class TestBug16LoginOpenRedirect:
+    @pytest.mark.parametrize("nxt", ['https://evil.example.com/', '//evil.example.com', '/\evil.example.com'])
+    def test_offsite_next_is_ignored(self, client, nxt):
+        f.UserFactory(username='u16', password='Pass-Word-1616')
+        resp = client.post(f"{reverse('accounts:login')}?next={nxt}",
+                           {'username': 'u16', 'password': 'Pass-Word-1616'})
+        assert resp.status_code == 302 and 'evil.example.com' not in resp['Location']
+
+    def test_local_next_is_honoured(self, client):
+        f.UserFactory(username='u16', password='Pass-Word-1616')
+        resp = client.post(f"{reverse('accounts:login')}?next=/fees/",
+                           {'username': 'u16', 'password': 'Pass-Word-1616'})
+        assert resp['Location'] == '/fees/'
+
+
+# ── BUG-17  Top bar showed the username: it used user.first_name / get_full_name,
+#            which CustomUser does not have
+
+class TestBug17HeaderShowsFullName:
+    def test_header_shows_full_name_not_username(self, login):
+        u = f.UserFactory(username='zz_login_name', full_name='Fatima Al-Harbi', role='ADMIN')
+        html = login(u).get(reverse('students:hub')).content.decode()   # page body never names the user
+        assert 'Fatima Al-Harbi' in html
+        assert 'zz_login_name' not in html
