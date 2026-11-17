@@ -526,9 +526,27 @@ def continuation_agreement(request, pk):
 
 # Reverse maps: CSV display value → model code
 _GENDER_MAP = {
-    'male / ذكر': 'M', 'male': 'M', 'm': 'M',
-    'female / أنثى': 'F', 'female': 'F', 'f': 'F',
+    'male / ذكر': 'M', 'male': 'M', 'm': 'M', 'ذكر': 'M', 'boy': 'M',
+    'female / أنثى': 'F', 'female': 'F', 'f': 'F', 'أنثى': 'F', 'انثى': 'F', 'girl': 'F',
 }
+
+
+def _id_type_from_row(row):
+    """
+    ID Type for an imported row. An explicit, recognised 'ID Type' wins; otherwise
+    derive it from which ID number is filled in. Never default an Iqama/Passport
+    holder to National ID — that bills an expat as Saudi (0 % VAT).
+    """
+    explicit = _ID_TYPE_MAP.get(row.get('ID Type', '').lower())
+    if explicit:
+        return explicit
+    if row.get('National ID'):
+        return 'NATIONAL_ID'
+    if row.get('Iqama Number'):
+        return 'IQAMA'
+    if row.get('Passport Number'):
+        return 'PASSPORT'
+    return 'NATIONAL_ID'
 _ID_TYPE_MAP = {
     'national id / هوية وطنية': 'NATIONAL_ID',
     'national id': 'NATIONAL_ID',
@@ -595,8 +613,12 @@ def student_import(request):
                         admission_date = _date.today()
 
                     # ── Coded fields ───────────────────────────────────
-                    gender          = _GENDER_MAP.get(row.get('Gender', '').lower(), 'M')
-                    id_type         = _ID_TYPE_MAP.get(row.get('ID Type', '').lower(), 'NATIONAL_ID')
+                    gender          = _GENDER_MAP.get(row.get('Gender', '').lower())
+                    if gender is None:        # never guess: a wrong default silently mislabels students
+                        errors.append(f"Row {i} ({full_name}): unrecognised Gender '{row.get('Gender', '')}' "
+                                      "(use Male / Female or ذكر / أنثى).")
+                        continue
+                    id_type         = _id_type_from_row(row)
                     enrollment_type = _ENROLLMENT_MAP.get(row.get('Enrollment Type', '').lower(), 'NEW')
                     is_active       = row.get('Active', 'Yes').lower() != 'no'
 

@@ -79,6 +79,8 @@ class DivisionFactory(DjangoModelFactory):
         model = Division
         django_get_or_create = ('name',)
 
+    # NB: core migration 0005 seeds 'American'; this creates 'AMERICAN' alongside it.
+    # Tests that look divisions up with name__iexact must use their own division name.
     name            = Division.AMERICAN
     curriculum_type = Division.AMERICAN
 
