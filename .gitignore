@@ -38,7 +38,7 @@ staticfiles/
 .coverage.*
 htmlcov/
 coverage.xml
-
+erp.zip
 # ── Node / Tailwind toolchain (reinstall with `npm install`) ──────
 node_modules/
 

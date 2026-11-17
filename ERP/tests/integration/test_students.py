@@ -9,6 +9,7 @@ from students.models import Student
 from tests.factories import (
     UserFactory, StudentFactory,
     DivisionFactory, GradeFactory, SectionFactory, AcademicYearFactory,
+    StudyModeFactory,
 )
 
 pytestmark = pytest.mark.django_db
@@ -52,7 +53,11 @@ class TestStudentCreate:
             'arabic_name':     'طالب جديد',
             'dob':             '2010-05-15',
             'gender':          'M',
-            'nationality':     'Saudi',
+            'nationality':     'Saudi Arabia',
+            'national_id':     '1012345678',
+            'study_mode':      StudyModeFactory().pk,
+            'fee_category':    'regular',
+            'is_active':       'on',
             'division':        division.pk,
             'grade':           grade.pk,
             'section':         section.pk,
