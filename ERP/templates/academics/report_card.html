@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load grading_tags %}
 {% block title %}Report Card — {{ student.full_name }} — Al-Kawthar{% endblock %}
 
 {% block content %}
@@ -38,10 +39,19 @@
 <!-- Summary stats -->
 <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
     <div class="bg-white rounded-xl p-4 border border-slate-200 text-center">
+        {% if data.scale == 'AMERICAN' %}
         <p class="text-2xl font-bold {% if data.overall_gpa >= 3.0 %}text-green-600{% elif data.overall_gpa >= 2.0 %}text-amber-600{% else %}text-red-600{% endif %}">
             {{ data.overall_gpa|default:'—' }}
         </p>
         <p class="text-xs text-slate-500 mt-0.5">Cumulative GPA</p>
+        {% elif data.scale == 'FRENCH' %}
+        <p class="text-2xl font-bold text-slate-800">{{ data.overall_label|default:'—' }}</p>
+        <p class="text-xs text-slate-500 mt-0.5">Moyenne générale · {{ data.overall_mention }}</p>
+        {% else %}
+        <p class="text-2xl font-bold text-slate-800">{{ data.overall_label|default:'—' }}
+            <span class="text-base font-medium text-slate-500">({{ data.overall_pct }}%)</span></p>
+        <p class="text-xs text-slate-500 mt-0.5">Overall Grade</p>
+        {% endif %}
     </div>
     <div class="{% if data.passed %}bg-green-50 border-green-200{% else %}bg-red-50 border-red-200{% endif %} rounded-xl p-4 border text-center">
         <p class="text-2xl font-bold {% if data.passed %}text-green-700{% else %}text-red-700{% endif %}">
@@ -62,8 +72,9 @@
             <tr>
                 <th class="px-5 py-3 text-left font-semibold">Subject</th>
                 <th class="px-5 py-3 text-center font-semibold">Weighted Avg %</th>
-                <th class="px-5 py-3 text-center font-semibold">Grade</th>
-                <th class="px-5 py-3 text-center font-semibold">GPA</th>
+                <th class="px-5 py-3 text-center font-semibold">{% if data.scale == 'FRENCH' %}Mark /20{% else %}Grade{% endif %}</th>
+                {% if data.scale == 'AMERICAN' %}<th class="px-5 py-3 text-center font-semibold">GPA</th>
+                {% elif data.scale == 'FRENCH' %}<th class="px-5 py-3 text-center font-semibold">Mention</th>{% endif %}
                 <th class="px-5 py-3 text-center font-semibold">Result</th>
             </tr>
         </thead>
@@ -75,16 +86,10 @@
                 {% if r.absent %}AB{% elif r.avg_pct is not None %}{{ r.avg_pct }}%{% else %}—{% endif %}
             </td>
             <td class="px-5 py-3 text-center">
-                <span class="px-2 py-0.5 rounded-full text-xs font-semibold
-                    {% if r.letter == 'A+' or r.letter == 'A' %}bg-green-100 text-green-700
-                    {% elif r.letter == 'B+' or r.letter == 'B' %}bg-blue-100 text-blue-700
-                    {% elif r.letter == 'C+' or r.letter == 'C' %}bg-yellow-100 text-yellow-700
-                    {% elif r.letter == 'D' %}bg-orange-100 text-orange-700
-                    {% else %}bg-red-100 text-red-700{% endif %}">
-                    {{ r.letter }}
-                </span>
+                <span class="px-2 py-0.5 rounded-full text-xs font-semibold {{ r.letter|grade_css }}">{{ r.letter }}</span>
             </td>
-            <td class="px-5 py-3 text-center font-semibold text-slate-700">{{ r.gpa }}</td>
+            {% if data.scale == 'AMERICAN' %}<td class="px-5 py-3 text-center font-semibold text-slate-700">{{ r.gpa }}</td>
+            {% elif data.scale == 'FRENCH' %}<td class="px-5 py-3 text-center text-slate-700">{{ r.mention|default:'—' }}</td>{% endif %}
             <td class="px-5 py-3 text-center">
                 {% if r.absent %}
                 <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">Absent</span>
@@ -100,9 +105,16 @@
         <tfoot class="bg-slate-50 font-semibold text-slate-700">
             <tr>
                 <td class="px-5 py-3">Overall</td>
-                <td class="px-5 py-3 text-center">—</td>
+                <td class="px-5 py-3 text-center">{% if data.overall_pct is not None %}{{ data.overall_pct }}%{% else %}—{% endif %}</td>
+                {% if data.scale == 'AMERICAN' %}
                 <td class="px-5 py-3 text-center">—</td>
                 <td class="px-5 py-3 text-center">{{ data.overall_gpa|default:'—' }}</td>
+                {% elif data.scale == 'FRENCH' %}
+                <td class="px-5 py-3 text-center">{{ data.overall_label }}</td>
+                <td class="px-5 py-3 text-center">{{ data.overall_mention }}</td>
+                {% else %}
+                <td class="px-5 py-3 text-center">{{ data.overall_label }}</td>
+                {% endif %}
                 <td class="px-5 py-3 text-center">
                     {% if data.passed %}
                     <span class="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">PASS</span>

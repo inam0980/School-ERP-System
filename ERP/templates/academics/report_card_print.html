@@ -72,8 +72,9 @@
                 <th>#</th>
                 <th>Subject</th>
                 <th class="center">Weighted Avg %</th>
-                <th class="center">Grade</th>
-                <th class="center">GPA Points</th>
+                <th class="center">{% if data.scale == 'FRENCH' %}Mark /20{% else %}Grade{% endif %}</th>
+                {% if data.scale == 'AMERICAN' %}<th class="center">GPA Points</th>
+                {% elif data.scale == 'FRENCH' %}<th class="center">Mention</th>{% endif %}
                 <th class="center">Result</th>
             </tr>
         </thead>
@@ -84,7 +85,8 @@
             <td>{{ r.subject.name }}</td>
             <td class="center">{% if r.absent %}AB{% elif r.avg_pct is not None %}{{ r.avg_pct }}%{% else %}—{% endif %}</td>
             <td class="center">{{ r.letter }}</td>
-            <td class="center">{{ r.gpa }}</td>
+            {% if data.scale == 'AMERICAN' %}<td class="center">{{ r.gpa }}</td>
+            {% elif data.scale == 'FRENCH' %}<td class="center">{{ r.mention|default:'—' }}</td>{% endif %}
             <td class="center">
                 {% if r.absent %}<span class="absent">Absent</span>
                 {% elif r.passed %}<span class="pass">Pass</span>
@@ -95,8 +97,17 @@
         </tbody>
         <tfoot>
             <tr>
+                {% if data.scale == 'AMERICAN' %}
                 <td class="center" colspan="4">Cumulative GPA</td>
                 <td class="center">{{ data.overall_gpa|default:'—' }}</td>
+                {% elif data.scale == 'FRENCH' %}
+                <td class="center" colspan="3">Moyenne générale ({{ data.overall_pct }}%)</td>
+                <td class="center">{{ data.overall_label }}</td>
+                <td class="center">{{ data.overall_mention }}</td>
+                {% else %}
+                <td class="center" colspan="3">Overall ({{ data.overall_pct }}%)</td>
+                <td class="center">{{ data.overall_label }}</td>
+                {% endif %}
                 <td class="center">
                     {% if data.passed %}<span class="pass">PASS</span>
                     {% else %}<span class="fail">FAIL</span>{% endif %}
@@ -108,7 +119,9 @@
     <!-- Overall summary -->
     <div class="summary-box">
         <div class="big">
-            GPA: {{ data.overall_gpa|default:'—' }} &nbsp;/&nbsp;
+            {% if data.scale == 'AMERICAN' %}GPA: {{ data.overall_gpa|default:'—' }}
+            {% elif data.scale == 'FRENCH' %}Moyenne: {{ data.overall_label }} — {{ data.overall_mention }}
+            {% else %}Overall Grade: {{ data.overall_label }} ({{ data.overall_pct }}%){% endif %} &nbsp;/&nbsp;
             {% if data.passed %}PROMOTED{% else %}NEEDS IMPROVEMENT{% endif %}
         </div>
     </div>

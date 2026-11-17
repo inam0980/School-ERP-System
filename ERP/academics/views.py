@@ -16,6 +16,7 @@ from accounts.decorators import role_required
 from students.models import Student
 from core.models import Subject, Section, AcademicYear
 from .models import ExamType, Exam, Mark, GradeConfig, ReportCard, TERM_CHOICES
+from . import grading
 from .forms import (
     ExamTypeForm, ExamForm, GradeConfigForm, ReportCardFilterForm,
 )
@@ -208,6 +209,8 @@ def marks_entry(request, exam_pk):
         'has_approved': has_approved,
         'is_admin':     is_admin,
         'total_marks':  exam.total_marks,
+        'grade_scale':   grading.scale_for_grade(exam.section.grade),
+        'passing_marks': GradeConfig.passing_for(exam.section.grade_id),
     })
 
 
@@ -306,22 +309,11 @@ def _compute_report_data(student, academic_year, term):
     for m in marks:
         by_subject[m.exam.subject].append(m)
 
-    def _letter(p):
-        if p is None:  return 'AB'
-        if p >= 90:    return 'A+'
-        if p >= 85:    return 'A'
-        if p >= 80:    return 'B+'
-        if p >= 75:    return 'B'
-        if p >= 70:    return 'C+'
-        if p >= 65:    return 'C'
-        if p >= 60:    return 'D'
-        return 'F'
-
-    GPA_MAP = {'A+': 4.0, 'A': 4.0, 'B+': 3.5, 'B': 3.0,
-               'C+': 2.5, 'C': 2.0, 'D': 1.0, 'F': 0.0, 'AB': 0.0}
+    # Scale of the class the marks were earned in (the student may since have been promoted).
+    first = next(iter(marks), None)
+    scale = first.grade_scale if first else grading.scale_for_grade(student.grade)
 
     results = []
-    gpa_vals = []
     for subj, subj_marks in by_subject.items():
         wsum = wtotal = 0
         absent = False
@@ -334,26 +326,26 @@ def _compute_report_data(student, academic_year, term):
             if m.is_absent:
                 absent = True
         avg  = round(wsum / wtotal, 1) if wtotal else None
-        let  = _letter(avg)
-        gpa  = GPA_MAP[let]
-        gpa_vals.append(gpa)
+        let  = grading.label(avg, scale)
         passing = subj_marks[0].passing_marks          # GradeConfig of the exam's grade
         results.append({
             'subject':  subj,
             'avg_pct':  avg,
             'letter':   let,
-            'gpa':      gpa,
+            'gpa':      grading.gpa_points(let, scale),
+            'mention':  grading.mention(avg) if scale == grading.FRENCH else '',
             'passed':   (avg is not None and avg >= passing),
             'absent':   absent,
         })
 
     results.sort(key=lambda r: r['subject'].name)
-    overall_gpa    = round(sum(gpa_vals) / len(gpa_vals), 2) if gpa_vals else None
     overall_passed = all(r['passed'] for r in results) if results else False
     return {
         'subjects':     results,
-        'overall_gpa':  overall_gpa,
+        'scale':        scale,
         'passed':       overall_passed,
+        # overall_gpa (American) | overall_pct + overall_label (British) | + overall_mention (French)
+        **grading.overall([r['avg_pct'] for r in results], scale),
     }
 
 
@@ -468,19 +460,7 @@ def noor_export(request):
             scored_map[m.student_id][m.exam.subject_id]['wsum']   += pct * w
             scored_map[m.student_id][m.exam.subject_id]['wtotal'] += w
 
-    def _letter(p):
-        if p is None: return 'AB'
-        if p >= 90:   return 'A+'
-        if p >= 85:   return 'A'
-        if p >= 80:   return 'B+'
-        if p >= 75:   return 'B'
-        if p >= 70:   return 'C+'
-        if p >= 65:   return 'C'
-        if p >= 60:   return 'D'
-        return 'F'
-
-    GPA_MAP = {'A+': 4.0, 'A': 4.0, 'B+': 3.5, 'B': 3.0,
-               'C+': 2.5, 'C': 2.0, 'D': 1.0, 'F': 0.0, 'AB': 0.0}
+    scale = grading.scale_for_grade(section.grade)
 
     response = HttpResponse(content_type='text/csv; charset=utf-8')
     fname    = f"noor_{section}_{year.name}_{term}.csv"
@@ -491,24 +471,24 @@ def noor_export(request):
     header = ['Student ID', 'Full Name (EN)', 'Full Name (AR)', 'Roll No']
     for subj in subjects:
         header += [subj.name, f'{subj.name} Grade']
-    header += ['Overall GPA', 'Result']
+    header += ['Overall GPA' if scale == grading.AMERICAN else 'Overall Grade', 'Result']
     writer.writerow(header)
 
     passing = GradeConfig.passing_for(section.grade_id)   # school's pass mark for this grade
     for student in students:
         row = [student.student_id, student.full_name, student.arabic_name or '', student.roll_number or '']
-        gpas       = []
+        avgs       = []
         all_passed = True
         for subj in subjects:
             d   = scored_map[student.pk][subj.pk]
             avg = round(d['wsum'] / d['wtotal'], 1) if d['wtotal'] else None
-            let = _letter(avg)
-            row += [avg if avg is not None else 'AB', let]
-            gpas.append(GPA_MAP[let])
+            row += [avg if avg is not None else 'AB', grading.label(avg, scale)]
+            avgs.append(avg)
             if avg is None or avg < passing:
                 all_passed = False
-        overall = round(sum(gpas) / len(gpas), 2) if gpas else ''
-        row += [overall, 'Pass' if all_passed else 'Fail']
+        o = grading.overall(avgs, scale)
+        overall = o['overall_gpa'] if scale == grading.AMERICAN else o['overall_label']
+        row += [overall if overall is not None else '', 'Pass' if all_passed else 'Fail']
         writer.writerow(row)
 
     return response

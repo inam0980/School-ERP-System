@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load grading_tags %}
 {% block title %}Marks Entry — {{ exam.name }} — Al-Kawthar{% endblock %}
 
 {% block extra_head %}
@@ -163,11 +164,7 @@
                     <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-500">AB</span>
                     {% else %}
                     <span class="px-2 py-0.5 rounded-full text-xs font-semibold
-                        {% if row.letter == 'A+' or row.letter == 'A' %}bg-green-100 text-green-700
-                        {% elif row.letter == 'B+' or row.letter == 'B' %}bg-blue-100 text-blue-700
-                        {% elif row.letter == 'C+' or row.letter == 'C' %}bg-yellow-100 text-yellow-700
-                        {% elif row.letter == 'D' %}bg-orange-100 text-orange-700
-                        {% else %}bg-red-100 text-red-700{% endif %}">
+                        {{ row.letter|grade_css }}">
                         {{ row.letter }}
                     </span>
                     {% endif %}
@@ -272,18 +269,30 @@ function toggleAbsent(studentId) {
     }
 }
 
-// Live grade calculation
+// Live grade preview — mirrors academics/grading.py (server is the source of truth).
+const GRADE_SCALE   = "{{ grade_scale }}";
+const PASSING_MARKS = {{ passing_marks }};
+const CSS = {
+    green: 'bg-green-100 text-green-700', blue: 'bg-blue-100 text-blue-700',
+    yellow: 'bg-yellow-100 text-yellow-700', orange: 'bg-orange-100 text-orange-700',
+    red: 'bg-red-100 text-red-700',
+};
+const BANDS = {
+    AMERICAN: [[90,'A+','green'],[85,'A','green'],[80,'B+','blue'],[75,'B','blue'],
+               [70,'C+','yellow'],[65,'C','yellow'],[60,'D','orange'],[0,'F','red']],
+    BRITISH:  [[90,'A*','green'],[80,'A','green'],[70,'B','blue'],[60,'C','yellow'],
+               [50,'D','orange'],[40,'E','orange'],[0,'U','red']],
+};
 function letterGrade(pct) {
     if (pct === null || pct === '') return {letter: '—', css: 'bg-slate-100 text-slate-500'};
-    const p = parseFloat(pct);
-    if (p >= 90) return {letter: 'A+', css: 'bg-green-100 text-green-700'};
-    if (p >= 85) return {letter: 'A',  css: 'bg-green-100 text-green-700'};
-    if (p >= 80) return {letter: 'B+', css: 'bg-blue-100 text-blue-700'};
-    if (p >= 75) return {letter: 'B',  css: 'bg-blue-100 text-blue-700'};
-    if (p >= 70) return {letter: 'C+', css: 'bg-yellow-100 text-yellow-700'};
-    if (p >= 65) return {letter: 'C',  css: 'bg-yellow-100 text-yellow-700'};
-    if (p >= 60) return {letter: 'D',  css: 'bg-orange-100 text-orange-700'};
-    return {letter: 'F', css: 'bg-red-100 text-red-700'};
+    const p = Math.round(parseFloat(pct) * 10) / 10;           // same 1-dp rounding as the server
+    if (GRADE_SCALE === 'FRENCH') {
+        const note = Math.round(p / 5 * 10) / 10;
+        const c = note >= 14 ? 'green' : note >= 12 ? 'blue' : note >= 10 ? 'yellow' : 'red';
+        return {letter: note + '/20', css: CSS[c]};
+    }
+    const band = (BANDS[GRADE_SCALE] || BANDS.AMERICAN).find(b => p >= b[0]);
+    return {letter: band[1], css: CSS[band[2]]};
 }
 
 function updateGrade(studentId, obtained, total) {
@@ -312,7 +321,7 @@ function updateGrade(studentId, obtained, total) {
 
     // Row colour: fail = light red
     if (rowEl && !rowEl.classList.contains('bg-green-50') && !rowEl.classList.contains('bg-amber-50')) {
-        rowEl.classList.toggle('bg-red-50', lg.letter === 'F');
+        rowEl.classList.toggle('bg-red-50', Math.round(p * 10) / 10 < PASSING_MARKS);   // grade's pass mark
     }
 }
 </script>

@@ -50,7 +50,11 @@
             </p>
         </div>
         <div class="text-right">
-            <p class="text-sm text-slate-600">GPA: <strong class="text-primary">{{ card.data.overall_gpa|default:'—' }}</strong></p>
+            <p class="text-sm text-slate-600">
+                {% if card.data.scale == 'AMERICAN' %}GPA: <strong class="text-primary">{{ card.data.overall_gpa|default:'—' }}</strong>
+                {% elif card.data.scale == 'FRENCH' %}Moyenne: <strong class="text-primary">{{ card.data.overall_label }}</strong> · {{ card.data.overall_mention }}
+                {% else %}Overall: <strong class="text-primary">{{ card.data.overall_label }}</strong> ({{ card.data.overall_pct }}%){% endif %}
+            </p>
             <span class="px-3 py-0.5 rounded-full text-xs font-bold
                 {% if card.data.passed %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
                 {% if card.data.passed %}PASS{% else %}FAIL{% endif %}
@@ -63,8 +67,9 @@
             <tr class="bg-slate-50">
                 <th class="border border-slate-200 px-3 py-2 text-left font-semibold text-slate-600">Subject</th>
                 <th class="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">Avg %</th>
-                <th class="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">Grade</th>
-                <th class="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">GPA</th>
+                <th class="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">{% if card.data.scale == 'FRENCH' %}Mark /20{% else %}Grade{% endif %}</th>
+                {% if card.data.scale == 'AMERICAN' %}<th class="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">GPA</th>
+                {% elif card.data.scale == 'FRENCH' %}<th class="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">Mention</th>{% endif %}
                 <th class="border border-slate-200 px-3 py-2 text-center font-semibold text-slate-600">Result</th>
             </tr>
         </thead>
@@ -76,7 +81,8 @@
                 {% if r.absent %}AB{% elif r.avg_pct is not None %}{{ r.avg_pct }}%{% else %}—{% endif %}
             </td>
             <td class="border border-slate-200 px-3 py-1.5 text-center font-semibold">{{ r.letter }}</td>
-            <td class="border border-slate-200 px-3 py-1.5 text-center">{{ r.gpa }}</td>
+            {% if card.data.scale == 'AMERICAN' %}<td class="border border-slate-200 px-3 py-1.5 text-center">{{ r.gpa }}</td>
+            {% elif card.data.scale == 'FRENCH' %}<td class="border border-slate-200 px-3 py-1.5 text-center">{{ r.mention|default:'—' }}</td>{% endif %}
             <td class="border border-slate-200 px-3 py-1.5 text-center">
                 {% if r.absent %}AB{% elif r.passed %}✅{% else %}❌{% endif %}
             </td>

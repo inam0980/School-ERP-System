@@ -108,26 +108,23 @@ class Mark(models.Model):
             return None
         return round(float(self.obtained_marks) / self.exam.total_marks * 100, 1)
 
+    @property
+    def grade_scale(self):
+        """AMERICAN / BRITISH / FRENCH for this exam's grade (cached per exam)."""
+        from academics import grading
+        exam = self.exam
+        if not hasattr(exam, '_grade_scale'):
+            exam._grade_scale = grading.scale_for_grade(exam.section.grade)
+        return exam._grade_scale
+
     def get_letter_grade(self):
-        pct = self.get_percentage()
-        if pct is None:
-            return 'AB'
-        if pct >= 90: return 'A+'
-        if pct >= 85: return 'A'
-        if pct >= 80: return 'B+'
-        if pct >= 75: return 'B'
-        if pct >= 70: return 'C+'
-        if pct >= 65: return 'C'
-        if pct >= 60: return 'D'
-        return 'F'
+        from academics import grading
+        return grading.label(self.get_percentage(), self.grade_scale)
 
     def get_gpa_points(self):
-        grade = self.get_letter_grade()
-        mapping = {
-            'A+': 4.0, 'A': 4.0, 'B+': 3.5, 'B': 3.0,
-            'C+': 2.5, 'C': 2.0, 'D': 1.0, 'F': 0.0, 'AB': 0.0,
-        }
-        return mapping.get(grade, 0.0)
+        """4.0-scale points (American scale only; None for British / French)."""
+        from academics import grading
+        return grading.gpa_points(self.get_letter_grade(), self.grade_scale)
 
     @property
     def passing_marks(self):
