@@ -978,7 +978,11 @@ def assign_student_fee(request, student_pk):
         structure_id = request.POST.get('structure_id')
         item_ids     = request.POST.getlist('item_ids')
         due_date_raw = request.POST.get('due_date')
-        discount_pct = Decimal(request.POST.get('discount_pct', '0') or '0')
+        raw_pct      = (request.POST.get('discount_pct') or '').strip()
+        discount_pct = _parse_decimal(raw_pct, 0, 100) if raw_pct else Decimal('0')
+        if discount_pct is None:
+            messages.error(request, 'Discount must be a number between 0 and 100 %.')
+            return redirect('fees:assign_student_fee', student_pk=student.pk)
 
         # Additional (ad-hoc) fees rows
         adhoc_type_ids   = request.POST.getlist('adhoc_fee_type[]')
@@ -1059,11 +1063,8 @@ def assign_student_fee(request, student_pk):
                     amount_raw = (amount_raw or '').strip()
                     if not type_id or not amount_raw:
                         continue
-                    try:
-                        amount = Decimal(amount_raw)
-                        if amount <= 0:
-                            continue
-                    except Exception:
+                    amount = _parse_decimal(amount_raw, minimum=Decimal('0.01'))
+                    if amount is None:          # rejects 0, negatives, text, NaN, Infinity
                         continue
                     try:
                         fee_type = FeeType.objects.get(pk=type_id)

@@ -341,3 +341,70 @@ class TestPaymentPlan:
         assert PaymentPlan.objects.filter(pk=plan.pk).exists()
         client.post(reverse('fees:payment_plan_delete', args=[plan.pk]))
         assert not PaymentPlan.objects.filter(pk=plan.pk).exists()
+
+
+# ── Assigning fees to one student ────────────────────────────────────────────
+
+class TestAssignStudentFee:
+    @pytest.fixture
+    def structure(self, school):
+        s = f.FeeStructureFactory(academic_year=school.year, grade=school.grade)
+        books = f.FeeStructureItemFactory(structure=s, fee_type=f.FeeTypeFactory(name='Books'), amount=D('800'))
+        bus = f.FeeStructureItemFactory(structure=s, fee_type=f.TaxableFeeTypeFactory(), amount=D('2000'))
+        return s, books, bus
+
+    def _post(self, client, student, structure, items, pct='', **extra):
+        return client.post(reverse('fees:assign_student_fee', args=[student.pk]), {
+            'structure_id': structure.pk, 'item_ids': [i.pk for i in items],
+            'discount_pct': pct, 'due_date': '2030-01-31', **extra})
+
+    def test_assigns_items_with_vat_for_expat(self, login, accountant, school, structure):
+        s, books, bus = structure
+        self._post(login(accountant), school.expat, s, [books, bus])
+        fees = {sf.fee_structure.fee_type.name: sf for sf in StudentFee.objects.filter(student=school.expat)}
+        assert fees['Books'].net_amount == D('800.00')
+        assert fees['Transport'].net_amount == D('2300.00')          # 15 % VAT for Iqama holder
+        assert fees['Books'].due_date == datetime.date(2030, 1, 31)
+
+    def test_discount_applied(self, login, accountant, school, structure):
+        s, books, _ = structure
+        self._post(login(accountant), school.student, s, [books], pct='25')
+        sf = StudentFee.objects.get(student=school.student)
+        assert (sf.discount, sf.net_amount) == (D('200.00'), D('600.00'))
+
+    def test_assigning_twice_does_not_duplicate(self, login, accountant, school, structure):
+        s, books, _ = structure
+        client = login(accountant)
+        self._post(client, school.student, s, [books])
+        self._post(client, school.student, s, [books])
+        assert StudentFee.objects.filter(student=school.student).count() == 1
+
+    def test_structure_of_another_grade_rejected(self, login, accountant, school):
+        other = f.FeeStructureFactory(academic_year=school.year, grade=f.GradeFactory(division=school.division))
+        item = f.FeeStructureItemFactory(structure=other)
+        resp = self._post(login(accountant), school.student, other, [item])
+        assert resp.status_code == 404 and not StudentFee.objects.exists()
+
+    @pytest.mark.regression
+    @pytest.mark.parametrize("pct", ['abc', 'NaN', 'Infinity', '-20', '120'])
+    def test_bug24_bad_discount_rejected_without_crash(self, login, accountant, school, structure, pct):
+        s, books, _ = structure
+        resp = self._post(login(accountant), school.student, s, [books], pct=pct)
+        assert resp.status_code == 302
+        assert not StudentFee.objects.filter(student=school.student).exists()
+
+    @pytest.mark.regression
+    @pytest.mark.parametrize("amount", ['Infinity', 'NaN', '-5', 'abc'])
+    def test_bug24_bad_additional_fee_amount_skipped_without_crash(self, login, accountant, school, amount):
+        resp = login(accountant).post(reverse('fees:assign_student_fee', args=[school.student.pk]), {
+            'adhoc_fee_type[]': [f.FeeTypeFactory(name='Trip').pk], 'adhoc_amount[]': [amount],
+            'adhoc_note[]': [''], 'discount_pct': ''})
+        assert resp.status_code == 302
+        assert not StudentFee.objects.filter(student=school.student).exists()
+
+    def test_additional_fee(self, login, accountant, school):
+        login(accountant).post(reverse('fees:assign_student_fee', args=[school.student.pk]), {
+            'adhoc_fee_type[]': [f.FeeTypeFactory(name='Trip').pk], 'adhoc_amount[]': ['350'],
+            'adhoc_note[]': ['Museum visit'], 'discount_pct': ''})
+        sf = StudentFee.objects.get(student=school.student)
+        assert sf.net_amount == D('350.00')
