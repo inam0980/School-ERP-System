@@ -3159,7 +3159,9 @@ def setup_payment_plan(request, student_fee_pk):
             semesters.append(sem)
 
         total_inst = sum(amounts)
-        if abs(total_inst - sf.balance) > Decimal('1.00'):
+        # Must match to the halala: a plan even 0.50 short leaves the fee PARTIAL
+        # (and the family on the defaulters list) after every installment is paid.
+        if total_inst != sf.balance:
             errors.append(
                 f"Installments total SAR {total_inst:,.2f} does not match "
                 f"outstanding balance SAR {sf.balance:,.2f}."

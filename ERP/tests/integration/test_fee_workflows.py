@@ -248,3 +248,96 @@ class TestPayrollAndBank:
         login(accountant).post(reverse('fees:bank_verify', args=[p.pk]), {'bank_ref': 'SNB-99'})
         p.refresh_from_db()
         assert p.bank_verified and p.transaction_ref == 'SNB-99'
+
+
+# ── Payment plans (installments) ─────────────────────────────────────────────
+
+class TestPaymentPlan:
+    @pytest.fixture
+    def tuition(self, school):
+        item = f.FeeStructureItemFactory(fee_type=f.FeeTypeFactory(name='1st Semester'), amount=D('10000'))
+        return f.StudentFeeFactory(student=school.student, fee_structure=item, amount=D('10000'))
+
+    def _post(self, client, sf, rows, **extra):
+        today = datetime.date.today()
+        data = {'installment_count': len(rows)}
+        for i, (amount, sem) in enumerate(rows, start=1):
+            data.update({f'inst_amount_{i}': amount, f'inst_semester_{i}': sem,
+                         f'inst_due_{i}': (today + datetime.timedelta(days=30 * i)).isoformat()})
+        data.update(extra)
+        return client.post(reverse('fees:payment_plan_setup', args=[sf.pk]), data)
+
+    def test_create_plan(self, login, accountant, tuition):
+        from fees.models import PaymentPlan
+        resp = self._post(login(accountant), tuition,
+                          [('2500', 1), ('2500', 1), ('5000', 2)])
+        assert resp.status_code == 302
+        plan = PaymentPlan.objects.get(student_fee=tuition)
+        assert [(i.installment_no, i.semester, i.amount) for i in plan.installments.all()] == \
+               [(1, 1, D('2500')), (2, 1, D('2500')), (3, 2, D('5000'))]
+
+    @pytest.mark.regression
+    @pytest.mark.parametrize("rows", [
+        [('5000', 1), ('4999.50', 2)],          # 0.50 short → fee could never reach PAID
+        [('5000.50', 1), ('5000', 2)],          # 0.50 over
+    ])
+    def test_bug21_total_must_equal_balance_exactly(self, login, accountant, tuition, rows):
+        from fees.models import PaymentPlan
+        resp = self._post(login(accountant), tuition, rows)
+        assert resp.status_code == 200
+        assert not PaymentPlan.objects.exists()
+
+    def test_odd_halala_split_between_semesters(self, login, accountant, school):
+        from fees.models import PaymentPlan
+        item = f.FeeStructureItemFactory(fee_type=f.FeeTypeFactory(name='2nd Semester'), amount=D('1000.01'))
+        sf = f.StudentFeeFactory(student=school.student, fee_structure=item, amount=D('1000.01'))
+        self._post(login(accountant), sf, [('500.00', 1), ('500.01', 2)])
+        assert PaymentPlan.objects.filter(student_fee=sf).exists()
+
+    def test_paying_every_installment_marks_fee_paid(self, login, accountant, school, tuition):
+        from fees.models import PaymentPlan
+        client = login(accountant)
+        self._post(client, tuition, [('5000', 1), ('5000', 2)])
+        insts = PaymentPlan.objects.get(student_fee=tuition).installments.all()
+        client.post(f"{reverse('fees:collection')}?student_id={school.student.pk}", {
+            'student_id': school.student.pk, 'selected_installments': [i.pk for i in insts],
+            **{f'inst_amount_{i.pk}': str(i.amount) for i in insts}, 'payment_method': 'BANK'})
+        tuition.refresh_from_db()
+        assert tuition.status == StudentFee.PAID and tuition.balance == D('0')
+
+    def test_semester_cannot_go_backwards(self, login, accountant, tuition):
+        from fees.models import PaymentPlan
+        self._post(login(accountant), tuition, [('2500', 1), ('5000', 2), ('2500', 1)])
+        assert not PaymentPlan.objects.exists()
+
+    def test_both_semesters_required(self, login, accountant, tuition):
+        from fees.models import PaymentPlan
+        self._post(login(accountant), tuition, [('5000', 1), ('5000', 1)])
+        assert not PaymentPlan.objects.exists()
+
+    @pytest.mark.parametrize("bad", ['NaN', 'Infinity', '-100', 'abc'])
+    def test_bad_amounts_rejected_without_crash(self, login, accountant, tuition, bad):
+        from fees.models import PaymentPlan
+        assert self._post(login(accountant), tuition, [(bad, 1), ('5000', 2)]).status_code == 200
+        assert not PaymentPlan.objects.exists()
+
+    def test_replacing_plan(self, login, accountant, tuition):
+        from fees.models import PaymentPlan
+        client = login(accountant)
+        self._post(client, tuition, [('5000', 1), ('5000', 2)])
+        self._post(client, tuition, [('2500', 1), ('2500', 1), ('2500', 2), ('2500', 2)])
+        assert PaymentPlan.objects.get(student_fee=tuition).installments.count() == 4
+
+    def test_fully_paid_fee_needs_no_plan(self, login, accountant, tuition):
+        f.PaymentFactory(student_fee=tuition, paid_amount=D('10000'))
+        resp = login(accountant).get(reverse('fees:payment_plan_setup', args=[tuition.pk]))
+        assert resp.status_code == 302
+
+    def test_delete_requires_post(self, login, accountant, tuition):
+        from fees.models import PaymentPlan
+        plan = f.PaymentPlanFactory(student_fee=tuition)
+        client = login(accountant)
+        client.get(reverse('fees:payment_plan_delete', args=[plan.pk]))
+        assert PaymentPlan.objects.filter(pk=plan.pk).exists()
+        client.post(reverse('fees:payment_plan_delete', args=[plan.pk]))
+        assert not PaymentPlan.objects.filter(pk=plan.pk).exists()
