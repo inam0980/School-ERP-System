@@ -13,6 +13,7 @@ from django.db import transaction
 from django.db.models import Q, Sum, Count
 from django.views.decorators.http import require_POST
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.core.cache import cache
 
 from accounts.decorators import role_required
@@ -106,6 +107,7 @@ def _grades_by_division():
 # ════════════════════════════════════════════════════════════════
 
 @login_required
+@role_required(*_ACCOUNTANT)
 def api_fees_summary(request):
     cached = cache.get('fees_dashboard_summary')
     if cached is not None:
@@ -113,9 +115,10 @@ def api_fees_summary(request):
 
     today    = timezone.localdate()
     overdue  = StudentFee.objects.filter(status='OVERDUE').count()
-    today_total = Payment.objects.filter(payment_date=today).aggregate(
+    live     = Payment.objects.filter(is_voided=False)
+    today_total = live.filter(payment_date=today).aggregate(
         s=Sum('paid_amount'))['s'] or 0
-    month_total = Payment.objects.filter(
+    month_total = live.filter(
         payment_date__year=today.year,
         payment_date__month=today.month,
     ).aggregate(s=Sum('paid_amount'))['s'] or 0
@@ -129,6 +132,7 @@ def api_fees_summary(request):
 
 
 @login_required
+@role_required(*_ACCOUNTANT)
 def student_search_api(request):
     """Live search: returns up to 20 students whose name starts with `q`.
     Also supports filtering by division / grade / section for the Browse picker —
@@ -2310,7 +2314,8 @@ def daily_collection_report(request):
 
 def _redirect_back(request, fallback='fees:daily_collection'):
     nxt = request.POST.get('next', '')
-    if nxt.startswith('/'):
+    if nxt and url_has_allowed_host_and_scheme(
+            nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
         return redirect(nxt)
     return redirect(fallback)
 
@@ -2623,6 +2628,7 @@ def invoice_list(request):
 
 @login_required
 @role_required(*_ACCOUNTANT)
+@require_POST          # creates a ZATCA invoice — never on a GET
 def generate_invoice(request, student_pk):
     """
     Generate a ZATCA-compliant simplified tax invoice for a student
@@ -2942,8 +2948,13 @@ def tuition_config_form(request, pk=None):
                 messages.success(request, "Tuition fee configuration saved successfully.")
             return redirect('fees:tuition_config_detail', pk=config.pk)
 
+    basic_fields = [form[name] for name in (
+        'academic_year', 'division', 'grade', 'structure_type', 'num_payments',
+        'includes_books', 'from_academic_year', 'to_academic_year')]
+
     return render(request, 'fees/tuition_config_form.html', {
         'form':     form,
+        'basic_fields': basic_fields,
         'formset':  formset,
         'title':    'Edit Tuition Fee Config' if instance else 'New Tuition Fee Config',
         'instance': instance,

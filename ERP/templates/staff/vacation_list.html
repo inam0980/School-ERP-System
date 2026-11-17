@@ -26,14 +26,11 @@
 {% if is_admin %}
 <!-- Status Filter -->
 <div class="mb-4 flex gap-2 flex-wrap">
-    {% for code, label in request.resolver_match.func.view_class.status_choices|default:'' %}{% endfor %}
     <a href="{% url 'staff:vacation_list' %}"
        class="text-xs px-3 py-1.5 rounded-full border font-medium transition
               {% if not status_filter %}bg-primary text-white border-primary{% else %}border-slate-300 text-slate-600 hover:bg-slate-50{% endif %}">
         All
     </a>
-    {% for code, label in "PENDING,Pending|APPROVED,Approved|REJECTED,Rejected"|split:"|" %}
-    {% endfor %}
     <a href="?status=PENDING"
        class="text-xs px-3 py-1.5 rounded-full border font-medium transition
               {% if status_filter == 'PENDING' %}bg-amber-500 text-white border-amber-500{% else %}border-slate-300 text-slate-600 hover:bg-slate-50{% endif %}">
@@ -72,8 +69,12 @@
             <tr class="hover:bg-slate-50 transition">
                 {% if is_admin %}
                 <td class="px-4 py-3">
+                    {% if req.staff.staff_profile %}
                     <a href="{% url 'staff:profile' req.staff.staff_profile.pk %}"
                        class="font-medium text-primary hover:underline">{{ req.staff.full_name }}</a>
+                    {% else %}
+                    <span class="font-medium text-slate-700">{{ req.staff.full_name }}</span>
+                    {% endif %}
                 </td>
                 {% endif %}
                 <td class="px-4 py-3">

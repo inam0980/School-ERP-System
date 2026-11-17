@@ -495,3 +495,18 @@ def api_study_modes(request):
     )
     return JsonResponse({'study_modes': modes})
 
+
+
+# ════════════════════ PROTECTED MEDIA ════════════════════
+
+@login_required
+@role_required('SUPER_ADMIN', 'ADMIN', 'TEACHER', 'ACCOUNTANT', 'STAFF')
+def protected_media(request, path):
+    """
+    Serve uploads (student photos, passports, Iqamas, contracts) to school staff only.
+    Works with DEBUG off (django.conf.urls.static.static() does not), and
+    django.views.static.serve rejects path traversal with a 404.
+    """
+    from django.conf import settings
+    from django.views.static import serve
+    return serve(request, path, document_root=settings.MEDIA_ROOT)

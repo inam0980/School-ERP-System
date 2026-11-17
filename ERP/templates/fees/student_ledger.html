@@ -17,11 +17,14 @@
             </div>
         </div>
         <div class="flex gap-2">
-            <a href="{% url 'fees:generate_invoice' student.pk %}"
-               onclick="return confirm('Generate a ZATCA tax invoice for all paid fees?')"
-               class="inline-flex items-center gap-2 bg-accent text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition">
-                🧾 Generate Invoice
-            </a>
+            <form method="post" action="{% url 'fees:generate_invoice' student.pk %}"
+                  onsubmit="return confirm('Generate a ZATCA tax invoice for all paid fees?')">
+                {% csrf_token %}
+                <button type="submit"
+                        class="inline-flex items-center gap-2 bg-accent text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:opacity-90 transition">
+                    🧾 Generate Invoice
+                </button>
+            </form>
         </div>
     </div>
 

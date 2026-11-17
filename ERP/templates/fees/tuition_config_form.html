@@ -38,8 +38,7 @@
     </div>
     {% endif %}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {% for fname in 'academic_year,division,grade,structure_type,num_payments,includes_books,from_academic_year,to_academic_year' %}
-      {% with field=form|getitem:fname %}
+      {% for field in basic_fields %}
       <div>
         <label class="block text-xs font-medium text-slate-600 mb-1">
           {{ field.label }}{% if field.field.required %} <span class="text-red-500">*</span>{% endif %}
@@ -48,7 +47,6 @@
         {% if field.help_text %}<p class="text-xs text-slate-400 mt-0.5">{{ field.help_text }}</p>{% endif %}
         {% if field.errors %}<p class="text-xs text-red-600 mt-0.5">{{ field.errors.0 }}</p>{% endif %}
       </div>
-      {% endwith %}
       {% endfor %}
     </div>
   </div>

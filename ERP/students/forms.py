@@ -216,6 +216,12 @@ class StudentForm(forms.ModelForm):
         if not national_id and not iqama:
             self.add_error('iqama_number',
                            'Please enter the student\'s ID / Iqama number.')
+        # id_type is not a form field, but it drives Student.is_saudi → VAT.
+        # Derive it from whichever ID was supplied so expats are billed VAT.
+        if national_id:
+            self.instance.id_type = Student.NATIONAL_ID_TYPE
+        elif iqama:
+            self.instance.id_type = Student.IQAMA
         return cleaned
 
 

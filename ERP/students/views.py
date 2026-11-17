@@ -281,7 +281,7 @@ def student_add(request):
 def student_detail(request, pk):
     from decimal import Decimal
     from django.db.models import Sum
-    from fees.models import StudentFee, Payment
+    from fees.models import StudentFee, Payment, Refund
 
     student = get_object_or_404(Student.objects.select_related(
         'division', 'grade', 'section', 'academic_year', 'created_by'
@@ -299,9 +299,14 @@ def student_detail(request, pk):
     )
     total_charged = fees.exclude(status=StudentFee.WAIVED).aggregate(
         s=Sum('net_amount'))['s'] or Decimal('0.00')
-    total_paid = Payment.objects.filter(
-        student_fee__student=student).aggregate(
+    # Same rule as StudentFee.amount_paid: live payments minus refunds.
+    paid = Payment.objects.filter(
+        student_fee__student=student, is_voided=False).aggregate(
         s=Sum('paid_amount'))['s'] or Decimal('0.00')
+    refunded = Refund.objects.filter(
+        payment__student_fee__student=student, payment__is_voided=False).aggregate(
+        s=Sum('amount'))['s'] or Decimal('0.00')
+    total_paid = paid - refunded
     balance_due   = total_charged - total_paid
     overdue_count = fees.filter(status=StudentFee.OVERDUE).count()
 
@@ -482,6 +487,7 @@ def pickup_delete(request, pickup_pk):
 # ────────────────────────── ID CARD PRINT ──────────────────────────
 
 @login_required
+@role_required(*_STAFF)
 def student_id_card(request, pk):
     student = get_object_or_404(Student, pk=pk)
     return render(request, 'students/id_card.html', {'student': student})

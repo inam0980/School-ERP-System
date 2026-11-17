@@ -1,0 +1,20 @@
+#!/bin/sh
+# Pre-push gate: the full test-suite must pass and coverage must not drop.
+# Enable once per clone:   git config core.hooksPath .githooks
+# Bypass in an emergency:  git push --no-verify   (then fix it immediately)
+
+MIN_COVERAGE=62
+
+ROOT="$(git rev-parse --show-toplevel)"
+PY="$ROOT/venv/Scripts/python.exe"
+[ -x "$PY" ] || PY="$ROOT/venv/bin/python"
+
+echo "▶ Running test-suite before push (coverage must stay >= ${MIN_COVERAGE}%)…"
+cd "$ROOT/ERP" || exit 1
+"$PY" -m pytest -q -p no:cacheprovider --cov=. --cov-report=term:skip-covered \
+      --cov-fail-under="$MIN_COVERAGE"
+status=$?
+if [ $status -ne 0 ]; then
+  echo "✖ Push blocked: tests failed or coverage dropped. Fix it, then push again."
+fi
+exit $status

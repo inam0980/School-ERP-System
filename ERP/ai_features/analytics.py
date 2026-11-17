@@ -200,7 +200,7 @@ def compute_section_performance(academic_year=None):
     from academics.models import Mark
     from core.models import Section
 
-    sections = Section.objects.all().select_related('grade', 'division')
+    sections = Section.objects.all().select_related('grade__division')
     labels, data_points, section_objs = [], [], []
 
     for sec in sections:

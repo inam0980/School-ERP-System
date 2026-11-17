@@ -33,19 +33,47 @@ def _load_dotenv():
             os.environ.setdefault(key, value)
         break
 
-_load_dotenv()
+if not os.environ.get('ERP_NO_DOTENV'):      # tests set this to control the env exactly
+    _load_dotenv()
 
 
-# Quick-start development settings - unsuitable for production
+def _env_bool(name, default=False):
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    return val.strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _secret_key(key_file):
+    """
+    SECRET_KEY from the environment / .env; otherwise a random key generated on
+    first start and kept in `key_file` (git-ignored) so sessions survive restarts.
+    The old hard-coded key is public in git history and must never be used.
+    """
+    key = os.environ.get('SECRET_KEY', '').strip()
+    if key:
+        return key
+    try:
+        return key_file.read_text(encoding='utf-8').strip()
+    except FileNotFoundError:
+        pass
+    from django.core.management.utils import get_random_secret_key
+    key = get_random_secret_key()
+    try:
+        key_file.write_text(key, encoding='utf-8')
+    except OSError:
+        pass        # read-only disk: key still works for this process
+    return key
+
+
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# serve.py (the production Windows service) uses THIS file, so defaults are production-safe.
+SECRET_KEY = _secret_key(BASE_DIR / '.secret_key')
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-evg(q5x-7m8qf@u0u(+ik$fmdf1&$p94vtxwg2bt^c#m@n_+f9'
+# Off unless DJANGO_DEBUG=true is set (put it in your local .env for development).
+DEBUG = _env_bool('DJANGO_DEBUG', default=False)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',') if h.strip()]
 
 
 # Application definition
@@ -204,3 +232,31 @@ else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL', 'Al-Kawthar International School <no-reply@alkawthar.edu.sa>')
+
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+# With DEBUG off, Django logs request errors nowhere by default. Send them to the
+# console (captured by the NSSM service log) and to a rotating file in logs/.
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {'format': '%(asctime)s %(levelname)s %(name)s: %(message)s'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'verbose'},
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOG_DIR / 'erp.log'),
+            'maxBytes': 5 * 1024 * 1024, 'backupCount': 5,
+            'formatter': 'verbose', 'encoding': 'utf-8',
+        },
+    },
+    'loggers': {
+        'django.request': {'handlers': ['console', 'file'], 'level': 'ERROR', 'propagate': False},
+        'django.security': {'handlers': ['console', 'file'], 'level': 'WARNING', 'propagate': False},
+    },
+    'root': {'handlers': ['console', 'file'], 'level': 'WARNING'},
+}

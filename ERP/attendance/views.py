@@ -107,6 +107,15 @@ def submit_attendance(request):
     if not records:
         return JsonResponse({'success': False, 'error': 'No records provided'}, status=400)
 
+    try:
+        date.fromisoformat(str(att_date))
+    except ValueError:
+        return JsonResponse({'success': False, 'error': f'Invalid date: {att_date}'}, status=400)
+
+    known_ids = set(Student.objects.filter(
+        pk__in=[r.get('student_id') for r in records if str(r.get('student_id', '')).isdigit()]
+    ).values_list('pk', flat=True))
+
     created_count = 0
     updated_count = 0
     valid_statuses = {'P', 'A', 'L', 'E'}
@@ -117,6 +126,8 @@ def submit_attendance(request):
         remarks    = rec.get('remarks', '').strip()[:255]
 
         if status not in valid_statuses:
+            continue
+        if not str(student_id).isdigit() or int(student_id) not in known_ids:
             continue
 
         _, created = Attendance.objects.update_or_create(

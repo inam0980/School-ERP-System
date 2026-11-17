@@ -23,6 +23,7 @@ from .forms import (
 
 _ADMIN      = ('SUPER_ADMIN', 'ADMIN')
 _MANAGEMENT = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT')
+_EMPLOYEES  = ('SUPER_ADMIN', 'ADMIN', 'TEACHER', 'ACCOUNTANT', 'STAFF')   # everyone except PARENT
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -195,6 +196,7 @@ def staff_delete(request, pk):
 # ──────────────────────────────────────────────────────────────────────────────
 
 @login_required
+@role_required(*_EMPLOYEES)
 def vacation_list(request):
     is_admin = request.user.role in ('SUPER_ADMIN', 'ADMIN')
 
@@ -215,6 +217,7 @@ def vacation_list(request):
 
 
 @login_required
+@role_required(*_EMPLOYEES)
 def vacation_form(request, pk=None):
     instance = get_object_or_404(VacationRequest, pk=pk) if pk else None
 

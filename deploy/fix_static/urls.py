@@ -17,8 +17,9 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
-from django.conf.urls.static import static
 from django.views.static import serve as _serve
+
+from core.views import protected_media
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -30,7 +31,9 @@ urlpatterns = [
     path('fees/', include('fees.urls')),
     path('staff/', include('staff.urls')),
     path('ai/', include('ai_features.urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # Uploads contain student PII — staff-only, and served with DEBUG on or off.
+    re_path(r'^media/(?P<path>.*)$', protected_media, name='protected_media'),
+]
 
 # Serve collected static files under a pure-WSGI server (Waitress) where
 # Django's runserver auto-serving is unavailable. Works with DEBUG on or off.
