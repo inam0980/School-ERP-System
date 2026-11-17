@@ -56,7 +56,7 @@ Tests use an in-memory SQLite DB (`ERP/settings_test.py`). They never touch the 
 
 ## Coverage ratchet
 
-Current baseline: **66 %** (migrations, settings, seed scripts excluded via `.coveragerc`).
+Current baseline: **74 %** (migrations, settings, seed scripts excluded via `.coveragerc`).
 The pre-push hook fails if coverage drops below the number in `.githooks/pre-push`.
 When coverage goes up, raise that number. It only ever goes up.
 

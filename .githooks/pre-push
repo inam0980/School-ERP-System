@@ -3,7 +3,7 @@
 # Enable once per clone:   git config core.hooksPath .githooks
 # Bypass in an emergency:  git push --no-verify   (then fix it immediately)
 
-MIN_COVERAGE=66
+MIN_COVERAGE=74
 
 ROOT="$(git rev-parse --show-toplevel)"
 PY="$ROOT/venv/Scripts/python.exe"

@@ -408,3 +408,62 @@ class TestAssignStudentFee:
             'adhoc_note[]': ['Museum visit'], 'discount_pct': ''})
         sf = StudentFee.objects.get(student=school.student)
         assert sf.net_amount == D('350.00')
+
+
+# ── Fee reminder emails ──────────────────────────────────────────────────────
+
+class TestFeeReminders:
+    @pytest.fixture
+    def overdue(self, school):
+        past = datetime.date.today() - datetime.timedelta(days=10)
+        school.student.father_email = 'father@example.com'
+        school.student.save()
+        return f.StudentFeeFactory(student=school.student, amount=D('1200'), due_date=past)
+
+    def test_emails_parent_of_defaulter(self, login, accountant, overdue, mailoutbox):
+        resp = login(accountant).post(reverse('fees:send_reminders'))
+        assert resp.status_code == 302
+        assert len(mailoutbox) == 1
+        mail = mailoutbox[0]
+        assert mail.to == ['father@example.com']
+        assert 'SAR 1200.00' in mail.subject and overdue.student.full_name in mail.body
+
+    def test_fees_contact_email_takes_priority(self, login, accountant, overdue, mailoutbox):
+        overdue.student.fees_contact_email = 'accounts@family.sa'
+        overdue.student.save()
+        login(accountant).post(reverse('fees:send_reminders'))
+        assert mailoutbox[0].to == ['accounts@family.sa']
+
+    def test_one_email_per_student_with_all_lines(self, login, accountant, overdue, mailoutbox):
+        f.StudentFeeFactory(student=overdue.student, amount=D('300'), due_date=overdue.due_date,
+                            fee_structure=f.FeeStructureItemFactory(fee_type=f.FeeTypeFactory(name='Bus')))
+        login(accountant).post(reverse('fees:send_reminders'))
+        assert len(mailoutbox) == 1 and 'SAR 1500.00' in mailoutbox[0].subject
+
+    def test_paid_and_not_yet_due_fees_are_not_chased(self, login, accountant, school, mailoutbox):
+        school.student.father_email = 'father@example.com'; school.student.save()
+        paid = f.StudentFeeFactory(student=school.student, amount=D('100'),
+                                   due_date=datetime.date.today() - datetime.timedelta(days=5))
+        f.PaymentFactory(student_fee=paid, paid_amount=D('100'))
+        f.StudentFeeFactory(student=school.student, amount=D('100'),
+                            due_date=datetime.date.today() + datetime.timedelta(days=5),
+                            fee_structure=f.FeeStructureItemFactory(fee_type=f.FeeTypeFactory(name='Bus')))
+        login(accountant).post(reverse('fees:send_reminders'))
+        assert mailoutbox == []
+
+    def test_no_email_on_file_is_skipped(self, login, accountant, overdue, mailoutbox):
+        overdue.student.father_email = ''; overdue.student.save()
+        login(accountant).post(reverse('fees:send_reminders'))
+        assert mailoutbox == []
+
+    def test_mail_server_failure_is_reported_not_crash(self, login, accountant, overdue, monkeypatch):
+        def boom(*a, **k):
+            raise ConnectionRefusedError('smtp down')
+        monkeypatch.setattr('django.core.mail.send_mail', boom)
+        resp = login(accountant).post(reverse('fees:send_reminders'), follow=True)
+        assert resp.status_code == 200 and '1 failed' in resp.content.decode()
+
+    def test_get_not_allowed_and_teachers_denied(self, login, accountant, teacher, overdue, mailoutbox):
+        assert login(accountant).get(reverse('fees:send_reminders')).status_code == 405
+        login(teacher).post(reverse('fees:send_reminders'))
+        assert mailoutbox == []
