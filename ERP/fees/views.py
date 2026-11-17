@@ -1947,7 +1947,7 @@ def outstanding_report(request):
 
 
 def _export_outstanding_csv(qs):
-    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="outstanding_fees.csv"'
     response.write('\ufeff')
     writer = csv.writer(response)
@@ -2068,7 +2068,7 @@ def unpaid_tuition_report(request):
 
     # CSV export
     if request.GET.get('export') == 'csv':
-        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = 'attachment; filename="unpaid_tuition_report.csv"'
         response.write('\ufeff')
         writer = csv.writer(response)
@@ -2178,7 +2178,7 @@ def sales_report(request):
 
     # CSV export (transaction detail)
     if request.GET.get('export') == 'csv':
-        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = 'attachment; filename="sales_report.csv"'
         response.write('\ufeff')
         writer = csv.writer(response)
@@ -2269,7 +2269,7 @@ def daily_collection_report(request):
 
     # CSV export
     if request.GET.get('export') == 'csv':
-        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = f'attachment; filename="daily_collection_{report_date}.csv"'
         response.write('\ufeff')
         writer = csv.writer(response)
@@ -2578,7 +2578,7 @@ def defaulters_list(request):
         )
 
     if request.GET.get('export') == 'csv':
-        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = (
             f'attachment; filename="defaulters_{as_of}.csv"'
         )
@@ -2757,7 +2757,7 @@ def payroll_list(request):
 
 
 def _export_payroll_csv(salaries, month):
-    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
     label    = month.strftime('%Y-%m') if month else 'all'
     response['Content-Disposition'] = f'attachment; filename="payroll_{label}.csv"'
     response.write('\ufeff')
@@ -3035,7 +3035,7 @@ def tuition_config_export_csv(request):
         if stype:
             qs = qs.filter(structure_type=stype)
 
-    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="tuition_fee_structure.csv"'
     response.write('\ufeff')
     writer = csv.writer(response)

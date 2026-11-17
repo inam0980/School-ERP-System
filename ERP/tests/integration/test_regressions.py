@@ -263,3 +263,60 @@ class TestBug17HeaderShowsFullName:
         html = login(u).get(reverse('students:hub')).content.decode()   # page body never names the user
         assert 'Fatima Al-Harbi' in html
         assert 'zz_login_name' not in html
+
+
+# ── BUG-18  Every CSV export put a hidden BOM (﻿) at the start of EVERY row:
+#            charset=utf-8-sig adds one per write. Corrupts the first column
+#            (student IDs, receipt nos.) — including the Noor file sent to the Ministry.
+
+BOM = '﻿'.encode('utf-8')
+
+
+class TestBug18CsvExportsHaveExactlyOneBom:
+    @pytest.fixture
+    def data(self, school):
+        import datetime
+        from academics.models import Mark  # noqa: F401
+        overdue = f.StudentFeeFactory(student=school.student, amount=D('1000'),
+                                      due_date=datetime.date.today() - datetime.timedelta(days=5))
+        overdue.refresh_status()
+        f.StudentFeeFactory(student=school.expat, amount=D('500'),
+                            due_date=datetime.date.today() - datetime.timedelta(days=5)).refresh_status()
+        from fees.models import FeeType
+        uniform = f.FeeTypeFactory(name='Uniform', category=FeeType.UNIFORM)       # → sales report
+        paid = f.StudentFeeFactory(student=school.expat, amount=D('300'),
+                                   fee_structure=f.FeeStructureItemFactory(fee_type=uniform))
+        f.PaymentFactory(student_fee=paid, paid_amount=D('100'))
+        f.PaymentFactory(student_fee=paid, paid_amount=D('50'))
+        sem1 = f.FeeTypeFactory(name='1st Semester', category=FeeType.TUITION)     # → unpaid tuition
+        for s in (school.student, school.expat):
+            f.StudentFeeFactory(student=s, amount=D('9000'), fee_structure=f.FeeStructureItemFactory(
+                fee_type=sem1, structure=f.FeeStructureFactory(academic_year=school.year, grade=school.grade,
+                                                               structure_type='new' if s is school.expat else 'regular')))
+        f.SalaryFactory(month=datetime.date.today().replace(day=1))
+        f.SalaryFactory(staff=f.AccountantFactory(), month=datetime.date.today().replace(day=1))
+        f.TuitionFeeConfigFactory(academic_year=school.year, division=school.division, grade=school.grade)
+        exam = f.ExamFactory(section=school.section, subject=school.subject, academic_year=school.year, term='T1')
+        for s in (school.student, school.expat):
+            f.MarkFactory(student=s, exam=exam, obtained_marks=70, status='approved')
+        return school
+
+    @pytest.mark.parametrize("url_name, params", [
+        ('fees:outstanding',            {'export': 'csv'}),
+        ('fees:unpaid_tuition',         {'export': 'csv'}),
+        ('fees:sales_report',           {'export': 'csv'}),
+        ('fees:daily_collection',       {'export': 'csv'}),
+        ('fees:defaulters',             {'export': 'csv'}),
+        ('fees:payroll_list',           {'export': 'csv'}),
+        ('fees:tuition_config_export_csv', {}),
+        ('academics:noor_export',       'NOOR'),
+    ])
+    def test_single_leading_bom(self, login, super_admin, data, url_name, params):
+        if params == 'NOOR':
+            params = {'section': data.section.pk, 'year': data.year.pk, 'term': 'T1'}
+        resp = login(super_admin).get(reverse(url_name), params)
+        assert resp.status_code == 200 and 'csv' in resp['Content-Type']
+        body = resp.content
+        assert body.count(b'\n') >= 2, "fixture should produce at least a header + one data row"
+        assert body.startswith(BOM), "keep one BOM so Excel shows Arabic correctly"
+        assert body.count(BOM) == 1, f"{body.count(BOM)} BOMs found — rows are corrupted"

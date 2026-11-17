@@ -129,9 +129,17 @@ class Mark(models.Model):
         }
         return mapping.get(grade, 0.0)
 
+    @property
+    def passing_marks(self):
+        """Pass threshold (%) for this exam's grade — GradeConfig, default 60."""
+        exam = self.exam
+        if not hasattr(exam, '_passing_marks'):          # cache per exam: one query per exam, not per mark
+            exam._passing_marks = GradeConfig.passing_for(exam.section.grade_id)
+        return exam._passing_marks
+
     def is_passed(self):
         pct = self.get_percentage()
-        return pct is not None and pct >= 60
+        return pct is not None and pct >= self.passing_marks
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -155,8 +163,17 @@ class GradeConfig(models.Model):
     class Meta:
         verbose_name = 'Grade Config'
 
+    DEFAULT_PASSING_MARKS = 60
+
     def __str__(self):
         return f"Config: {self.grade} — Pass ≥ {self.passing_marks}%"
+
+    @classmethod
+    def passing_for(cls, grade):
+        """Passing % for a Grade (instance or pk); the school default when not configured."""
+        grade_id = getattr(grade, 'pk', grade)
+        value = cls.objects.filter(grade_id=grade_id).values_list('passing_marks', flat=True).first()
+        return value if value is not None else cls.DEFAULT_PASSING_MARKS
 
 
 # ──────────────────────────────────────────────────────────────────────────────

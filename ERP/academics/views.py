@@ -300,7 +300,7 @@ def _compute_report_data(student, academic_year, term):
         exam__academic_year=academic_year,
         exam__term=term,
         status='approved',
-    ).select_related('exam', 'exam__subject', 'exam__exam_type')
+    ).select_related('exam', 'exam__subject', 'exam__exam_type', 'exam__section')
 
     by_subject = defaultdict(list)
     for m in marks:
@@ -337,12 +337,13 @@ def _compute_report_data(student, academic_year, term):
         let  = _letter(avg)
         gpa  = GPA_MAP[let]
         gpa_vals.append(gpa)
+        passing = subj_marks[0].passing_marks          # GradeConfig of the exam's grade
         results.append({
             'subject':  subj,
             'avg_pct':  avg,
             'letter':   let,
             'gpa':      gpa,
-            'passed':   (avg is not None and avg >= 60),
+            'passed':   (avg is not None and avg >= passing),
             'absent':   absent,
         })
 
@@ -481,7 +482,7 @@ def noor_export(request):
     GPA_MAP = {'A+': 4.0, 'A': 4.0, 'B+': 3.5, 'B': 3.0,
                'C+': 2.5, 'C': 2.0, 'D': 1.0, 'F': 0.0, 'AB': 0.0}
 
-    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
     fname    = f"noor_{section}_{year.name}_{term}.csv"
     response['Content-Disposition'] = f'attachment; filename="{fname}"'
     response.write('\ufeff')   # BOM for Arabic in Excel
@@ -493,6 +494,7 @@ def noor_export(request):
     header += ['Overall GPA', 'Result']
     writer.writerow(header)
 
+    passing = GradeConfig.passing_for(section.grade_id)   # school's pass mark for this grade
     for student in students:
         row = [student.student_id, student.full_name, student.arabic_name or '', student.roll_number or '']
         gpas       = []
@@ -503,7 +505,7 @@ def noor_export(request):
             let = _letter(avg)
             row += [avg if avg is not None else 'AB', let]
             gpas.append(GPA_MAP[let])
-            if let in ('F', 'AB'):
+            if avg is None or avg < passing:
                 all_passed = False
         overall = round(sum(gpas) / len(gpas), 2) if gpas else ''
         row += [overall, 'Pass' if all_passed else 'Fail']
