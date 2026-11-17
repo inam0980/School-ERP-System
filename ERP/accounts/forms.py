@@ -17,10 +17,14 @@ def style_form(form):
 
 
 def role_choices_for(actor):
-    """Only a Super Admin may grant the Super Admin role."""
-    if actor.role == CustomUser.SUPER_ADMIN:
-        return CustomUser.ROLE_CHOICES
-    return [c for c in CustomUser.ROLE_CHOICES if c[0] != CustomUser.SUPER_ADMIN]
+    """
+    Roles the actor may assign. Only a Super Admin may grant Super Admin.
+    PARENT is never offered: the school decided (2026-11-17) there is no parent login.
+    """
+    hidden = {CustomUser.PARENT}
+    if actor.role != CustomUser.SUPER_ADMIN:
+        hidden.add(CustomUser.SUPER_ADMIN)
+    return [c for c in CustomUser.ROLE_CHOICES if c[0] not in hidden]
 
 
 class _RoleLimitedForm(forms.ModelForm):

@@ -211,3 +211,16 @@ class TestChangeOwnPassword:
 
     def test_anonymous_redirected(self, client):
         assert client.get(reverse('accounts:password_change')).status_code == 302
+
+
+# ── No parent portal (school decision 2026-11-17): PARENT accounts can't be created
+
+class TestParentRoleHidden:
+    @pytest.mark.parametrize("actor_role", ['ADMIN', 'SUPER_ADMIN'])
+    def test_parent_not_offered(self, login, actor_role):
+        form = login(f.UserFactory(role=actor_role)).get(reverse('accounts:user_add')).context['form']
+        assert 'PARENT' not in [c[0] for c in form.fields['role'].choices]
+
+    def test_parent_cannot_be_posted(self, login, super_admin):
+        login(super_admin).post(reverse('accounts:user_add'), _new_user_payload(role='PARENT'))
+        assert not CustomUser.objects.filter(username='sara.t').exists()
