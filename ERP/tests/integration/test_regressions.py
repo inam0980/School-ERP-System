@@ -320,3 +320,70 @@ class TestBug18CsvExportsHaveExactlyOneBom:
         assert body.count(b'\n') >= 2, "fixture should produce at least a header + one data row"
         assert body.startswith(BOM), "keep one BOM so Excel shows Arabic correctly"
         assert body.count(BOM) == 1, f"{body.count(BOM)} BOMs found — rows are corrupted"
+
+
+# ── BUG-19  Discount % was not range-checked: -50 % raised the bill, >100 % gave it away
+# ── BUG-20  'NaN' / 'Infinity' amounts crashed money views with HTTP 500
+
+class TestBug19And20MoneyInputValidation:
+    @pytest.fixture
+    def fee(self, school):
+        item = f.FeeStructureItemFactory(fee_type=f.FeeTypeFactory(name='Books'), amount=D('1000'))
+        return f.StudentFeeFactory(student=school.student, fee_structure=item, amount=D('1000'))
+
+    def _collect(self, client, school, fee, amount='100', pct=''):
+        return client.post(f"{reverse('fees:collection')}?student_id={school.student.pk}", {
+            'student_id': school.student.pk, 'selected_fees': [fee.pk],
+            f'amount_{fee.pk}': amount, f'discount_pct_{fee.pk}': pct, 'payment_method': 'BANK'})
+
+    @pytest.mark.parametrize("pct", ['-50', '100.01', '1e3'])
+    def test_collection_rejects_out_of_range_discount(self, login, accountant, school, fee, pct):
+        from fees.models import Payment
+        self._collect(login(accountant), school, fee, pct=pct)
+        fee.refresh_from_db()
+        assert fee.discount == D('0') and fee.net_amount == D('1000')
+        assert not Payment.objects.exists()
+
+    def test_collection_full_discount_allowed(self, login, accountant, school, fee):
+        self._collect(login(accountant), school, fee, amount='0.01', pct='99.999')
+        fee.refresh_from_db()
+        assert fee.discount == D('999.99')
+
+    @pytest.mark.parametrize("bad", ['NaN', 'nan', 'sNaN', 'Infinity', '-inf'])
+    def test_collection_bad_numbers_do_not_crash(self, login, accountant, school, fee, bad):
+        from fees.models import Payment
+        for kwargs in ({'amount': bad}, {'pct': bad}):
+            resp = self._collect(login(accountant), school, fee, **kwargs)
+            assert resp.status_code in (200, 302)
+        assert not Payment.objects.exists()
+
+    @pytest.mark.parametrize("bad", ['NaN', 'Infinity'])
+    def test_refund_bad_numbers_do_not_crash(self, login, admin, fee, bad):
+        from fees.models import Refund
+        p = f.PaymentFactory(student_fee=fee, paid_amount=D('500'))
+        resp = login(admin).post(reverse('fees:refund_payment', args=[p.pk]), {'amount': bad, 'reason': 'x'})
+        assert resp.status_code == 302 and not Refund.objects.exists()
+
+    def _adhoc(self, client, school, amount='100', pct=''):
+        return client.post(reverse('fees:adhoc_charge'), {
+            'student_id': school.student.pk, 'adhoc_fee_type': f.FeeTypeFactory(name='ID Card').pk,
+            'adhoc_amount': amount, 'adhoc_discount_pct': pct})
+
+    @pytest.mark.parametrize("pct", ['-50', '150', 'NaN', 'Infinity'])
+    def test_adhoc_rejects_bad_discount(self, login, accountant, school, pct):
+        from fees.models import StudentFee
+        resp = self._adhoc(login(accountant), school, pct=pct)
+        assert resp.status_code == 302
+        assert not StudentFee.objects.filter(student=school.student).exists()
+
+    @pytest.mark.parametrize("amount", ['NaN', 'Infinity', '-5'])
+    def test_adhoc_rejects_bad_amount(self, login, accountant, school, amount):
+        from fees.models import StudentFee
+        assert self._adhoc(login(accountant), school, amount=amount).status_code == 302
+        assert not StudentFee.objects.filter(student=school.student).exists()
+
+    def test_adhoc_happy_path(self, login, accountant, school):
+        from fees.models import StudentFee
+        self._adhoc(login(accountant), school, amount='200', pct='10')
+        sf = StudentFee.objects.get(student=school.student)
+        assert (sf.amount, sf.discount, sf.net_amount) == (D('200'), D('20.00'), D('180.00'))

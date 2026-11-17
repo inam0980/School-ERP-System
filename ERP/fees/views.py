@@ -1,7 +1,7 @@
 import io
 import csv
 import json
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from datetime import date, timedelta
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -39,6 +39,23 @@ from .pdf_exports import fee_structure_export_group_pdf
 _ADMIN       = ('SUPER_ADMIN', 'ADMIN')
 _ACCOUNTANT  = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT')
 _STAFF_VIEW  = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'STAFF')
+
+
+def _parse_decimal(raw, minimum=None, maximum=None):
+    """
+    Parse a money / percentage form value. Returns a finite Decimal within
+    [minimum, maximum], or None. Rejects NaN / Infinity, which Decimal() happily
+    parses but which crash on the next comparison or quantize().
+    """
+    try:
+        val = Decimal(str(raw).strip())
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+    if not val.is_finite():
+        return None
+    if (minimum is not None and val < minimum) or (maximum is not None and val > maximum):
+        return None
+    return val
 
 # Legacy tuition payment fee-type names (pre-rename), in payment order.
 # Migration 0037 re-points existing data to the semester-based names below.
@@ -1450,20 +1467,18 @@ def fee_collection(request):
                     continue
 
                 raw_pct = request.POST.get(f'discount_pct_{pk}', '').strip()
-                try:
-                    pct = Decimal(raw_pct) if raw_pct else Decimal('0')
-                except Exception:
-                    pct = Decimal('0')
+                pct = _parse_decimal(raw_pct, 0, 100) if raw_pct else Decimal('0')
+                if pct is None:
+                    errors.append(f"{fee.fee_structure.fee_type.name}: discount must be between 0 and 100 %.")
+                    continue
                 disc = (pct / 100 * fee.amount).quantize(Decimal('0.01'))
                 if disc != (fee.discount or Decimal('0')):
                     fee.discount      = disc
                     fee.discount_note = request.POST.get(f'discount_note_{pk}', '').strip()
                     fee.save()
 
-                raw_amt = request.POST.get(f'amount_{pk}', '').strip()
-                try:
-                    amount = Decimal(raw_amt)
-                except Exception:
+                amount = _parse_decimal(request.POST.get(f'amount_{pk}', ''))
+                if amount is None:
                     errors.append(f"{fee.fee_structure.fee_type.name}: invalid amount entered.")
                     continue
 
@@ -1502,10 +1517,8 @@ def fee_collection(request):
                 if inst.balance <= 0:
                     continue
 
-                raw_amt = request.POST.get(f'inst_amount_{inst_pk}', '').strip()
-                try:
-                    amount = Decimal(raw_amt)
-                except Exception:
+                amount = _parse_decimal(request.POST.get(f'inst_amount_{inst_pk}', ''))
+                if amount is None:
                     errors.append(
                         f"Installment {inst.installment_no} of "
                         f"{inst.plan.student_fee.fee_structure.fee_type.name}: "
@@ -1612,20 +1625,16 @@ def charge_adhoc_fee(request):
         messages.error(request, "Invalid fee type selected.")
         return redirect(f"{request.build_absolute_uri('/fees/collection/')}?student_id={student_pk}")
 
-    raw_amount = request.POST.get('adhoc_amount', '').strip()
-    try:
-        amount = Decimal(raw_amount)
-        if amount <= 0:
-            raise ValueError
-    except Exception:
+    amount = _parse_decimal(request.POST.get('adhoc_amount', ''), minimum=Decimal('0.01'))
+    if amount is None:
         messages.error(request, "Enter a valid amount greater than 0.")
         return redirect(f"/fees/collection/?student_id={student_pk}")
 
     raw_pct = request.POST.get('adhoc_discount_pct', '').strip()
-    try:
-        discount_pct = Decimal(raw_pct) if raw_pct else Decimal('0')
-    except Exception:
-        discount_pct = Decimal('0')
+    discount_pct = _parse_decimal(raw_pct, 0, 100) if raw_pct else Decimal('0')
+    if discount_pct is None:
+        messages.error(request, "Discount must be between 0 and 100 %.")
+        return redirect(f"/fees/collection/?student_id={student_pk}")
     discount = (discount_pct / 100 * amount).quantize(Decimal('0.01'))
     discount_note = request.POST.get('adhoc_discount_note', '').strip()
 
@@ -2374,10 +2383,7 @@ def refund_payment(request, pk):
         return _redirect_back(request)
 
     reason = request.POST.get('reason', '').strip()
-    try:
-        amount = Decimal(request.POST.get('amount', '').strip())
-    except Exception:
-        amount = Decimal('0')
+    amount = _parse_decimal(request.POST.get('amount', '')) or Decimal('0')
 
     refundable = payment.refundable_amount
     if not reason:
