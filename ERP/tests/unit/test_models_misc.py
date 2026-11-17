@@ -159,9 +159,9 @@ class TestMarkGrading:
 
     def test_percentage_is_rounded_before_pass_fail_decision(self):
         """
-        CURRENT POLICY (pending confirmation from school): the percentage is
-        rounded to 1 dp *before* grading, so 59.95 % passes and 89.95 % is A+.
-        If the school decides not to round, flip these assertions first (TDD).
+        DECIDED (2026-11-17): keep rounding to 1 dp *before* grading, so 59.95 %
+        passes and 89.95 % is A+ — the percentage shown and the result always agree
+        (never "60.0 %  FAIL"). Change only on a new school decision; flip these first.
         """
         assert self._mark(D('59.94')).is_passed() is False
         assert self._mark(D('59.95')).is_passed() is True
