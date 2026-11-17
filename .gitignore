@@ -1,27 +1,75 @@
-# Claude Code
-.claude/
+# ══════════════════════════════════════════════════════════════════
+#  School ERP — .gitignore
+#  Rule of thumb: commit SOURCE CODE only. Never commit data, secrets,
+#  build output, dependencies, or large binaries.
+# ══════════════════════════════════════════════════════════════════
 
-# Deployment
-.deploy/
+# ── Secrets / environment ─────────────────────────────────────────
+.env
+.env.*
+!.env.example
+local_settings.py
 
-# Python virtual environment
-.venv/
-venv/
+# ── Data: database & user uploads (contain real student PII) ─────
+*.sqlite3
+*.sqlite3-journal
+db.sqlite3
+media/
+*.dump
+*.bak
+backups/
 
-# Python cache
+# ── Python ────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *.pyo
+*.egg-info/
+.venv/
+venv/
+env/
 
-# Django
-*.log
-db.sqlite3
-media/
+# ── Django build output ───────────────────────────────────────────
 staticfiles/
-local_settings.py
-.env
+*.log
 
-# IDE
+# ── Testing / coverage ────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# ── Node / Tailwind toolchain (reinstall with `npm install`) ──────
+node_modules/
+
+# ── Offline deployment bundle (keep on USB / GitHub Release, not git)
+offline_packages/
+nssm/
+*.whl
+*.exe
+*.msi
+*.zip
+*.7z
+*.tar.gz
+deploy/tailwind_b64.txt
+
+# ── Generated sample data ─────────────────────────────────────────
+students_import_*.csv
+
+# ── Editor / tool artifacts ───────────────────────────────────────
+.claude/
+.deploy/
 .vscode/
 .idea/
 *.swp
+TOKENCAP*.md
+.tokencap-notes.md
+
+# ── OS junk ───────────────────────────────────────────────────────
+desktop.ini
+Thumbs.db
+.DS_Store
+
+# ── Scratch files ─────────────────────────────────────────────────
+maine.txt
+mmmmm.txt
