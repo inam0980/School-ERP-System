@@ -483,3 +483,75 @@ class TestBug25StandaloneCreditNote:
     def test_reason_required(self, login, accountant, school):
         self._credit(login(accountant), school.expat, reason='')
         assert self._count() == 0
+
+
+# ── BUG-26  Fee-structure edit: an unparseable amount (typo '8OO') was treated as
+#            "cleared" and silently DELETED the fee line. Out-of-range / NaN /
+#            Infinity amounts crashed (HTTP 500) here and on other money forms.
+
+class TestBug26MoneyFormsNeverCrashOrDelete:
+    @pytest.fixture
+    def structure(self, school):
+        s = f.FeeStructureFactory(academic_year=school.year, grade=school.grade)
+        item = f.FeeStructureItemFactory(structure=s, fee_type=f.FeeTypeFactory(name='Books'), amount=D('800'))
+        return s, item
+
+    def _edit(self, client, structure, item, amount):
+        s = structure
+        return client.post(reverse('fees:fee_structure_edit', args=[s.pk]), {
+            'name': s.name, 'structure_type': s.structure_type, 'academic_year': s.academic_year_id,
+            'grade': s.grade_id, 'frequency': s.frequency, f'amount_{item.fee_type_id}': amount})
+
+    @pytest.mark.parametrize("typo", ['8OO', 'abc', 'NaN', 'Infinity', '1000000000', '-800'])
+    def test_bad_amount_keeps_the_line(self, login, accountant, structure, typo):
+        from fees.models import FeeStructureItem
+        s, item = structure
+        resp = self._edit(login(accountant), s, item, typo)
+        assert resp.status_code in (200, 302)
+        assert FeeStructureItem.objects.get(pk=item.pk).amount == D('800')
+
+    def test_zero_still_removes_unused_line(self, login, accountant, structure):
+        from fees.models import FeeStructureItem
+        s, item = structure
+        self._edit(login(accountant), s, item, '0')
+        assert not FeeStructureItem.objects.filter(pk=item.pk).exists()
+
+    def test_valid_amount_updates(self, login, accountant, structure):
+        s, item = structure
+        self._edit(login(accountant), s, item, '950.50')
+        item.refresh_from_db()
+        assert item.amount == D('950.50')
+
+    @pytest.mark.parametrize("amount", ['1000000000', '99999999999'])
+    def test_huge_additional_fee_does_not_crash(self, login, accountant, school, amount):
+        from fees.models import StudentFee
+        resp = login(accountant).post(reverse('fees:assign_student_fee', args=[school.student.pk]), {
+            'adhoc_fee_type[]': [f.FeeTypeFactory(name='Trip').pk], 'adhoc_amount[]': [amount],
+            'adhoc_note[]': [''], 'discount_pct': ''})
+        assert resp.status_code == 302 and not StudentFee.objects.exists()
+
+    def test_huge_adhoc_charge_does_not_crash(self, login, accountant, school):
+        from fees.models import StudentFee
+        resp = login(accountant).post(reverse('fees:adhoc_charge'), {
+            'student_id': school.student.pk, 'adhoc_fee_type': f.FeeTypeFactory(name='ID Card').pk,
+            'adhoc_amount': '1000000000'})
+        assert resp.status_code == 302 and not StudentFee.objects.exists()
+
+    @pytest.mark.parametrize("amount, vat", [('Infinity', '15'), ('1000000000', '15'), ('500', 'NaN'), ('500', '500')])
+    def test_reservation_invoice_bad_numbers(self, login, accountant, amount, vat):
+        from fees.models import ExternalCandidatePayment
+        cand = f.ExternalCandidateFactory()
+        resp = login(accountant).post(reverse('fees:reservation_invoice'), {
+            'candidate_id': cand.pk, 'action': 'collect_fee', 'payment_method': 'CASH',
+            'fee_description[]': ['Entrance exam'], 'amount[]': [amount], 'vat_rate[]': [vat]})
+        assert resp.status_code in (200, 302)
+        assert not ExternalCandidatePayment.objects.exists()
+
+    def test_reservation_invoice_happy_path(self, login, accountant):
+        from fees.models import ExternalCandidatePayment
+        cand = f.ExternalCandidateFactory()
+        login(accountant).post(reverse('fees:reservation_invoice'), {
+            'candidate_id': cand.pk, 'action': 'collect_fee', 'payment_method': 'CASH',
+            'fee_description[]': ['Entrance exam'], 'amount[]': ['500'], 'vat_rate[]': ['15']})
+        p = ExternalCandidatePayment.objects.get()
+        assert (p.amount, p.vat_amount, p.total) == (D('500'), D('75.00'), D('575.00'))

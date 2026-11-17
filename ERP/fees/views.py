@@ -41,11 +41,15 @@ _ACCOUNTANT  = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT')
 _STAFF_VIEW  = ('SUPER_ADMIN', 'ADMIN', 'ACCOUNTANT', 'STAFF')
 
 
-def _parse_decimal(raw, minimum=None, maximum=None):
+MONEY_MAX = Decimal('99999999.99')   # largest value a DecimalField(max_digits=10, decimal_places=2) can store
+
+
+def _parse_decimal(raw, minimum=None, maximum=MONEY_MAX):
     """
     Parse a money / percentage form value. Returns a finite Decimal within
-    [minimum, maximum], or None. Rejects NaN / Infinity, which Decimal() happily
-    parses but which crash on the next comparison or quantize().
+    [minimum, maximum], or None. Rejects NaN / Infinity (Decimal() parses them,
+    then the next comparison or quantize() crashes) and, by default, anything
+    too large for the money columns (a typo with extra zeros used to crash the save).
     """
     try:
         val = Decimal(str(raw).strip())
@@ -479,11 +483,13 @@ def fee_structure_form(request, pk=None):
 
                 if raw:
                     # Field present with a value → upsert
-                    try:
-                        amt = Decimal(raw)
-                    except Exception:
-                        amt = None
-                    if amt and amt > 0:
+                    amt = _parse_decimal(raw.replace(',', ''), minimum=0)
+                    if amt is None:
+                        # A typo ('8OO', '-800', too large) must never be read as "cleared"
+                        # — that used to silently delete the fee line.
+                        messages.error(request, f"{ft.name}: '{raw}' is not a valid amount — left unchanged.")
+                        continue
+                    if amt > 0:
                         if ft.pk in existing_items:
                             item = existing_items[ft.pk]
                             if item.amount != amt:
@@ -545,11 +551,12 @@ def fee_structure_form(request, pk=None):
         study_mode_id       = request.POST.get('study_mode', '').strip() or None
         if structure_type not in ('regular', 'new', 'transfer', 'other'):
             structure_type = 'regular'
-        try:
-            global_discount = Decimal(global_discount_raw)
-        except Exception:
-            global_discount = Decimal('0')
         errors = []
+        global_discount = (_parse_decimal(global_discount_raw, 0, 100)
+                           if (global_discount_raw or '').strip() else Decimal('0'))
+        if global_discount is None:
+            errors.append('Group discount must be a number between 0 and 100 %.')
+            global_discount = Decimal('0')
         if not academic_year_id:
             errors.append('Academic Year is required.')
         if not division_id:
@@ -585,8 +592,11 @@ def fee_structure_form(request, pk=None):
                     return ft
 
                 def _d(val, default='0'):
-                    """Parse a Decimal from POST data, stripping commas safely."""
-                    return Decimal(str(val).replace(',', '').strip() or default)
+                    """Parse a non-negative money value (commas allowed); raise before any DB write."""
+                    parsed = _parse_decimal(str(val).replace(',', '').strip() or default, minimum=0)
+                    if parsed is None:
+                        raise ValueError(f"'{val}' is not a valid amount")
+                    return parsed
 
                 try:
                     n_inst = int(request.POST.get('installments_count', '3').strip())
@@ -3321,17 +3331,15 @@ def reservation_invoice(request):
             desc = desc.strip()
             if not desc:
                 continue
-            try:
-                amt = Decimal(fee_amounts[i].strip())
-                if amt <= 0:
-                    raise ValueError
-            except Exception:
+            amt = _parse_decimal(fee_amounts[i] if i < len(fee_amounts) else '', minimum=Decimal('0.01'))
+            if amt is None:
                 errors.append(f"Row {i+1}: enter a valid amount greater than 0.")
                 continue
-            try:
-                vat_r = Decimal(fee_vat_rates[i].strip() if i < len(fee_vat_rates) else '0')
-            except Exception:
-                vat_r = Decimal('0')
+            raw_vat = (fee_vat_rates[i] if i < len(fee_vat_rates) else '').strip() or '0'
+            vat_r = _parse_decimal(raw_vat, 0, 100)
+            if vat_r is None:
+                errors.append(f"Row {i+1}: VAT rate must be between 0 and 100 %.")
+                continue
             line_data.append({'desc': desc, 'amount': amt, 'vat_rate': vat_r})
 
         if not line_data and not errors:
